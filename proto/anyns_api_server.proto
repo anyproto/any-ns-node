@@ -1,0 +1,93 @@
+syntax = "proto3";
+option go_package = "pb/anyns_api_server";
+
+message NameAvailableRequest {
+  // Name including .any suffix
+  string fullName = 1;
+}
+
+message NameAvailableResponse {
+  bool available = 1;
+  
+  // An Ethereum address that owns that name
+  // This field is non-empty only if name is "already registered"
+  string ownerEthAddress = 2;
+
+  // A content hash attached to this name
+  // This field is non-empty only if name is "already registered"
+  string ownerAnyAddress = 3;
+
+  // A SpaceID attached to this name
+  // This field is non-empty only if name is "already registered"
+  string spaceId = 4;
+}
+
+message NameRegisterRequest {
+  string fullName = 1;
+
+  // A content hash attached to this name
+  string ownerAnyAddress = 2;
+  
+  // An Ethereum address that owns that name
+  string ownerEthAddress = 3;
+
+  // A SpaceID attached to this name
+  string spaceId = 4;
+}
+
+message NameRegisterSignedRequest {
+  // NameRegisterRequest struct
+  bytes payload = 1;
+
+  // payload signed by payload.ownerEthAddress 
+  bytes signature = 2; 
+}
+
+message NameUpdateRequest {
+  string fullName = 1;
+
+  // A content hash attached to this name
+  string ownerAnyAddress = 2;
+
+  // A SpaceID attached to this name
+  string spaceId = 3;
+}
+
+message GetOperationStatusRequest {
+  uint32 operationId = 1;
+}
+
+enum OperationState {
+  Pending = 0;
+  Completed = 1;
+  Error = 2;
+}
+
+message OperationResponse {
+  uint32 operationId = 1;
+  OperationState operationState = 2;
+}
+
+message GetNameRegisterMsgResponse {
+  bytes msg = 1;
+}
+
+service Anyns {
+  // Check if name is free or get the attached information if not
+  rpc IsNameAvailable(NameAvailableRequest) returns (NameAvailableResponse) {}
+
+  // TODO: remove this method (it is unsecure) and use NameRegisterRequestSigned
+  rpc NameRegister(NameRegisterRequest) returns (OperationResponse) {}
+  rpc NameRegisterSigned(NameRegisterSignedRequest) returns (OperationResponse) {}
+
+  // Add to queue a name update operation
+  // results in async operation
+  rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
+
+  // Get the async operation with id==X statue
+  rpc GetOperationStatus(GetOperationStatusRequest) returns (OperationResponse) {}
+
+// v2:
+  // rpc RenewName(NameRegisterRequest) returns (OperationResponse) {}
+  // rpc GetNameByAddress()
+}
