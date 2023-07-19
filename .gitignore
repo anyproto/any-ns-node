@@ -1,0 +1,38 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# playground/tmp folder for testing different clients
+playground/tmp
+playground/debug.json
+debug.json
+
+# .paw folder for macos paw client
+.paw
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Golang vendor folder
+vendor
+
+# artefacts for Intelli-J fleet
+.fleet
+
+# Intelli-J files
+.idea
+
+# MacOS file that stores custom attributes of its containing folder,
+# such as folder view options, icon positions, and other visual information
+.DS_Store
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+./config*.yaml

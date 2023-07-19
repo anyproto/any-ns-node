@@ -1,0 +1,33 @@
+account:
+    peerId: 12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS
+    peerKey: psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q==
+    signingKey: 3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg==
+drpc:
+    stream:
+        maxMsgSizeMb: 256
+yamux:
+    listenAddrs:
+        - 127.0.0.1:4830
+    writeTimeoutSec: 10
+    dialTimeoutSec: 10
+network:
+    id: 64ba63209976be4a733bbb91
+    networkId: N4Gvo3v5wL31RrYgX3PrhAGMYvdWe5rAgtVB8cZySYWrkhb6
+    nodes:
+        - peerId: 12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS
+          addresses:
+            - 127.0.0.1:4830
+          types:
+            - coordinator
+    creationTime: 2023-07-21T11:51:12.970882+01:00
+networkStorePath: .
+log:
+  production: false
+contracts:
+  geth_url: https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f
+  registry: 0xc0D3c96aE923Da6b45E6d4c21a0424730a20BCA9
+  resolver: 0x34F9c5CB9b6dcc036e045a15af20CEdC0dE4dcB2
+  private_controller: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732
+  name_wrapper: 0xFe69BF9B3fD69d09977b37b5953C8B43687f3B23
+  admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
+  admin_pk: XXX
