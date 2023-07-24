@@ -8,6 +8,7 @@ import (
 	"github.com/anyproto/anyns-node/account"
 	"github.com/anyproto/anyns-node/anynsrpc"
 	"github.com/anyproto/anyns-node/config"
+	"github.com/anyproto/anyns-node/contracts"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -102,6 +103,7 @@ func main() {
 
 func Bootstrap(a *app.App) {
 	a.Register(account.New()).
+		Register(contracts.New()).
 		Register(nodeconf.New()).
 		Register(nodeconfstore.New()).
 		Register(nodeconfsource.New()).

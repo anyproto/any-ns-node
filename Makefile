@@ -6,8 +6,15 @@ build:
 	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/anyns-node/app))
 	go build -v -o bin/anyns-node -ldflags "$(FLAGS) -X github.com/anyproto/anyns-node/app.AppName=anyns-node" github.com/anyproto/anyns-node/cmd
 
+contracts/mock/contracts_mock.go: contracts/contracts.go
+	# go install go.uber.org/mock/mockgen@latest 
+	mockgen -source=contracts/contracts.go > contracts/mock/contracts_mock.go
+
+.PHONY: mocks
+mocks: contracts/mock/contracts_mock.go
+
 .PHONY: test
-test:
+test: mocks
 	go test ./... --cover
 
 .PHONY: check-style
