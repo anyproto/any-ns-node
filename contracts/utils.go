@@ -110,7 +110,7 @@ func PrepareCallData(fullName string, contentHash string, spaceID string) ([][]b
 	`
 	contractABI, err := abi.JSON(strings.NewReader(jsondata))
 	if err != nil {
-		log.Fatal("error parsing ABI:", zap.Error(err))
+		log.Error("error parsing ABI:", zap.Error(err))
 		return nil, err
 	}
 
@@ -123,7 +123,7 @@ func PrepareCallData(fullName string, contentHash string, spaceID string) ([][]b
 	// 2 - convert fullName to name hash
 	nh, err := NameHash(fullName)
 	if err != nil {
-		log.Fatal("can not convert FullName to namehash", zap.Error(err))
+		log.Error("can not convert FullName to namehash", zap.Error(err))
 		return nil, err
 	}
 
@@ -131,7 +131,7 @@ func PrepareCallData(fullName string, contentHash string, spaceID string) ([][]b
 	if spaceID != "" {
 		data, err := contractABI.Pack("setSpaceId", nh, []byte(spaceID))
 		if err != nil {
-			log.Fatal("error encoding function data", zap.Error(err))
+			log.Error("error encoding function data", zap.Error(err))
 			return nil, nil
 		}
 
@@ -145,7 +145,7 @@ func PrepareCallData(fullName string, contentHash string, spaceID string) ([][]b
 	if contentHash != "" {
 		data, err := contractABI.Pack("setContenthash", nh, []byte(contentHash))
 		if err != nil {
-			log.Fatal("error encoding function data", zap.Error(err))
+			log.Error("error encoding function data", zap.Error(err))
 			return nil, nil
 		}
 

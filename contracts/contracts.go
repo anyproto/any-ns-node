@@ -42,15 +42,14 @@ type Service interface {
 	ConnectToResolver(conn *ethclient.Client) (*ac.AnytypeResolver, error)
 	ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
 
-	// NameRegister:
 	MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error)
 	Commit(opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
 	Register(authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
 
 	// aux
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
-	WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error)
-	CheckTransactionReceipt(conn *ethclient.Client, txHash common.Hash) bool
+	// Wait for tx and get result
+	WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error)
 
 	app.Component
 }
@@ -71,7 +70,7 @@ func (acontracts *anynsContracts) Init(a *app.App) (err error) {
 func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh [32]byte) (common.Address, error) {
 	reg, err := acontracts.ConnectToRegistryContract(conn)
 	if err != nil {
-		log.Fatal("failed to connect to contract", zap.Error(err))
+		log.Error("failed to connect to contract", zap.Error(err))
 		return common.Address{}, err
 	}
 
@@ -107,7 +106,7 @@ func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, 
 	// 2 - get content hash and spaceID
 	owner, spaceID, err := acontracts.getAdditionalData(conn, fullName)
 	if err != nil {
-		log.Fatal("failed to get real additional data of the name", zap.Error(err))
+		log.Error("failed to get real additional data of the name", zap.Error(err))
 		return "", "", "", err
 	}
 	if owner != nil {
@@ -124,14 +123,14 @@ func (acontracts *anynsContracts) getRealOwner(conn *ethclient.Client, fullName 
 	// 1 - connect to contract
 	nw, err := acontracts.ConnectToNamewrapperContract(conn)
 	if err != nil {
-		log.Fatal("failed to connect to contract", zap.Error(err))
+		log.Error("failed to connect to contract", zap.Error(err))
 		return nil, err
 	}
 
 	// 2 - convert to name hash
 	nh, err := NameHash(fullName)
 	if err != nil {
-		log.Fatal("can not convert FullName to namehash", zap.Error(err))
+		log.Error("can not convert FullName to namehash", zap.Error(err))
 		return nil, err
 	}
 
@@ -144,7 +143,7 @@ func (acontracts *anynsContracts) getRealOwner(conn *ethclient.Client, fullName 
 	id := new(big.Int).SetBytes(nh[:])
 	addr, err := nw.OwnerOf(&callOpts, id)
 	if err != nil {
-		log.Fatal("failed to convert Owner", zap.Error(err))
+		log.Error("failed to convert Owner", zap.Error(err))
 		return nil, err
 	}
 
@@ -160,14 +159,14 @@ func (acontracts *anynsContracts) getAdditionalData(conn *ethclient.Client, full
 	// 1 - connect to contract
 	ar, err := acontracts.ConnectToResolver(conn)
 	if err != nil {
-		log.Fatal("failed to connect to contract", zap.Error(err))
+		log.Error("failed to connect to contract", zap.Error(err))
 		return nil, nil, err
 	}
 
 	// 2 - convert to name hash
 	nh, err := NameHash(fullName)
 	if err != nil {
-		log.Fatal("can not convert FullName to namehash", zap.Error(err))
+		log.Error("can not convert FullName to namehash", zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -175,13 +174,13 @@ func (acontracts *anynsContracts) getAdditionalData(conn *ethclient.Client, full
 	callOpts := bind.CallOpts{}
 	hash, err := ar.Contenthash(&callOpts, nh)
 	if err != nil {
-		log.Fatal("can not get contenthash", zap.Error(err))
+		log.Error("can not get contenthash", zap.Error(err))
 		return nil, nil, err
 	}
 
 	space, err := ar.SpaceId(&callOpts, nh)
 	if err != nil {
-		log.Fatal("can not get SpaceID", zap.Error(err))
+		log.Error("can not get SpaceID", zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -209,7 +208,7 @@ func (acontracts *anynsContracts) ConnectToRegistryContract(conn *ethclient.Clie
 
 	reg, err := ac.NewENSRegistry(common.HexToAddress(contractRegAddr), conn)
 	if err != nil || reg == nil {
-		log.Fatal("failed to instantiate ENSRegistry contract", zap.Error(err))
+		log.Error("failed to instantiate ENSRegistry contract", zap.Error(err))
 		return nil, err
 	}
 
@@ -222,7 +221,7 @@ func (acontracts *anynsContracts) ConnectToNamewrapperContract(conn *ethclient.C
 
 	nw, err := ac.NewAnytypeNameWrapper(common.HexToAddress(contractAddr), conn)
 	if err != nil || nw == nil {
-		log.Fatal("failed to instantiate AnytypeNameWrapper contract", zap.Error(err))
+		log.Error("failed to instantiate AnytypeNameWrapper contract", zap.Error(err))
 		return nil, err
 	}
 
@@ -235,7 +234,7 @@ func (acontracts *anynsContracts) ConnectToResolver(conn *ethclient.Client) (*ac
 
 	ar, err := ac.NewAnytypeResolver(common.HexToAddress(contractAddr), conn)
 	if err != nil || ar == nil {
-		log.Fatal("failed to instantiate AnytypeResolver contract", zap.Error(err))
+		log.Error("failed to instantiate AnytypeResolver contract", zap.Error(err))
 		return nil, err
 	}
 
@@ -248,7 +247,7 @@ func (acontracts *anynsContracts) ConnectToController(conn *ethclient.Client) (*
 
 	ac, err := ac.NewAnytypeRegistrarControllerPrivate(common.HexToAddress(contractAddr), conn)
 	if err != nil || ac == nil {
-		log.Fatal("failed to instantiate AnytypeRegistrarControllerPrivate contract", zap.Error(err))
+		log.Error("failed to instantiate AnytypeRegistrarControllerPrivate contract", zap.Error(err))
 		return nil, err
 	}
 
@@ -261,14 +260,14 @@ func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Clien
 	privateKey, err := crypto.HexToECDSA(acontracts.config.AdminPk)
 
 	if err != nil {
-		log.Fatal("can not get admin PK", zap.Error(err))
+		log.Error("can not get admin PK", zap.Error(err))
 		return nil, err
 	}
 
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		log.Fatal("error casting public key to ECDSA")
+		log.Error("error casting public key to ECDSA")
 	}
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
@@ -276,13 +275,13 @@ func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Clien
 	// 2 - get gas costs, etc
 	nonce, err := conn.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
-		log.Fatal("can not get nonce", zap.Error(err))
+		log.Error("can not get nonce", zap.Error(err))
 		return nil, err
 	}
 
 	gasPrice, err := conn.SuggestGasPrice(context.Background())
 	if err != nil {
-		log.Fatal("can not get gas price", zap.Error(err))
+		log.Error("can not get gas price", zap.Error(err))
 		return nil, err
 	}
 
@@ -296,7 +295,7 @@ func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Clien
 	return auth, nil
 }
 
-func (acontracts *anynsContracts) CheckTransactionReceipt(conn *ethclient.Client, txHash common.Hash) bool {
+func (acontracts *anynsContracts) checkTransactionReceipt(conn *ethclient.Client, txHash common.Hash) bool {
 	tx, err := conn.TransactionReceipt(context.Background(), txHash)
 	if err != nil {
 		return false
@@ -313,7 +312,7 @@ func (acontracts *anynsContracts) CheckTransactionReceipt(conn *ethclient.Client
 func (acontracts *anynsContracts) Commit(opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
 	tx, err := controller.Commit(opts, commitment)
 	if err != nil {
-		log.Fatal("failed to commit", zap.Error(err))
+		log.Error("failed to commit", zap.Error(err))
 		return nil, err
 	}
 
@@ -321,8 +320,16 @@ func (acontracts *anynsContracts) Commit(opts *bind.TransactOpts, commitment [32
 	return tx, nil
 }
 
-func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
-	return bind.WaitMined(ctx, client, tx)
+func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error) {
+	// receipt is not used
+	_, err = bind.WaitMined(ctx, client, tx)
+	if err != nil {
+		log.Error("failed to wait for tx to be mined", zap.Error(err))
+		return false, err
+	}
+
+	wasMined = acontracts.checkTransactionReceipt(client, tx.Hash())
+	return wasMined, nil
 }
 
 func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error) {
@@ -332,7 +339,7 @@ func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registran
 
 	callData, err := PrepareCallData(fullName, ownerAnyAddr, spaceId)
 	if err != nil {
-		log.Fatal("can not prepare call data", zap.Error(err))
+		log.Error("can not prepare call data", zap.Error(err))
 		return [32]byte{}, err
 	}
 
@@ -359,14 +366,14 @@ func (acontracts *anynsContracts) Register(authOpts *bind.TransactOpts, nameFirs
 
 	callData, err := PrepareCallData(fullName, ownerAnyAddr, spaceId)
 	if err != nil {
-		log.Fatal("can not prepare call data", zap.Error(err))
+		log.Error("can not prepare call data", zap.Error(err))
 		return nil, err
 	}
 
 	var isReverseRecord bool = false
 	var ownerControlledFuses uint16 = 0
 
-	return controller.Register(
+	tx, err := controller.Register(
 		authOpts,
 		nameFirstPart,
 		registrantAccount,
@@ -376,4 +383,12 @@ func (acontracts *anynsContracts) Register(authOpts *bind.TransactOpts, nameFirs
 		callData,
 		isReverseRecord,
 		ownerControlledFuses)
+
+	if err != nil {
+		log.Error("failed to register", zap.Error(err))
+		return nil, err
+	}
+
+	log.Info("register tx sent. Waiting for it to be mined", zap.String("TX hash", tx.Hash().Hex()))
+	return tx, nil
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
+	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
 
 	"github.com/anyproto/any-sync/app"
@@ -56,14 +57,14 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	// 0 - create connection
 	conn, err := arpc.contracts.CreateEthConnection()
 	if err != nil {
-		log.Fatal("failed to connect to geth", zap.Error(err))
+		log.Error("failed to connect to geth", zap.Error(err))
 		return nil, err
 	}
 
 	// 1 - convert to name hash
 	nh, err := contracts.NameHash(in.FullName)
 	if err != nil {
-		log.Fatal("can not convert FullName to namehash", zap.Error(err))
+		log.Error("can not convert FullName to namehash", zap.Error(err))
 		return nil, err
 	}
 
@@ -71,7 +72,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	log.Info("getting owner for name", zap.String("FullName", in.GetFullName()))
 	addr, err := arpc.contracts.GetOwnerForNamehash(conn, nh)
 	if (err != nil) || (addr == nil) {
-		log.Fatal("failed to get owner", zap.Error(err))
+		log.Error("failed to get owner", zap.Error(err))
 		return nil, err
 	}
 
@@ -92,7 +93,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	log.Info("name is NOT available...Getting additional info")
 	ea, aa, si, err := arpc.contracts.GetAdditionalNameInfo(conn, *addr, in.GetFullName())
 	if err != nil {
-		log.Fatal("failed to get additional info", zap.Error(err))
+		log.Error("failed to get additional info", zap.Error(err))
 		return nil, err
 	}
 
@@ -111,7 +112,7 @@ func (arpc *anynsRpc) NameRegister(ctx context.Context, in *as.NameRegisterReque
 	err := arpc.nameRegister(ctx, in)
 
 	if err != nil {
-		log.Fatal("can not register name", zap.Error(err))
+		log.Error("can not register name", zap.Error(err))
 		resp.OperationState = as.OperationState_Error
 		return &resp, err
 	}
@@ -129,7 +130,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	err := proto.Unmarshal(in.Payload, &nrr)
 	if err != nil {
 		resp.OperationState = as.OperationState_Error
-		log.Fatal("can not unmarshal NameRegisterRequest", zap.Error(err))
+		log.Error("can not unmarshal NameRegisterRequest", zap.Error(err))
 		return &resp, err
 	}
 
@@ -137,7 +138,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	err = VerifyIdentity(in, nrr.OwnerAnyAddress)
 	if err != nil {
 		resp.OperationState = as.OperationState_Error
-		log.Fatal("identity is different", zap.Error(err))
+		log.Error("identity is different", zap.Error(err))
 		return &resp, err
 	}
 
@@ -145,7 +146,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	err = arpc.nameRegister(ctx, &nrr)
 
 	if err != nil {
-		log.Fatal("can not register name", zap.Error(err))
+		log.Error("can not register name", zap.Error(err))
 		resp.OperationState = as.OperationState_Error
 		return &resp, err
 	}
@@ -162,19 +163,23 @@ func (arpc *anynsRpc) NameUpdate(ctx context.Context, in *as.NameUpdateRequest) 
 func (arpc *anynsRpc) nameRegister(ctx context.Context, in *as.NameRegisterRequest) error {
 	var registrantAccount common.Address = common.HexToAddress(in.OwnerEthAddress)
 
-	// TODO:
 	// 0 - check all parameters
+	err := arpc.checkRegisterParams(in)
+	if err != nil {
+		log.Error("invalid parameters", zap.Error(err))
+		return err
+	}
 
 	conn, err := arpc.contracts.CreateEthConnection()
 	if err != nil {
-		log.Fatal("failed to connect to geth", zap.Error(err))
+		log.Error("failed to connect to geth", zap.Error(err))
 		return err
 	}
 
 	// 1 - connect to geth
 	controller, err := arpc.contracts.ConnectToController(conn)
 	if err != nil {
-		log.Fatal("failed to connect to contract", zap.Error(err))
+		log.Error("failed to connect to contract", zap.Error(err))
 		return err
 	}
 
@@ -185,7 +190,7 @@ func (arpc *anynsRpc) nameRegister(ctx context.Context, in *as.NameRegisterReque
 	// 3 - calculate a commitment
 	secret, err := contracts.GenerateRandomSecret()
 	if err != nil {
-		log.Fatal("can not generate random secret", zap.Error(err))
+		log.Error("can not generate random secret", zap.Error(err))
 		return err
 	}
 
@@ -199,43 +204,47 @@ func (arpc *anynsRpc) nameRegister(ctx context.Context, in *as.NameRegisterReque
 		in.GetSpaceId())
 
 	if err != nil {
-		log.Fatal("can not calculate a commitment", zap.Error(err))
+		log.Error("can not calculate a commitment", zap.Error(err))
 		return err
 	}
 
 	authOpts, err := arpc.contracts.GenerateAuthOptsForAdmin(conn)
 	if err != nil {
-		log.Fatal("can not get auth params for admin", zap.Error(err))
+		log.Error("can not get auth params for admin", zap.Error(err))
 		return err
 	}
 
-	// 2 - send a commit transaction from Admin
+	// 4 - commit from Admin
 	tx, err := arpc.contracts.Commit(
 		authOpts,
 		commitment,
 		controller)
+
+	// TODO: check if tx is nil?
 	if err != nil {
-		log.Fatal("can not Commit tx", zap.Error(err))
+		log.Error("can not Commit tx", zap.Error(err))
 		return err
 	}
 
-	// 3 - wait for tx to be mined
-	arpc.contracts.WaitMined(ctx, conn, tx)
-
-	txRes := arpc.contracts.CheckTransactionReceipt(conn, tx.Hash())
+	// wait for tx to be mined
+	txRes, err := arpc.contracts.WaitMined(ctx, conn, tx)
+	if err != nil {
+		log.Error("can not wait for commit tx", zap.Error(err))
+		return err
+	}
 	if !txRes {
-		log.Warn("commit TX failed", zap.Error(err))
-		return errors.New("commit tx failed")
+		// new error
+		return errors.New("commit tx not mined")
 	}
 
 	// update nonce again...
 	authOpts, err = arpc.contracts.GenerateAuthOptsForAdmin(conn)
 	if err != nil {
-		log.Fatal("can not get auth params for admin", zap.Error(err))
+		log.Error("can not get auth params for admin", zap.Error(err))
 		return err
 	}
 
-	// 4 - now send register tx
+	// 5 - register
 	tx, err = arpc.contracts.Register(
 		authOpts,
 		nameFirstPart,
@@ -246,24 +255,59 @@ func (arpc *anynsRpc) nameRegister(ctx context.Context, in *as.NameRegisterReque
 		in.GetOwnerAnyAddress(),
 		in.GetSpaceId())
 
+	// TODO: check if tx is nil?
 	if err != nil {
-		log.Fatal("can not Commit tx", zap.Error(err))
+		log.Error("can not Commit tx", zap.Error(err))
 		return err
 	}
 
-	log.Info("register tx sent. Waiting for it to be mined",
-		zap.String("TX hash", tx.Hash().Hex()))
-
-	// 5 - wait for tx to be mined
-	arpc.contracts.WaitMined(ctx, conn, tx)
-
-	// 6 - return results
-	txRes = arpc.contracts.CheckTransactionReceipt(conn, tx.Hash())
+	// wait for tx to be mined
+	txRes, err = arpc.contracts.WaitMined(ctx, conn, tx)
+	if err != nil {
+		log.Error("can not wait for register tx", zap.Error(err))
+		return err
+	}
 	if !txRes {
 		// new error
 		return errors.New("register tx failed")
 	}
 
 	log.Info("operation succeeded!")
+	return nil
+}
+
+func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
+	// TODO:
+	// 1 - check name
+
+	// 2 - check ETH address
+	if !common.IsHexAddress(in.OwnerEthAddress) {
+		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
+		return errors.New("invalid ETH address")
+	}
+
+	// TODO:
+	// 3 - check if Any address is valid (CID)
+	/*
+		_, err := crypto.DecodeAccountAddress(in.OwnerAnyAddress)
+		if err != nil {
+			log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
+			return errors.New("invalid Any address")
+		}
+	*/
+
+	// 4 - space ID (if not empty)
+	if in.SpaceId != "" {
+		_, err := cid.Decode(in.SpaceId)
+
+		log.Info("DJDJDJDJ")
+
+		if err != nil {
+			log.Error("invalid SpaceId", zap.String("Any SpaceId", in.SpaceId))
+			return errors.New("invalid SpaceId")
+		}
+	}
+
+	// everything is OK
 	return nil
 }

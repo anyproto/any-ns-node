@@ -40,20 +40,6 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 	return m.recorder
 }
 
-// CheckTransactionReceipt mocks base method.
-func (m *MockService) CheckTransactionReceipt(conn *ethclient.Client, txHash common.Hash) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CheckTransactionReceipt", conn, txHash)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// CheckTransactionReceipt indicates an expected call of CheckTransactionReceipt.
-func (mr *MockServiceMockRecorder) CheckTransactionReceipt(conn, txHash interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckTransactionReceipt", reflect.TypeOf((*MockService)(nil).CheckTransactionReceipt), conn, txHash)
-}
-
 // Commit mocks base method.
 func (m *MockService) Commit(opts *bind.TransactOpts, commitment [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
@@ -250,10 +236,10 @@ func (mr *MockServiceMockRecorder) Register(authOpts, nameFirstPart, registrantA
 }
 
 // WaitMined mocks base method.
-func (m *MockService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
+func (m *MockService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitMined", ctx, client, tx)
-	ret0, _ := ret[0].(*types.Receipt)
+	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
