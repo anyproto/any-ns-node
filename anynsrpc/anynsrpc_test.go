@@ -16,10 +16,10 @@ import (
 	"github.com/zeebo/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/anyproto/anyns-node/config"
-	contracts "github.com/anyproto/anyns-node/contracts"
-	mock_contracts "github.com/anyproto/anyns-node/contracts/mock"
-	as "github.com/anyproto/anyns-node/pb/anyns_api_server"
+	"github.com/anyproto/any-ns-node/config"
+	contracts "github.com/anyproto/any-ns-node/contracts"
+	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
 var ctx = context.Background()

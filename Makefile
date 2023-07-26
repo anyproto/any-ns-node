@@ -3,8 +3,8 @@ export PATH:=deps:$(PATH)
 
 .PHONY: build
 build:
-	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/anyns-node/app))
-	go build -v -o bin/anyns-node -ldflags "$(FLAGS) -X github.com/anyproto/anyns-node/app.AppName=anyns-node" github.com/anyproto/anyns-node/cmd
+	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/any-ns-node/app))
+	go build -v -o bin/any-ns-node -ldflags "$(FLAGS) -X github.com/anyproto/any-ns-node/app.AppName=any-ns-node" github.com/anyproto/any-ns-node/cmd
 
 contracts/mock/contracts_mock.go: contracts/contracts.go
 	# go install go.uber.org/mock/mockgen@latest 

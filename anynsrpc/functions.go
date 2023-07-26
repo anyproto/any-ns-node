@@ -3,8 +3,8 @@ package anynsrpc
 import (
 	"errors"
 
+	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 	"github.com/anyproto/any-sync/util/crypto"
-	as "github.com/anyproto/anyns-node/pb/anyns_api_server"
 )
 
 func VerifyIdentity(in *as.NameRegisterSignedRequest, ownerAnyAddress string) error {

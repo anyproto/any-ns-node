@@ -5,10 +5,10 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/anyproto/anyns-node/account"
-	"github.com/anyproto/anyns-node/anynsrpc"
-	"github.com/anyproto/anyns-node/config"
-	"github.com/anyproto/anyns-node/contracts"
+	"github.com/anyproto/any-ns-node/account"
+	"github.com/anyproto/any-ns-node/anynsrpc"
+	"github.com/anyproto/any-ns-node/config"
+	"github.com/anyproto/any-ns-node/contracts"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"

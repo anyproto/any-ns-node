@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	app "github.com/anyproto/any-sync/app"
-	anytype_crypto "github.com/anyproto/anyns-node/anytype_crypto"
+	anytype_crypto "github.com/anyproto/any-ns-node/anytype_crypto"
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"

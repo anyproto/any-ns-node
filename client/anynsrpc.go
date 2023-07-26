@@ -9,7 +9,7 @@ import (
 	"github.com/anyproto/any-sync/net/rpc/rpcerr"
 	"github.com/anyproto/any-sync/nodeconf"
 
-	as "github.com/anyproto/anyns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
 /*
@@ -27,7 +27,7 @@ type service struct {
 	close    chan struct{}
 }
 
-const CName = "anyns.anynsclient"
+const CName = "any-ns.anynsclient"
 
 var log = logger.NewNamed(CName)
 

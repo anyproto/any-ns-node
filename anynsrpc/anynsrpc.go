@@ -10,16 +10,16 @@ import (
 	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
 
+	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/rpc/server"
-	"github.com/anyproto/anyns-node/config"
 
-	contracts "github.com/anyproto/anyns-node/contracts"
-	as "github.com/anyproto/anyns-node/pb/anyns_api_server"
+	contracts "github.com/anyproto/any-ns-node/contracts"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
-const CName = "anyns.rpc"
+const CName = "any-ns.rpc"
 
 var log = logger.NewNamed(CName)
 

@@ -1,4 +1,4 @@
-module github.com/anyproto/anyns-node
+module github.com/anyproto/any-ns-node
 
 go 1.19
 

@@ -17,12 +17,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	ac "github.com/anyproto/anyns-node/anytype_crypto"
-	"github.com/anyproto/anyns-node/config"
-	as "github.com/anyproto/anyns-node/pb/anyns_api_server"
+	ac "github.com/anyproto/any-ns-node/anytype_crypto"
+	"github.com/anyproto/any-ns-node/config"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
-const CName = "anyns.contracts"
+const CName = "any-ns.contracts"
 
 var log = logger.NewNamed(CName)
 
