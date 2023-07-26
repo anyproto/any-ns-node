@@ -104,6 +104,40 @@ func TestAnynsRpc_GetOperationStatus(t *testing.T) {
 	})
 }
 
+func TestIsValidAnyAddress(t *testing.T) {
+
+	t.Run("valid", func(t *testing.T) {
+		len := len("12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy")
+		assert.Equal(t, len, 52)
+
+		valid := []string{
+			"12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy", // Anytype address
+		}
+
+		for _, address := range valid {
+			res := isValidAnyAddress(address)
+			assert.Equal(t, res, true)
+		}
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		invalid := []string{
+			"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",         // Legacy Bitcoin address
+			"3FZbgi29cpjq2GjdwV8eyHuJJnkLtktZc5",         // Segwit Bitcoin address
+			"bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", // Bech32 Bitcoin address
+			"invalidaddress",                             // Invalid address
+			"",                                           // Empty address
+			"0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", // Ethereum address
+			"bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze", // CID
+		}
+
+		for _, address := range invalid {
+			res := isValidAnyAddress(address)
+			assert.Equal(t, res, false)
+		}
+	})
+}
+
 func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
@@ -155,57 +189,54 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 
 func TestAnynsRpc_RegisterName(t *testing.T) {
 
-	// TODO: uncomment
-	/*
-		t.Run("bad names", func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
+	t.Run("bad names", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
 
-			fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-			fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-			fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-			fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-				var tx = types.NewTransaction(
-					0,
-					common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-					big.NewInt(0), 0, big.NewInt(0),
-					nil,
-				)
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
+		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+			var tx = types.NewTransaction(
+				0,
+				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
+				big.NewInt(0), 0, big.NewInt(0),
+				nil,
+			)
 
-				return tx, nil
-			}).AnyTimes()
+			return tx, nil
+		}).AnyTimes()
 
-			fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-				// success
-				return true, nil
-			}).AnyTimes()
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+			// success
+			return true, nil
+		}).AnyTimes()
 
-			// 1 - bad names
-			var arrayOfBadNames = []string{
-				"hello",          // no extension
-				"somename/hello", // multi-level is not allowed
-				"xx.any",         // too short
-				"somename.hello", // bad TLD
-			}
+		// 1 - bad names
+		var arrayOfBadNames = []string{
+			"hello",          // no extension
+			"somename/hello", // multi-level is not allowed
+			"xx.any",         // too short
+			"somename.hello", // bad TLD
+		}
 
-			// for-each this array
-			for _, badName := range arrayOfBadNames {
-				pctx := peer.CtxWithPeerId(ctx, "peerId")
-				resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-					FullName:        badName,
-					OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-					OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-				})
+		// for-each this array
+		for _, badName := range arrayOfBadNames {
+			pctx := peer.CtxWithPeerId(ctx, "peerId")
+			resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+				FullName:        badName,
+				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			})
 
-				require.Error(t, err)
-				assert.NotNil(t, resp)
-				assert.Equal(t, resp.OperationId, uint64(1))
-				assert.Equal(t, resp.OperationState, as.OperationState_Error)
-			}
-		})
-	*/
+			require.Error(t, err)
+			assert.NotNil(t, resp)
+			assert.Equal(t, resp.OperationId, uint64(1))
+			assert.Equal(t, resp.OperationState, as.OperationState_Error)
+		}
+	})
 
 	t.Run("bad eth address", func(t *testing.T) {
 		fx := newFixture(t)
@@ -254,57 +285,54 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 		}
 	})
 
-	// TODO: uncomment
-	/*
-		t.Run("bad any address", func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
+	t.Run("bad any address", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
 
-			fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-			fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-			fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-			fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-				var tx = types.NewTransaction(
-					0,
-					common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-					big.NewInt(0), 0, big.NewInt(0),
-					nil,
-				)
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
+		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+			var tx = types.NewTransaction(
+				0,
+				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
+				big.NewInt(0), 0, big.NewInt(0),
+				nil,
+			)
 
-				return tx, nil
-			}).AnyTimes()
+			return tx, nil
+		}).AnyTimes()
 
-			fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-				// success
-				return true, nil
-			}).AnyTimes()
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+			// success
+			return true, nil
+		}).AnyTimes()
 
-			// 3 - bad Any address
-			var arrayOfBadAnyAddresses = []string{
-				"", // no address
-				"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSu",   // too short
-				"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuSS", // too long
-				"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuSg", // bad symbol
-			}
+		// 3 - bad Any address
+		var arrayOfBadAnyAddresses = []string{
+			"", // no address
+			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSu",   // too short
+			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuSS", // too long
+			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuSg", // bad symbol
+		}
 
-			// for-each this array
-			for _, badAnyAddress := range arrayOfBadAnyAddresses {
-				pctx := peer.CtxWithPeerId(ctx, "peerId")
-				resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-					FullName:        "coolName.any",
-					OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-					OwnerAnyAddress: badAnyAddress,
-				})
+		// for-each this array
+		for _, badAnyAddress := range arrayOfBadAnyAddresses {
+			pctx := peer.CtxWithPeerId(ctx, "peerId")
+			resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+				FullName:        "coolName.any",
+				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+				OwnerAnyAddress: badAnyAddress,
+			})
 
-				require.Error(t, err)
-				assert.NotNil(t, resp)
-				assert.Equal(t, resp.OperationId, uint64(1))
-				assert.Equal(t, resp.OperationState, as.OperationState_Error)
-			}
-		})
-	*/
+			require.Error(t, err)
+			assert.NotNil(t, resp)
+			assert.Equal(t, resp.OperationId, uint64(1))
+			assert.Equal(t, resp.OperationState, as.OperationState_Error)
+		}
+	})
 
 	t.Run("bad space ID", func(t *testing.T) {
 		fx := newFixture(t)
@@ -466,6 +494,45 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 		assert.Equal(t, resp.OperationId, uint64(1))
 		assert.Equal(t, resp.OperationState, as.OperationState_Completed)
 	})
+
+	t.Run("success with spaceID", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
+		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+			var tx = types.NewTransaction(
+				0,
+				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
+				big.NewInt(0), 0, big.NewInt(0),
+				nil,
+			)
+			return tx, nil
+		})
+
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+			return true, nil
+		}).AnyTimes()
+
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		pctx := peer.CtxWithPeerId(ctx, "peerId")
+		resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyAddress: "12D3KooWBvbgjyDsrBKfKca1k24kpczkc2EsEtNFh4FnTTXMkiVM",
+			// also, SpaceID is attached to
+			SpaceId: "bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, resp.OperationId, uint64(1))
+		assert.Equal(t, resp.OperationState, as.OperationState_Completed)
+	})
 }
 
 type fixture struct {
@@ -495,7 +562,6 @@ func newFixture(t *testing.T) *fixture {
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		GethUrl:   "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
-		// TODO:
 	}
 
 	fx.a.Register(fx.ts).
