@@ -15,8 +15,10 @@ import (
 /*
  * This client should be used to access the Anytype Naming Service (Anyns)
  */
-type Service interface {
+type AnyNsClientService interface {
 	IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (out *as.NameAvailableResponse, err error)
+	GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error)
+	NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error)
 
 	app.ComponentRunnable
 }
@@ -40,6 +42,10 @@ func (s *service) Init(a *app.App) (err error) {
 
 func (s *service) Name() (name string) {
 	return CName
+}
+
+func New() AnyNsClientService {
+	return new(service)
 }
 
 func (s *service) Run(_ context.Context) error {
@@ -74,6 +80,27 @@ func (s *service) doClient(ctx context.Context, fn func(cl as.DRPCAnynsClient) e
 func (s *service) IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (out *as.NameAvailableResponse, err error) {
 	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
 		if out, err = cl.IsNameAvailable(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+func (s *service) GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error) {
+	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
+		if out, err = cl.GetOperationStatus(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+// unisgned NameRegister method is not implemented! However, server still has it
+func (s *service) NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error) {
+	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
+		if out, err = cl.NameRegisterSigned(ctx, in); err != nil {
 			return rpcerr.Unwrap(err)
 		}
 		return nil

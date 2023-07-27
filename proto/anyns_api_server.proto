@@ -1,6 +1,8 @@
 syntax = "proto3";
 option go_package = "pb/anyns_api_server";
 
+//import "google/protobuf/timestamp.proto";
+
 message NameAvailableRequest {
   // Name including .any suffix
   string fullName = 1;
@@ -20,6 +22,10 @@ message NameAvailableResponse {
   // A SpaceID attached to this name
   // This field is non-empty only if name is "already registered"
   string spaceId = 4;
+
+  // TODO:
+  // when the name will be expired
+  //google.protobuf.Timestamp willBeExpired = 5;
 }
 
 message NameRegisterRequest {
@@ -80,14 +86,12 @@ service Anyns {
   rpc NameRegister(NameRegisterRequest) returns (OperationResponse) {}
   rpc NameRegisterSigned(NameRegisterSignedRequest) returns (OperationResponse) {}
 
-  // Add to queue a name update operation
-  // results in async operation
-  rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
-
   // Get the async operation with id==X statue
   rpc GetOperationStatus(GetOperationStatusRequest) returns (OperationResponse) {}
 
 // v2:
+  // Add to queue a name update operation
+  // rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
   // rpc RenewName(NameRegisterRequest) returns (OperationResponse) {}
   // rpc GetNameByAddress()
 }

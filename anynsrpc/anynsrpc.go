@@ -156,11 +156,6 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	return &resp, err
 }
 
-func (arpc *anynsRpc) NameUpdate(ctx context.Context, in *as.NameUpdateRequest) (*as.OperationResponse, error) {
-	// TODO:
-	return nil, nil
-}
-
 func (arpc *anynsRpc) nameRegister(ctx context.Context, in *as.NameRegisterRequest) error {
 	var registrantAccount common.Address = common.HexToAddress(in.OwnerEthAddress)
 
