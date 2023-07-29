@@ -10,8 +10,11 @@ contracts/mock/contracts_mock.go: contracts/contracts.go
 	# go install go.uber.org/mock/mockgen@latest 
 	mockgen -source=contracts/contracts.go > contracts/mock/contracts_mock.go
 
+queue/mock/queue_mock.go: queue/queue.go
+	mockgen -source=queue/queue.go > queue/mock/queue_mock.go
+
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go
+mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go
 
 .PHONY: test
 test: mocks

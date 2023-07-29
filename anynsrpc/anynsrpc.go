@@ -3,7 +3,6 @@ package anynsrpc
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
@@ -17,6 +16,7 @@ import (
 
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	"github.com/anyproto/any-ns-node/queue"
 )
 
 const CName = "any-ns.rpc"
@@ -27,15 +27,16 @@ func New() app.Component {
 	return &anynsRpc{}
 }
 
-// consensusRpc implements consensus rpc server
 type anynsRpc struct {
 	contractsConfig config.Contracts
-	contracts       contracts.Service
+	contracts       contracts.ContractsService
+	queue           queue.QueueService
 }
 
 func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
-	arpc.contracts = a.MustComponent(contracts.CName).(contracts.Service)
+	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+	arpc.queue = a.MustComponent(queue.CName).(queue.QueueService)
 
 	return as.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
@@ -45,13 +46,15 @@ func (arpc *anynsRpc) Name() (name string) {
 }
 
 func (arpc *anynsRpc) GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (*as.OperationResponse, error) {
-	// TODO: get status from the queue
-	// for now, just return completed
-	var resp as.OperationResponse
-	resp.OperationId = in.OperationId
-	resp.OperationState = as.OperationState_Completed
+	currentState, err := arpc.queue.GetRequestStatus(ctx, in.OperationId)
+	if err != nil {
+		return nil, err
+	}
 
-	return &resp, nil
+	var res as.OperationResponse
+	res.OperationId = in.OperationId
+	res.OperationState = currentState
+	return &res, nil
 }
 
 func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (*as.NameAvailableResponse, error) {
@@ -72,7 +75,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	// 2 - call contract's method
 	log.Info("getting owner for name", zap.String("FullName", in.GetFullName()))
 	addr, err := arpc.contracts.GetOwnerForNamehash(conn, nh)
-	if (err != nil) || (addr == nil) {
+	if err != nil {
 		log.Error("failed to get owner", zap.Error(err))
 		return nil, err
 	}
@@ -84,7 +87,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	var res as.NameAvailableResponse
 	var addrEmpty = common.Address{}
 
-	if *addr == addrEmpty {
+	if addr == addrEmpty {
 		log.Info("name is not registered yet...")
 		res.Available = true
 		return &res, nil
@@ -92,7 +95,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 
 	// 4 - if name is not available, then get additional info
 	log.Info("name is NOT available...Getting additional info")
-	ea, aa, si, err := arpc.contracts.GetAdditionalNameInfo(conn, *addr, in.GetFullName())
+	ea, aa, si, err := arpc.contracts.GetAdditionalNameInfo(conn, addr, in.GetFullName())
 	if err != nil {
 		log.Error("failed to get additional info", zap.Error(err))
 		return nil, err
@@ -107,24 +110,24 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 }
 
 func (arpc *anynsRpc) NameRegister(ctx context.Context, in *as.NameRegisterRequest) (*as.OperationResponse, error) {
-	var resp as.OperationResponse // TODO: make non-blocking and save to queue
-	resp.OperationId = 1          // TODO: increase the operation ID
-
-	err := arpc.nameRegister(ctx, in)
-
+	// 1 - check all parameters
+	err := arpc.checkRegisterParams(in)
 	if err != nil {
-		log.Error("can not register name", zap.Error(err))
-		resp.OperationState = as.OperationState_Error
-		return &resp, err
+		log.Error("invalid parameters", zap.Error(err))
+		return nil, err
 	}
 
-	resp.OperationState = as.OperationState_Completed
-	return &resp, err
+	// 2 - create new operation
+	operationId, err := arpc.queue.ProcessRequest(ctx, in)
+
+	return &as.OperationResponse{
+		OperationState: as.OperationState_Pending,
+		OperationId:    operationId,
+	}, err
 }
 
 func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (*as.OperationResponse, error) {
-	var resp as.OperationResponse // TODO: make non-blocking and save to queue
-	resp.OperationId = 1          // TODO: increase the operation ID
+	var resp as.OperationResponse
 
 	// 1 - unmarshal the signed request
 	var nrr as.NameRegisterRequest
@@ -143,138 +146,23 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 		return &resp, err
 	}
 
-	// 3 - finally call function
-	err = arpc.nameRegister(ctx, &nrr)
-
-	if err != nil {
-		log.Error("can not register name", zap.Error(err))
-		resp.OperationState = as.OperationState_Error
-		return &resp, err
-	}
-
-	resp.OperationState = as.OperationState_Completed
-	return &resp, err
-}
-
-func (arpc *anynsRpc) nameRegister(ctx context.Context, in *as.NameRegisterRequest) error {
-	var registrantAccount common.Address = common.HexToAddress(in.OwnerEthAddress)
-
-	// 0 - check all parameters
-	err := arpc.checkRegisterParams(in)
+	// 3 - check all parameters
+	err = arpc.checkRegisterParams(&nrr)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
-		return err
+		return nil, err
 	}
 
-	conn, err := arpc.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to connect to geth", zap.Error(err))
-		return err
-	}
-
-	// 1 - connect to geth
-	controller, err := arpc.contracts.ConnectToController(conn)
-	if err != nil {
-		log.Error("failed to connect to contract", zap.Error(err))
-		return err
-	}
-
-	// 2 - get a name's first part
-	// TODO: normalize string
-	nameFirstPart := contracts.RemoveTLD(in.FullName)
-
-	// 3 - calculate a commitment
-	secret, err := contracts.GenerateRandomSecret()
-	if err != nil {
-		log.Error("can not generate random secret", zap.Error(err))
-		return err
-	}
-
-	commitment, err := arpc.contracts.MakeCommitment(
-		nameFirstPart,
-		registrantAccount,
-		secret,
-		controller,
-		in.GetFullName(),
-		in.GetOwnerAnyAddress(),
-		in.GetSpaceId())
-
-	if err != nil {
-		log.Error("can not calculate a commitment", zap.Error(err))
-		return err
-	}
-
-	authOpts, err := arpc.contracts.GenerateAuthOptsForAdmin(conn)
-	if err != nil {
-		log.Error("can not get auth params for admin", zap.Error(err))
-		return err
-	}
-
-	// 4 - commit from Admin
-	tx, err := arpc.contracts.Commit(
-		authOpts,
-		commitment,
-		controller)
-
-	// TODO: check if tx is nil?
-	if err != nil {
-		log.Error("can not Commit tx", zap.Error(err))
-		return err
-	}
-
-	// wait for tx to be mined
-	txRes, err := arpc.contracts.WaitMined(ctx, conn, tx)
-	if err != nil {
-		log.Error("can not wait for commit tx", zap.Error(err))
-		return err
-	}
-	if !txRes {
-		// new error
-		return errors.New("commit tx not mined")
-	}
-
-	// update nonce again...
-	authOpts, err = arpc.contracts.GenerateAuthOptsForAdmin(conn)
-	if err != nil {
-		log.Error("can not get auth params for admin", zap.Error(err))
-		return err
-	}
-
-	// 5 - register
-	tx, err = arpc.contracts.Register(
-		authOpts,
-		nameFirstPart,
-		registrantAccount,
-		secret,
-		controller,
-		in.GetFullName(),
-		in.GetOwnerAnyAddress(),
-		in.GetSpaceId())
-
-	// TODO: check if tx is nil?
-	if err != nil {
-		log.Error("can not Commit tx", zap.Error(err))
-		return err
-	}
-
-	// wait for tx to be mined
-	txRes, err = arpc.contracts.WaitMined(ctx, conn, tx)
-	if err != nil {
-		log.Error("can not wait for register tx", zap.Error(err))
-		return err
-	}
-	if !txRes {
-		// new error
-		return errors.New("register tx failed")
-	}
-
-	log.Info("operation succeeded!")
-	return nil
+	// 4 - add to queue
+	operationId, err := arpc.queue.ProcessRequest(ctx, &nrr)
+	resp.OperationId = operationId
+	resp.OperationState = as.OperationState_Pending
+	return &resp, err
 }
 
 func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
 	// 1 - check name
-	if !arpc.checkName(in.FullName) {
+	if !checkName(in.FullName) {
 		log.Error("invalid name", zap.String("name", in.FullName))
 		return errors.New("invalid name")
 	}
@@ -286,7 +174,7 @@ func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
 	}
 
 	// 3 - check Any address
-	if !arpc.checkAnyAddress(in.OwnerAnyAddress) {
+	if !checkAnyAddress(in.OwnerAnyAddress) {
 		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
 		return errors.New("invalid Any address")
 	}
@@ -303,49 +191,4 @@ func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
 
 	// everything is OK
 	return nil
-}
-
-func (arpc *anynsRpc) checkName(name string) bool {
-	// get name parts
-	parts := strings.Split(name, ".")
-	if len(parts) != 2 {
-		return false
-	}
-
-	// if extension is not 'any', then return false
-	if parts[len(parts)-1] != "any" {
-		return false
-	}
-
-	// if first part is less than 3 chars, then return false
-	if len(parts[0]) < 3 {
-		return false
-	}
-
-	// if it has slashes, then return false
-	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return false
-	}
-
-	return true
-}
-
-func isValidAnyAddress(address string) bool {
-	// correct address format is 12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy
-	// it should start with 1
-	if !strings.HasPrefix(address, "1") {
-		return false
-	}
-
-	// the len should be 52
-	if len(address) != 52 {
-		return false
-	}
-
-	return true
-}
-
-func (arpc *anynsRpc) checkAnyAddress(addr string) bool {
-	// in.OwnerAnyAddress should be a ed25519 public key hash
-	return isValidAnyAddress(addr)
 }

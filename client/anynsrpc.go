@@ -12,8 +12,13 @@ import (
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
+const CName = "any-ns.anynsclient"
+
+var log = logger.NewNamed(CName)
+
 /*
- * This client should be used to access the Anytype Naming Service (Anyns)
+ * This client component can be used to access the Anytype Naming Service (Anyns)
+ * from other components.
  */
 type AnyNsClientService interface {
 	IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (out *as.NameAvailableResponse, err error)
@@ -28,10 +33,6 @@ type service struct {
 	nodeconf nodeconf.Service
 	close    chan struct{}
 }
-
-const CName = "any-ns.anynsclient"
-
-var log = logger.NewNamed(CName)
 
 func (s *service) Init(a *app.App) (err error) {
 	s.pool = a.MustComponent(pool.CName).(pool.Pool)

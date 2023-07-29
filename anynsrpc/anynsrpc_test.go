@@ -2,16 +2,12 @@ package anynsrpc
 
 import (
 	"context"
-	"math/big"
 	"testing"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/commonspace/object/accountdata"
-	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
-	"github.com/anyproto/any-sync/testutil/accounttest"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
 	"go.uber.org/mock/gomock"
@@ -20,6 +16,8 @@ import (
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	"github.com/anyproto/any-ns-node/queue"
+	mock_queue "github.com/anyproto/any-ns-node/queue/mock"
 )
 
 var ctx = context.Background()
@@ -91,7 +89,11 @@ func TestAnynsRpc_GetOperationStatus(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
+		fx.queue.EXPECT().GetRequestStatus(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, operationId interface{}) (as.OperationState, error) {
+			return as.OperationState_Completed, nil
+		})
+
+		pctx := context.Background()
 		resp, err := fx.GetOperationStatus(pctx, &as.GetOperationStatusRequest{
 			OperationId: 1,
 		})
@@ -145,11 +147,11 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 		// if this return empty address -> it means address is free
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}) (*common.Address, error) {
-			return &common.Address{}, nil
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}) (common.Address, error) {
+			return common.Address{}, nil
 		})
 
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
+		pctx := context.Background()
 		resp, err := fx.IsNameAvailable(pctx, &as.NameAvailableRequest{
 			FullName: "hello.any",
 		})
@@ -165,15 +167,16 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 		// if this returns some address -> it means name is taken
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}) (*common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}) (common.Address, error) {
 			notEmptyAddr := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-			return &notEmptyAddr, nil
+			return notEmptyAddr, nil
 		})
+
 		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}, owner interface{}) (string, string, string, error) {
 			return "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", nil
 		})
 
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
+		pctx := context.Background()
 		resp, err := fx.IsNameAvailable(pctx, &as.NameAvailableRequest{
 			FullName: "hello.any",
 		})
@@ -193,25 +196,8 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-
-			return tx, nil
-		}).AnyTimes()
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			// success
-			return true, nil
+		fx.queue.EXPECT().ProcessRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, req interface{}) (int64, error) {
+			return 1, nil
 		}).AnyTimes()
 
 		// 1 - bad names
@@ -224,44 +210,20 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 
 		// for-each this array
 		for _, badName := range arrayOfBadNames {
-			pctx := peer.CtxWithPeerId(ctx, "peerId")
-			resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+			pctx := context.Background()
+			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
 				FullName:        badName,
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 			})
 
 			require.Error(t, err)
-			assert.NotNil(t, resp)
-			assert.Equal(t, resp.OperationId, uint64(1))
-			assert.Equal(t, resp.OperationState, as.OperationState_Error)
 		}
 	})
 
 	t.Run("bad eth address", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-
-			return tx, nil
-		}).AnyTimes()
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			// success
-			return true, nil
-		}).AnyTimes()
 
 		var arrayOfBadEthAddresses = []string{
 			"", // no address
@@ -271,44 +233,20 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 		}
 
 		for _, badEthAddress := range arrayOfBadEthAddresses {
-			pctx := peer.CtxWithPeerId(ctx, "peerId")
-			resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+			pctx := context.Background()
+			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
 				FullName:        "coolName.any",
 				OwnerEthAddress: badEthAddress,
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 			})
 
 			require.Error(t, err)
-			assert.NotNil(t, resp)
-			assert.Equal(t, resp.OperationId, uint64(1))
-			assert.Equal(t, resp.OperationState, as.OperationState_Error)
 		}
 	})
 
 	t.Run("bad any address", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-
-			return tx, nil
-		}).AnyTimes()
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			// success
-			return true, nil
-		}).AnyTimes()
 
 		// 3 - bad Any address
 		var arrayOfBadAnyAddresses = []string{
@@ -320,44 +258,20 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 
 		// for-each this array
 		for _, badAnyAddress := range arrayOfBadAnyAddresses {
-			pctx := peer.CtxWithPeerId(ctx, "peerId")
-			resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+			pctx := context.Background()
+			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
 				FullName:        "coolName.any",
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: badAnyAddress,
 			})
 
 			require.Error(t, err)
-			assert.NotNil(t, resp)
-			assert.Equal(t, resp.OperationId, uint64(1))
-			assert.Equal(t, resp.OperationState, as.OperationState_Error)
 		}
 	})
 
 	t.Run("bad space ID", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-
-			return tx, nil
-		}).AnyTimes()
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			// success
-			return true, nil
-		}).AnyTimes()
 
 		var arrayOfBadSpaces = []string{
 			"bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjz",   // too short
@@ -367,8 +281,8 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 
 		// for-each this array
 		for _, badSpace := range arrayOfBadSpaces {
-			pctx := peer.CtxWithPeerId(ctx, "peerId")
-			resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+			pctx := context.Background()
+			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
 				FullName:        "coolName.any",
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -376,162 +290,7 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			assert.NotNil(t, resp)
-			assert.Equal(t, resp.OperationId, uint64(1))
-			assert.Equal(t, resp.OperationState, as.OperationState_Error)
 		}
-	})
-
-	t.Run("commit tx failed", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-
-			return tx, nil
-		})
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			return false, nil
-		}).AnyTimes()
-
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
-		resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-			FullName:        "hello.any",
-			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-		})
-
-		require.Error(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, resp.OperationId, uint64(1))
-		assert.Equal(t, resp.OperationState, as.OperationState_Error)
-	})
-
-	t.Run("register tx failed", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-			return tx, nil
-		})
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			return true, nil
-		})
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			return false, nil
-		})
-
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
-		resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-			FullName:        "hello.any",
-			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-		})
-
-		require.Error(t, err)
-		assert.NotNil(t, resp)
-
-		assert.Equal(t, resp.OperationId, uint64(1))
-		assert.Equal(t, resp.OperationState, as.OperationState_Error)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-			return tx, nil
-		})
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			return true, nil
-		}).AnyTimes()
-
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
-		resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-			FullName:        "hello.any",
-			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-			OwnerAnyAddress: "12D3KooWBvbgjyDsrBKfKca1k24kpczkc2EsEtNFh4FnTTXMkiVM",
-		})
-
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, resp.OperationId, uint64(1))
-		assert.Equal(t, resp.OperationState, as.OperationState_Completed)
-	})
-
-	t.Run("success with spaceID", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
-		fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-			return tx, nil
-		})
-
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
-			return true, nil
-		}).AnyTimes()
-
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
-		pctx := peer.CtxWithPeerId(ctx, "peerId")
-		resp, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-			FullName:        "hello.any",
-			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-			OwnerAnyAddress: "12D3KooWBvbgjyDsrBKfKca1k24kpczkc2EsEtNFh4FnTTXMkiVM",
-			// also, SpaceID is attached to
-			SpaceId: "bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze",
-		})
-
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, resp.OperationId, uint64(1))
-		assert.Equal(t, resp.OperationState, as.OperationState_Completed)
 	})
 }
 
@@ -540,7 +299,8 @@ type fixture struct {
 	ctrl      *gomock.Controller
 	ts        *rpctest.TestServer
 	config    *config.Config
-	contracts *mock_contracts.MockService
+	contracts *mock_contracts.MockContractsService
+	queue     *mock_queue.MockQueueService
 
 	*anynsRpc
 }
@@ -555,9 +315,15 @@ func newFixture(t *testing.T) *fixture {
 		anynsRpc: New().(*anynsRpc),
 	}
 
-	fx.contracts = mock_contracts.NewMockService(fx.ctrl)
+	fx.contracts = mock_contracts.NewMockContractsService(fx.ctrl)
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
 	fx.contracts.EXPECT().Init(gomock.Any()).AnyTimes()
+
+	fx.queue = mock_queue.NewMockQueueService(fx.ctrl)
+	fx.queue.EXPECT().Name().Return(queue.CName).AnyTimes()
+	fx.queue.EXPECT().Init(gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().Run(gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().Close(gomock.Any()).AnyTimes()
 
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
@@ -565,9 +331,11 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	fx.a.Register(fx.ts).
-		Register(&accounttest.AccountTestService{}).
+		// this generates new random account every Init
+		// Register(&accounttest.AccountTestService{}).
 		Register(fx.config).
 		Register(fx.contracts).
+		Register(fx.queue).
 		Register(fx.anynsRpc)
 
 	require.NoError(t, fx.a.Start(ctx))

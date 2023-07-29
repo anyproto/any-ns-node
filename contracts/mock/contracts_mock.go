@@ -8,8 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	app "github.com/anyproto/any-sync/app"
 	anytype_crypto "github.com/anyproto/any-ns-node/anytype_crypto"
+	app "github.com/anyproto/any-sync/app"
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
@@ -17,31 +17,31 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockService is a mock of Service interface.
-type MockService struct {
+// MockContractsService is a mock of ContractsService interface.
+type MockContractsService struct {
 	ctrl     *gomock.Controller
-	recorder *MockServiceMockRecorder
+	recorder *MockContractsServiceMockRecorder
 }
 
-// MockServiceMockRecorder is the mock recorder for MockService.
-type MockServiceMockRecorder struct {
-	mock *MockService
+// MockContractsServiceMockRecorder is the mock recorder for MockContractsService.
+type MockContractsServiceMockRecorder struct {
+	mock *MockContractsService
 }
 
-// NewMockService creates a new mock instance.
-func NewMockService(ctrl *gomock.Controller) *MockService {
-	mock := &MockService{ctrl: ctrl}
-	mock.recorder = &MockServiceMockRecorder{mock}
+// NewMockContractsService creates a new mock instance.
+func NewMockContractsService(ctrl *gomock.Controller) *MockContractsService {
+	mock := &MockContractsService{ctrl: ctrl}
+	mock.recorder = &MockContractsServiceMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockService) EXPECT() *MockServiceMockRecorder {
+func (m *MockContractsService) EXPECT() *MockContractsServiceMockRecorder {
 	return m.recorder
 }
 
 // Commit mocks base method.
-func (m *MockService) Commit(opts *bind.TransactOpts, commitment [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+func (m *MockContractsService) Commit(opts *bind.TransactOpts, commitment [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Commit", opts, commitment, controller)
 	ret0, _ := ret[0].(*types.Transaction)
@@ -50,13 +50,13 @@ func (m *MockService) Commit(opts *bind.TransactOpts, commitment [32]byte, contr
 }
 
 // Commit indicates an expected call of Commit.
-func (mr *MockServiceMockRecorder) Commit(opts, commitment, controller interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Commit(opts, commitment, controller interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockService)(nil).Commit), opts, commitment, controller)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockContractsService)(nil).Commit), opts, commitment, controller)
 }
 
 // ConnectToController mocks base method.
-func (m *MockService) ConnectToController(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarControllerPrivate, error) {
+func (m *MockContractsService) ConnectToController(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarControllerPrivate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConnectToController", conn)
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeRegistrarControllerPrivate)
@@ -65,13 +65,13 @@ func (m *MockService) ConnectToController(conn *ethclient.Client) (*anytype_cryp
 }
 
 // ConnectToController indicates an expected call of ConnectToController.
-func (mr *MockServiceMockRecorder) ConnectToController(conn interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToController(conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToController", reflect.TypeOf((*MockService)(nil).ConnectToController), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToController", reflect.TypeOf((*MockContractsService)(nil).ConnectToController), conn)
 }
 
 // ConnectToNamewrapperContract mocks base method.
-func (m *MockService) ConnectToNamewrapperContract(conn *ethclient.Client) (*anytype_crypto.AnytypeNameWrapper, error) {
+func (m *MockContractsService) ConnectToNamewrapperContract(conn *ethclient.Client) (*anytype_crypto.AnytypeNameWrapper, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConnectToNamewrapperContract", conn)
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeNameWrapper)
@@ -80,13 +80,13 @@ func (m *MockService) ConnectToNamewrapperContract(conn *ethclient.Client) (*any
 }
 
 // ConnectToNamewrapperContract indicates an expected call of ConnectToNamewrapperContract.
-func (mr *MockServiceMockRecorder) ConnectToNamewrapperContract(conn interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToNamewrapperContract(conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToNamewrapperContract", reflect.TypeOf((*MockService)(nil).ConnectToNamewrapperContract), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToNamewrapperContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToNamewrapperContract), conn)
 }
 
 // ConnectToRegistryContract mocks base method.
-func (m *MockService) ConnectToRegistryContract(conn *ethclient.Client) (*anytype_crypto.ENSRegistry, error) {
+func (m *MockContractsService) ConnectToRegistryContract(conn *ethclient.Client) (*anytype_crypto.ENSRegistry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConnectToRegistryContract", conn)
 	ret0, _ := ret[0].(*anytype_crypto.ENSRegistry)
@@ -95,13 +95,13 @@ func (m *MockService) ConnectToRegistryContract(conn *ethclient.Client) (*anytyp
 }
 
 // ConnectToRegistryContract indicates an expected call of ConnectToRegistryContract.
-func (mr *MockServiceMockRecorder) ConnectToRegistryContract(conn interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToRegistryContract(conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistryContract", reflect.TypeOf((*MockService)(nil).ConnectToRegistryContract), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistryContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToRegistryContract), conn)
 }
 
 // ConnectToResolver mocks base method.
-func (m *MockService) ConnectToResolver(conn *ethclient.Client) (*anytype_crypto.AnytypeResolver, error) {
+func (m *MockContractsService) ConnectToResolver(conn *ethclient.Client) (*anytype_crypto.AnytypeResolver, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConnectToResolver", conn)
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeResolver)
@@ -110,13 +110,13 @@ func (m *MockService) ConnectToResolver(conn *ethclient.Client) (*anytype_crypto
 }
 
 // ConnectToResolver indicates an expected call of ConnectToResolver.
-func (mr *MockServiceMockRecorder) ConnectToResolver(conn interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToResolver(conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToResolver", reflect.TypeOf((*MockService)(nil).ConnectToResolver), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToResolver", reflect.TypeOf((*MockContractsService)(nil).ConnectToResolver), conn)
 }
 
 // CreateEthConnection mocks base method.
-func (m *MockService) CreateEthConnection() (*ethclient.Client, error) {
+func (m *MockContractsService) CreateEthConnection() (*ethclient.Client, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEthConnection")
 	ret0, _ := ret[0].(*ethclient.Client)
@@ -125,13 +125,13 @@ func (m *MockService) CreateEthConnection() (*ethclient.Client, error) {
 }
 
 // CreateEthConnection indicates an expected call of CreateEthConnection.
-func (mr *MockServiceMockRecorder) CreateEthConnection() *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) CreateEthConnection() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEthConnection", reflect.TypeOf((*MockService)(nil).CreateEthConnection))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEthConnection", reflect.TypeOf((*MockContractsService)(nil).CreateEthConnection))
 }
 
 // GenerateAuthOptsForAdmin mocks base method.
-func (m *MockService) GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error) {
+func (m *MockContractsService) GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateAuthOptsForAdmin", conn)
 	ret0, _ := ret[0].(*bind.TransactOpts)
@@ -140,13 +140,13 @@ func (m *MockService) GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.Tr
 }
 
 // GenerateAuthOptsForAdmin indicates an expected call of GenerateAuthOptsForAdmin.
-func (mr *MockServiceMockRecorder) GenerateAuthOptsForAdmin(conn interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GenerateAuthOptsForAdmin(conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthOptsForAdmin", reflect.TypeOf((*MockService)(nil).GenerateAuthOptsForAdmin), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthOptsForAdmin", reflect.TypeOf((*MockContractsService)(nil).GenerateAuthOptsForAdmin), conn)
 }
 
 // GetAdditionalNameInfo mocks base method.
-func (m *MockService) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, error) {
+func (m *MockContractsService) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", conn, currentOwner, fullName)
 	ret0, _ := ret[0].(string)
@@ -157,28 +157,28 @@ func (m *MockService) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner
 }
 
 // GetAdditionalNameInfo indicates an expected call of GetAdditionalNameInfo.
-func (mr *MockServiceMockRecorder) GetAdditionalNameInfo(conn, currentOwner, fullName interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(conn, currentOwner, fullName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockService)(nil).GetAdditionalNameInfo), conn, currentOwner, fullName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), conn, currentOwner, fullName)
 }
 
 // GetOwnerForNamehash mocks base method.
-func (m *MockService) GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (*common.Address, error) {
+func (m *MockContractsService) GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOwnerForNamehash", client, namehash)
-	ret0, _ := ret[0].(*common.Address)
+	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOwnerForNamehash indicates an expected call of GetOwnerForNamehash.
-func (mr *MockServiceMockRecorder) GetOwnerForNamehash(client, namehash interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(client, namehash interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockService)(nil).GetOwnerForNamehash), client, namehash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), client, namehash)
 }
 
 // Init mocks base method.
-func (m *MockService) Init(a *app.App) error {
+func (m *MockContractsService) Init(a *app.App) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Init", a)
 	ret0, _ := ret[0].(error)
@@ -186,13 +186,13 @@ func (m *MockService) Init(a *app.App) error {
 }
 
 // Init indicates an expected call of Init.
-func (mr *MockServiceMockRecorder) Init(a interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Init(a interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockService)(nil).Init), a)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockContractsService)(nil).Init), a)
 }
 
 // MakeCommitment mocks base method.
-func (m *MockService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) ([32]byte, error) {
+func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) ([32]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MakeCommitment", nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 	ret0, _ := ret[0].([32]byte)
@@ -201,13 +201,13 @@ func (m *MockService) MakeCommitment(nameFirstPart string, registrantAccount com
 }
 
 // MakeCommitment indicates an expected call of MakeCommitment.
-func (mr *MockServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 }
 
 // Name mocks base method.
-func (m *MockService) Name() string {
+func (m *MockContractsService) Name() string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Name")
 	ret0, _ := ret[0].(string)
@@ -215,13 +215,13 @@ func (m *MockService) Name() string {
 }
 
 // Name indicates an expected call of Name.
-func (mr *MockServiceMockRecorder) Name() *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Name() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockService)(nil).Name))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockContractsService)(nil).Name))
 }
 
 // Register mocks base method.
-func (m *MockService) Register(authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) (*types.Transaction, error) {
+func (m *MockContractsService) Register(authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 	ret0, _ := ret[0].(*types.Transaction)
@@ -230,13 +230,13 @@ func (m *MockService) Register(authOpts *bind.TransactOpts, nameFirstPart string
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockServiceMockRecorder) Register(authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Register(authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockService)(nil).Register), authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 }
 
 // WaitMined mocks base method.
-func (m *MockService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (bool, error) {
+func (m *MockContractsService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitMined", ctx, client, tx)
 	ret0, _ := ret[0].(bool)
@@ -245,7 +245,7 @@ func (m *MockService) WaitMined(ctx context.Context, client *ethclient.Client, t
 }
 
 // WaitMined indicates an expected call of WaitMined.
-func (mr *MockServiceMockRecorder) WaitMined(ctx, client, tx interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) WaitMined(ctx, client, tx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitMined", reflect.TypeOf((*MockService)(nil).WaitMined), ctx, client, tx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitMined", reflect.TypeOf((*MockContractsService)(nil).WaitMined), ctx, client, tx)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
+	"github.com/anyproto/any-ns-node/queue"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -108,6 +109,7 @@ func Bootstrap(a *app.App) {
 		Register(nodeconfstore.New()).
 		Register(nodeconfsource.New()).
 		Register(coordinatorclient.New()).
+		Register(queue.New()).
 		Register(pool.New()).
 		Register(peerservice.New()).
 		Register(yamux.New()).

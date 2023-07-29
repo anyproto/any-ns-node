@@ -60,7 +60,7 @@ message NameUpdateRequest {
 }
 
 message GetOperationStatusRequest {
-  uint32 operationId = 1;
+  int64 operationId = 1;
 }
 
 enum OperationState {
@@ -70,7 +70,7 @@ enum OperationState {
 }
 
 message OperationResponse {
-  uint32 operationId = 1;
+  int64 operationId = 1;
   OperationState operationState = 2;
 }
 

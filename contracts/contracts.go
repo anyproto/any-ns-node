@@ -31,10 +31,10 @@ func New() app.Component {
 }
 
 // Low-level calls to contracts
-type Service interface {
+type ContractsService interface {
 	CreateEthConnection() (*ethclient.Client, error)
 
-	GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (*common.Address, error)
+	GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error)
 	GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, err error)
 
 	ConnectToRegistryContract(conn *ethclient.Client) (*ac.ENSRegistry, error)
@@ -75,7 +75,9 @@ func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh
 	}
 
 	callOpts := bind.CallOpts{}
-	return reg.Owner(&callOpts, nh)
+	own, err := reg.Owner(&callOpts, nh)
+
+	return own, err
 }
 
 func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, err error) {

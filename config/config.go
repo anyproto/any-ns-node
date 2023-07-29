@@ -35,6 +35,7 @@ type Config struct {
 	Network          nodeconf.Configuration `yaml:"network"`
 	NetworkStorePath string                 `yaml:"networkStorePath"`
 	Yamux            yamux.Config           `yaml:"yamux"`
+	Mongo            Mongo                  `yaml:"mongo"`
 	Contracts        Contracts              `yaml:"contracts"`
 }
 
