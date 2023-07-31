@@ -1,0 +1,23 @@
+account:
+    peerId: 12D3KooWPmdgRPQWHchdLra6v5taUTgcjybWKEy4L6ebeU8jDwWj
+    peerKey: UoeyMS8ST7oZJYytangJCKW46YeoXOiGdz0jXfUVz9vPUGnkczpAIRMqnmXK9NxA51KXOwDAVAzQCQ5GJQSvdA==
+    signingKey: UoeyMS8ST7oZJYytangJCKW46YeoXOiGdz0jXfUVz9vPUGnkczpAIRMqnmXK9NxA51KXOwDAVAzQCQ5GJQSvdA==
+drpc:
+    stream:
+        maxMsgSizeMb: 256
+yamux:
+    writeTimeoutSec: 10
+    dialTimeoutSec: 10
+network:
+    id: 64ba63209976be4a733bbb91
+    networkId: N4Gvo3v5wL31RrYgX3PrhAGMYvdWe5rAgtVB8cZySYWrkhb6
+    nodes:
+        - peerId: 12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS
+          addresses:
+            - 127.0.0.1:4830
+          types:
+            - coordinator
+    creationTime: 2023-07-21T11:51:12.970882+01:00
+networkStorePath: .
+log:
+  production: false

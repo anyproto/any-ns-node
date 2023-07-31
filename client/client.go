@@ -1,4 +1,4 @@
-package anynsclient
+package client
 
 import (
 	"context"
@@ -23,6 +23,8 @@ var log = logger.NewNamed(CName)
 type AnyNsClientService interface {
 	IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (out *as.NameAvailableResponse, err error)
 	GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error)
+	// TODO: remove and use only NameRegisterSigned
+	NameRegister(ctx context.Context, in *as.NameRegisterRequest) (out *as.OperationResponse, err error)
 	NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error)
 
 	app.ComponentRunnable
@@ -63,8 +65,10 @@ func (s *service) Close(_ context.Context) error {
 }
 
 func (s *service) doClient(ctx context.Context, fn func(cl as.DRPCAnynsClient) error) error {
-	// TODO: check here...
-	peer, err := s.pool.Get(ctx, s.nodeconf.ConsensusPeers()[0])
+	// TODO: https://github.com/orgs/anyproto/projects/3?pane=issue&itemId=34657351
+	// introduce different node type for NS node
+	peer, err := s.pool.Get(ctx, s.nodeconf.CoordinatorPeers()[0])
+
 	if err != nil {
 		return err
 	}
@@ -98,7 +102,16 @@ func (s *service) GetOperationStatus(ctx context.Context, in *as.GetOperationSta
 	return
 }
 
-// unisgned NameRegister method is not implemented! However, server still has it
+func (s *service) NameRegister(ctx context.Context, in *as.NameRegisterRequest) (out *as.OperationResponse, err error) {
+	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
+		if out, err = cl.NameRegister(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
 func (s *service) NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error) {
 	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
 		if out, err = cl.NameRegisterSigned(ctx, in); err != nil {

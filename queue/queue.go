@@ -77,7 +77,8 @@ func (aqueue *anynsQueue) Run(ctx context.Context) (err error) {
 	aqueue.itemColl = client.Database(dbName).Collection(collectionName)
 
 	// 2 - start one worker
-	go aqueue.worker(ctx, aqueue.itemColl, aqueue.q, aqueue.done)
+	// TODO:
+	//go aqueue.worker(ctx, aqueue.itemColl, aqueue.q, aqueue.done)
 	return nil
 }
 

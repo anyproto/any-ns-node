@@ -2,17 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 
 	"github.com/anyproto/any-ns-node/account"
 	"github.com/anyproto/any-ns-node/anynsrpc"
+	"github.com/anyproto/any-ns-node/client"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 	"github.com/anyproto/any-ns-node/queue"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
+
 	"github.com/anyproto/any-sync/coordinator/coordinatorclient"
 	"github.com/anyproto/any-sync/coordinator/nodeconfsource"
 	"github.com/anyproto/any-sync/nodeconf"
@@ -42,6 +46,9 @@ var (
 	flagConfigFile = flag.String("c", "etc/nsnode-config.yml", "path to config file")
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
+	flagClient     = flag.Bool("cl", false, "run as client")
+	command        = flag.String("cmd", "", "command to run: [name-register, is-name-available]]")
+	params         = flag.String("params", "", "command params in json format")
 )
 
 func main() {
@@ -77,7 +84,13 @@ func main() {
 
 	// bootstrap components
 	a.Register(conf)
-	Bootstrap(a)
+
+	if *flagClient {
+		runAsClient(a, ctx)
+		return
+	}
+
+	BootstrapServer(a)
 
 	// start app
 	if err := a.Start(ctx); err != nil {
@@ -102,7 +115,77 @@ func main() {
 	time.Sleep(time.Second / 3)
 }
 
-func Bootstrap(a *app.App) {
+func runAsClient(a *app.App, ctx context.Context) {
+	log.Info("running a client...")
+	BootstrapClient(a)
+
+	// start app
+	if err := a.Start(ctx); err != nil {
+		log.Fatal("can't start app", zap.Error(err))
+	}
+	log.Info("app started", zap.String("version", a.Version()))
+
+	// get a "client" service instance
+	var client = a.MustComponent(client.CName).(client.AnyNsClientService)
+
+	// check commands
+	switch *command {
+	case "name-register":
+		clientNameRegister(client, ctx)
+	case "is-name-available":
+		clientIsNameAvailable(client, ctx)
+	default:
+		log.Fatal("unknown command", zap.String("command", *command))
+	}
+}
+
+func clientIsNameAvailable(client client.AnyNsClientService, ctx context.Context) {
+	var req = &as.NameAvailableRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.IsNameAvailable(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientNameRegister(client client.AnyNsClientService, ctx context.Context) {
+	var req = &as.NameRegisterRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.NameRegister(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func BootstrapClient(a *app.App) {
+	a.Register(account.New()).
+		Register(nodeconf.New()).
+		Register(nodeconfstore.New()).
+		Register(nodeconfsource.New()).
+		Register(coordinatorclient.New()).
+		Register(pool.New()).
+		Register(peerservice.New()).
+		Register(yamux.New()).
+		Register(secureservice.New()).
+		Register(server.New()).
+		Register(client.New())
+}
+
+func BootstrapServer(a *app.App) {
 	a.Register(account.New()).
 		Register(contracts.New()).
 		Register(nodeconf.New()).

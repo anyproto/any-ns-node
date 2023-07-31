@@ -1,12 +1,23 @@
 # Anytype Naming Service node
-
 This global singleton node provides access to AnyNS smart contracts. You can call smart contracts directly or by using _this_ dRPC service. 
 
 ## Building and Running
 1. To build: `make build`
-2. To run: `go run ./cmd --c=config-sepolia.yaml`
+2. To run: `go run ./cmd --c=NODE_CONFIG`
+3. To run as a client: `go run ./cmd --c=CLIENT_CONFIG --cl --cmd=COMMAND --params=PARAMS_JSON`
 
-## .yml Config file
+## Available client commands
+
+### 1. is-name-available
+Check if name is available. If not - it will return information
+Parameters: `'{ "FullName": "xxx.any"}'`.
+Example: `go run ./cmd --c=config-client.yaml --cl --cmd=is-name-available --params='{ "FullName": "xxx.any"}'`
+
+### 2. name-register
+Create an operation to register a new name.
+Parameters: `'{ "FullName": "suppa.any", "OwnerAnyAddress": "A6WVkd1MxX1i7hGQCcDhMFvfEzokPppRzxve2wdhTZ8jZTio", "OwnerEthAddress": "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF", "SpaceId": "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"}'`.
+
+## .yml Config files
 Please see example in the '/etc' subfolder.
 
 ### Contracts section
