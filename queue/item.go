@@ -4,13 +4,42 @@ import (
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
+type QueueItemStatus int32
+
+const (
+	OperationStatus_Initial         QueueItemStatus = 0
+	OperationStatus_WaitingCommit   QueueItemStatus = 1
+	OperationStatus_WaitingRegister QueueItemStatus = 2
+	OperationStatus_Completed       QueueItemStatus = 3
+	OperationStatus_Error           QueueItemStatus = 4
+)
+
+func StatusToState(status QueueItemStatus) as.OperationState {
+	switch status {
+	case OperationStatus_Initial:
+		return as.OperationState_Pending
+	case OperationStatus_WaitingCommit:
+		return as.OperationState_Pending
+	case OperationStatus_WaitingRegister:
+		return as.OperationState_Pending
+	case OperationStatus_Completed:
+		return as.OperationState_Completed
+	case OperationStatus_Error:
+		return as.OperationState_Error
+	default:
+		return as.OperationState_Pending
+	}
+}
+
 type QueueItem struct {
-	Index           int64             `bson:"index"`
-	FullName        string            `bson:"fullName"`
-	OwnerAnyAddress string            `bson:"ownerAnyAddress"`
-	OwnerEthAddress string            `bson:"ownerEthAddress"`
-	SpaceId         string            `bson:"spaceId"`
-	Status          as.OperationState `bson:"status"`
+	Index           int64           `bson:"index"`
+	FullName        string          `bson:"fullName"`
+	OwnerAnyAddress string          `bson:"ownerAnyAddress"`
+	OwnerEthAddress string          `bson:"ownerEthAddress"`
+	SpaceId         string          `bson:"spaceId"`
+	Status          QueueItemStatus `bson:"status"`
+	TxCommitHash    string          `bson:"txCommitHash"`
+	TxRegisterHash  string          `bson:"txRegisterHash"`
 }
 
 func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
@@ -30,6 +59,6 @@ func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) 
 		OwnerAnyAddress: req.OwnerAnyAddress,
 		OwnerEthAddress: req.OwnerEthAddress,
 		SpaceId:         req.SpaceId,
-		Status:          as.OperationState_Pending,
+		Status:          OperationStatus_Initial,
 	}
 }

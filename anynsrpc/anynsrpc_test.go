@@ -196,7 +196,7 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.queue.EXPECT().ProcessRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, req interface{}) (int64, error) {
+		fx.queue.EXPECT().AddNewRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, req interface{}) (int64, error) {
 			return 1, nil
 		}).AnyTimes()
 
@@ -324,6 +324,10 @@ func newFixture(t *testing.T) *fixture {
 	fx.queue.EXPECT().Init(gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().Run(gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().Close(gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().ProcessAllItemsInDb(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().ProcessSingleItemInDb(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().ProcessSingleItemInQueue(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().SaveItemToDb(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",

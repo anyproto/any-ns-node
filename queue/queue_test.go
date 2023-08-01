@@ -16,7 +16,6 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
 var ctx = context.Background()
@@ -42,11 +41,13 @@ func TestAnynsQueue_RegisterName(t *testing.T) {
 		}).AnyTimes()
 
 		pctx := context.Background()
-		err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+		err := fx.NameRegister(pctx, &QueueItem{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-		})
+		},
+			nil,
+		)
 		require.Error(t, err)
 	})
 
@@ -74,11 +75,11 @@ func TestAnynsQueue_RegisterName(t *testing.T) {
 		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		pctx := context.Background()
-		err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+		err := fx.NameRegister(pctx, &QueueItem{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-		})
+		}, nil)
 
 		require.Error(t, err)
 	})
@@ -104,11 +105,11 @@ func TestAnynsQueue_RegisterName(t *testing.T) {
 		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		pctx := context.Background()
-		err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+		err := fx.NameRegister(pctx, &QueueItem{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWBvbgjyDsrBKfKca1k24kpczkc2EsEtNFh4FnTTXMkiVM",
-		})
+		}, nil)
 
 		require.NoError(t, err)
 	})
@@ -134,13 +135,13 @@ func TestAnynsQueue_RegisterName(t *testing.T) {
 		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		pctx := context.Background()
-		err := fx.NameRegister(pctx, &as.NameRegisterRequest{
+		err := fx.NameRegister(pctx, &QueueItem{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWBvbgjyDsrBKfKca1k24kpczkc2EsEtNFh4FnTTXMkiVM",
 			// also, SpaceID is attached to
 			SpaceId: "bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze",
-		})
+		}, nil)
 
 		require.NoError(t, err)
 	})

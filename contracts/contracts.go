@@ -318,7 +318,7 @@ func (acontracts *anynsContracts) Commit(opts *bind.TransactOpts, commitment [32
 		return nil, err
 	}
 
-	log.Info("commit tx sent: %s. Waiting for it to be mined...", zap.String("TX hash", tx.Hash().Hex()))
+	log.Info("commit tx sent. Waiting to be mined...", zap.String("TX hash", tx.Hash().Hex()))
 	return tx, nil
 }
 
@@ -326,7 +326,7 @@ func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclie
 	// receipt is not used
 	_, err = bind.WaitMined(ctx, client, tx)
 	if err != nil {
-		log.Error("failed to wait for tx to be mined", zap.Error(err))
+		log.Error("failed to wait for tx", zap.Error(err))
 		return false, err
 	}
 

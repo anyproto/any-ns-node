@@ -118,7 +118,11 @@ func (arpc *anynsRpc) NameRegister(ctx context.Context, in *as.NameRegisterReque
 	}
 
 	// 2 - create new operation
-	operationId, err := arpc.queue.ProcessRequest(ctx, in)
+	operationId, err := arpc.queue.AddNewRequest(ctx, in)
+	if err != nil {
+		log.Error("can not create new operation", zap.Error(err))
+		return nil, err
+	}
 
 	return &as.OperationResponse{
 		OperationState: as.OperationState_Pending,
@@ -154,7 +158,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	}
 
 	// 4 - add to queue
-	operationId, err := arpc.queue.ProcessRequest(ctx, &nrr)
+	operationId, err := arpc.queue.AddNewRequest(ctx, &nrr)
 	resp.OperationId = operationId
 	resp.OperationState = as.OperationState_Pending
 	return &resp, err
