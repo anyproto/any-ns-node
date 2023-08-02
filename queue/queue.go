@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -42,11 +43,14 @@ type QueueService interface {
 	// with each tx sent
 	NameRegister(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection) error
 
+	// read all "pending" items from DB and try to process em during startup
 	ProcessAllItemsInDb(ctx context.Context, coll *mongo.Collection) error
+	// process 1 item and update its state in the DB
 	ProcessSingleItemInDb(ctx context.Context, coll *mongo.Collection, queueItem *QueueItem) error
 
 	// read one item from the DB and process it, but do not remove it
 	ProcessSingleItemInQueue(ctx context.Context, coll *mongo.Collection, itemIndex int64) error
+	// just update item status in the DB
 	SaveItemToDb(ctx context.Context, coll *mongo.Collection, queueItem *QueueItem) error
 
 	app.ComponentRunnable
@@ -235,6 +239,8 @@ func (aqueue *anynsQueue) ProcessSingleItemInDb(ctx context.Context, coll *mongo
 }
 
 func (aqueue *anynsQueue) SaveItemToDb(ctx context.Context, coll *mongo.Collection, queueItem *QueueItem) error {
+	queueItem.DateModified = time.Now().Unix()
+
 	res, err := coll.ReplaceOne(ctx, findItemByIndexQuery{Index: queueItem.Index}, queueItem)
 	if res.MatchedCount == 0 {
 		log.Error("failed to update item in DB", zap.Error(err))

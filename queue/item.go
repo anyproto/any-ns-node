@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"time"
+
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 )
 
@@ -34,6 +36,7 @@ func StatusToState(status QueueItemStatus) as.OperationState {
 	}
 }
 
+// this structure is saved to mem queue and to DB
 type QueueItem struct {
 	Index           int64           `bson:"index"`
 	FullName        string          `bson:"fullName"`
@@ -43,6 +46,8 @@ type QueueItem struct {
 	Status          QueueItemStatus `bson:"status"`
 	TxCommitHash    string          `bson:"txCommitHash"`
 	TxRegisterHash  string          `bson:"txRegisterHash"`
+	DateCreated     int64           `bson:"dateCreated"`
+	DateModified    int64           `bson:"dateModified"`
 }
 
 func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
@@ -56,6 +61,8 @@ func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
 }
 
 func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) QueueItem {
+	currTime := time.Now().Unix()
+
 	return QueueItem{
 		Index:           count,
 		FullName:        req.FullName,
@@ -63,5 +70,8 @@ func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) 
 		OwnerEthAddress: req.OwnerEthAddress,
 		SpaceId:         req.SpaceId,
 		Status:          OperationStatus_Initial,
+
+		DateCreated:  currTime,
+		DateModified: currTime,
 	}
 }
