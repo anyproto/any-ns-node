@@ -287,6 +287,11 @@ func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Clien
 		return nil, err
 	}
 
+	// increase gas price - multiply gasPrice BigInt twice
+	gasPrice.Mul(gasPrice, big.NewInt(2))
+
+	// TODO: change to
+	//bind.NewKeyedTransactorWithChainID()
 	auth := bind.NewKeyedTransactor(privateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))

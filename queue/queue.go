@@ -102,7 +102,7 @@ func (aqueue *anynsQueue) Run(ctx context.Context) (err error) {
 	aqueue.ProcessAllItemsInDb(ctx, aqueue.itemColl)
 
 	// 3 - start one worker
-	if !aqueue.confQueue.SkipProcessing {
+	if !aqueue.confQueue.SkipBackroundProcessing {
 		go aqueue.worker(ctx, aqueue.itemColl, aqueue.q, aqueue.done)
 	}
 	return nil
@@ -158,6 +158,7 @@ func (aqueue *anynsQueue) GetRequestStatus(ctx context.Context, operationId int6
 	return StatusToState(item.Status), nil
 }
 
+// runs only if "SkipBackroundProcessing" is not set
 func (aqueue *anynsQueue) worker(ctx context.Context, coll *mongo.Collection, queue *mb.MB[int64], done chan bool) {
 	log.Info("worker started")
 
@@ -221,20 +222,13 @@ func (aqueue *anynsQueue) ProcessSingleItemInDb(ctx context.Context, coll *mongo
 	if !aqueue.confQueue.SkipProcessing {
 		// 2 - process item
 		log.Info("processing item from DB", zap.Int64("Item Index", queueItem.Index))
-
 		err = aqueue.NameRegister(ctx, queueItem, coll)
 	} else {
 		log.Info("skipping processing item in DB. setting that it was processed", zap.Any("Item Index", queueItem.Index))
 	}
 
 	// 3 - update item in DB
-	if err != nil {
-		log.Error("failed to process item. move state to ERROR", zap.Error(err))
-		queueItem.Status = OperationStatus_Error
-	} else {
-		log.Info("item processed without error. move state to COMPLETED")
-		queueItem.Status = OperationStatus_Completed
-	}
+	queueItem.Status = nameRegisterErrToStatus(err)
 
 	log.Info("Save item to DB", zap.Any("Item", queueItem))
 	return aqueue.SaveItemToDb(ctx, coll, queueItem)
@@ -250,8 +244,6 @@ func (aqueue *anynsQueue) SaveItemToDb(ctx context.Context, coll *mongo.Collecti
 		log.Error("failed to update item in DB", zap.Error(err))
 		return err
 	}
-
-	log.Info("Saved")
 	return nil
 }
 
@@ -331,18 +323,18 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 	// TODO: check if tx is nil?
 	if err != nil {
 		log.Error("can not Commit tx", zap.Error(err))
-		return err
+		return ErrCommitFailed
 	}
 
 	// save tx hash to DB (optional)
 	if coll != nil {
 		queueItem.TxCommitHash = tx.Hash().String()
-		queueItem.Status = OperationStatus_WaitingCommit
+		queueItem.Status = OperationStatus_CommitWaiting
 
 		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
 		if err != nil {
 			log.Error("can not save Commit tx", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
-			return err
+			return ErrCommitFailed
 		}
 	}
 
@@ -350,11 +342,11 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
 	if err != nil {
 		log.Error("can not wait for commit tx", zap.Error(err))
-		return err
+		return ErrCommitFailed
 	}
 	if !txRes {
 		// new error
-		return errors.New("commit tx not mined")
+		return ErrCommitFailed
 	}
 
 	// update nonce again...
@@ -378,18 +370,18 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 	// TODO: check if tx is nil?
 	if err != nil {
 		log.Error("can not Commit tx", zap.Error(err))
-		return err
+		return ErrRegisterFailed
 	}
 
 	// save tx hash to DB (optional)
 	if coll != nil {
-		queueItem.TxCommitHash = tx.Hash().String()
-		queueItem.Status = OperationStatus_WaitingRegister
+		queueItem.TxRegisterHash = tx.Hash().String()
+		queueItem.Status = OperationStatus_RegisterWaiting
 
 		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
 		if err != nil {
 			log.Error("can not save Register tx", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
-			return err
+			return ErrRegisterFailed
 		}
 	}
 
@@ -397,11 +389,10 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 	txRes, err = aqueue.contracts.WaitMined(ctx, conn, tx)
 	if err != nil {
 		log.Error("can not wait for register tx", zap.Error(err))
-		return err
+		return ErrRegisterFailed
 	}
 	if !txRes {
-		// new error
-		return errors.New("register tx failed")
+		return ErrRegisterFailed
 	}
 
 	log.Info("operation succeeded!")

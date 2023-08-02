@@ -8,19 +8,22 @@ type QueueItemStatus int32
 
 const (
 	OperationStatus_Initial         QueueItemStatus = 0
-	OperationStatus_WaitingCommit   QueueItemStatus = 1
-	OperationStatus_WaitingRegister QueueItemStatus = 2
+	OperationStatus_CommitWaiting   QueueItemStatus = 1
+	OperationStatus_RegisterWaiting QueueItemStatus = 2
 	OperationStatus_Completed       QueueItemStatus = 3
-	OperationStatus_Error           QueueItemStatus = 4
+
+	OperationStatus_CommitError   QueueItemStatus = 4
+	OperationStatus_RegisterError QueueItemStatus = 5
+	OperationStatus_Error         QueueItemStatus = 6
 )
 
 func StatusToState(status QueueItemStatus) as.OperationState {
 	switch status {
 	case OperationStatus_Initial:
 		return as.OperationState_Pending
-	case OperationStatus_WaitingCommit:
+	case OperationStatus_CommitWaiting:
 		return as.OperationState_Pending
-	case OperationStatus_WaitingRegister:
+	case OperationStatus_RegisterWaiting:
 		return as.OperationState_Pending
 	case OperationStatus_Completed:
 		return as.OperationState_Completed
