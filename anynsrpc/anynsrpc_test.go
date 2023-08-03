@@ -324,9 +324,9 @@ func newFixture(t *testing.T) *fixture {
 	fx.queue.EXPECT().Init(gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().Run(gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().Close(gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().ProcessAllItemsInDb(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().ProcessSingleItemInDb(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().ProcessSingleItemInQueue(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().FindAndProcessAllItemsInDb(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().FindAndProcessAllItemsInDbWithStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().ProcessItem(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().SaveItemToDb(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.config.Contracts = config.Contracts{

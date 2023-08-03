@@ -235,6 +235,21 @@ func (mr *MockContractsServiceMockRecorder) Register(authOpts, nameFirstPart, re
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 }
 
+// TxByHash mocks base method.
+func (m *MockContractsService) TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TxByHash", ctx, client, txHash)
+	ret0, _ := ret[0].(*types.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TxByHash indicates an expected call of TxByHash.
+func (mr *MockContractsServiceMockRecorder) TxByHash(ctx, client, txHash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TxByHash", reflect.TypeOf((*MockContractsService)(nil).TxByHash), ctx, client, txHash)
+}
+
 // WaitMined mocks base method.
 func (m *MockContractsService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (bool, error) {
 	m.ctrl.T.Helper()

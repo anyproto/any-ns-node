@@ -56,7 +56,7 @@ type QueueService interface {
 	IsStopProcessing(err error, prevState QueueItemStatus, newState QueueItemStatus) bool
 
 	NameRegister_InitialState(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
-	NameRegister_CommitWaiting(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
+	NameRegister_CommitSent(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
 	NameRegister_RegisterWaiting(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
 
 	app.ComponentRunnable
@@ -216,8 +216,9 @@ func (aqueue *anynsQueue) worker(ctx context.Context, coll *mongo.Collection, qu
 
 func (aqueue *anynsQueue) FindAndProcessAllItemsInDb(ctx context.Context, coll *mongo.Collection) {
 	aqueue.FindAndProcessAllItemsInDbWithStatus(ctx, coll, OperationStatus_Initial)
-	aqueue.FindAndProcessAllItemsInDbWithStatus(ctx, coll, OperationStatus_CommitWaiting)
-	aqueue.FindAndProcessAllItemsInDbWithStatus(ctx, coll, OperationStatus_RegisterWaiting)
+	aqueue.FindAndProcessAllItemsInDbWithStatus(ctx, coll, OperationStatus_CommitSent)
+	aqueue.FindAndProcessAllItemsInDbWithStatus(ctx, coll, OperationStatus_CommitDone)
+	aqueue.FindAndProcessAllItemsInDbWithStatus(ctx, coll, OperationStatus_RegisterSent)
 }
 
 func (aqueue *anynsQueue) FindAndProcessAllItemsInDbWithStatus(ctx context.Context, coll *mongo.Collection, status QueueItemStatus) {
@@ -308,9 +309,10 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 		prevState := queueItem.Status
 
 		// 1 - process
-		// OperationStatus_Initial -> OperationStatus_CommitWaiting
-		// OperationStatus_CommitWaiting -> OperationStatus_RegisterWaiting
-		// OperationStatus_RegisterWaiting -> OperationStatus_Completed
+		// OperationStatus_Initial -> OperationStatus_CommitSent
+		// OperationStatus_CommitSent -> OperationStatus_CommitDone
+		// OperationStatus_CommitDone -> OperationStatus_RegisterSent
+		// OperationStatus_RegisterSent -> OperationStatus_Completed
 		//
 		// eat error, loop will be stopped later in IsStopProcessing
 		_, newState := aqueue.NameRegisterMoveStateNext(ctx, queueItem, coll, conn)
@@ -343,9 +345,11 @@ func (aqueue *anynsQueue) IsStopProcessing(err error, prevState QueueItemStatus,
 	switch newState {
 	case OperationStatus_Initial:
 		return false
-	case OperationStatus_CommitWaiting:
+	case OperationStatus_CommitSent:
 		return false
-	case OperationStatus_RegisterWaiting:
+	case OperationStatus_CommitDone:
+		return false
+	case OperationStatus_RegisterSent:
 		return false
 	case OperationStatus_Completed:
 		// GREAT! we are done!
@@ -368,19 +372,26 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 		}
 
 		// TODO: assert that item.TxCommitHash should not be null here
-		return err, OperationStatus_CommitWaiting
-	case OperationStatus_CommitWaiting:
-		err := aqueue.NameRegister_CommitWaiting(ctx, queueItem, coll, conn)
+		return err, OperationStatus_CommitSent
+	case OperationStatus_CommitSent:
+		err := aqueue.NameRegister_CommitSent(ctx, queueItem, coll, conn)
+
+		// in case of failed tx -> save error to DB and stop processing it next time
+		if err != nil {
+			// save to DB
+			return err, OperationStatus_CommitError
+		}
+		return err, OperationStatus_CommitDone
+	case OperationStatus_CommitDone:
+		err := aqueue.NameRegister_CommitDone(ctx, queueItem, coll, conn)
 
 		// in case of failed tx -> save error to DB and stop processing it next time
 		if err != nil {
 			// save to DB
 			return err, OperationStatus_RegisterError
 		}
-
-		// TODO: assert that item.TxRegisterHash should not be null here
-		return err, OperationStatus_RegisterWaiting
-	case OperationStatus_RegisterWaiting:
+		return err, OperationStatus_RegisterSent
+	case OperationStatus_RegisterSent:
 		err := aqueue.NameRegister_RegisterWaiting(ctx, queueItem, coll, conn)
 
 		// in case of failed tx -> save error to DB and stop processing it next time
@@ -466,7 +477,7 @@ func (aqueue *anynsQueue) NameRegister_InitialState(ctx context.Context, queueIt
 	// 3 - update item in DB (optional)
 	if coll != nil {
 		queueItem.TxCommitHash = tx.Hash().String()
-		queueItem.Status = OperationStatus_CommitWaiting
+		queueItem.Status = OperationStatus_CommitSent
 
 		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
 		if err != nil {
@@ -479,8 +490,7 @@ func (aqueue *anynsQueue) NameRegister_InitialState(ctx context.Context, queueIt
 }
 
 // 1. wait for commit tx
-// 2. generate new register tx
-func (aqueue *anynsQueue) NameRegister_CommitWaiting(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	if len(queueItem.TxCommitHash) == 0 {
 		return errors.New("tx hash is empty")
 	}
@@ -489,7 +499,7 @@ func (aqueue *anynsQueue) NameRegister_CommitWaiting(ctx context.Context, queueI
 
 	// 1
 	txHash := common.HexToHash(queueItem.TxCommitHash)
-	tx, _, err := conn.TransactionByHash(context.Background(), txHash)
+	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
 	if err != nil {
 		log.Error("Failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
 		return ErrCommitFailed
@@ -506,7 +516,22 @@ func (aqueue *anynsQueue) NameRegister_CommitWaiting(ctx context.Context, queueI
 		return ErrCommitFailed
 	}
 
-	// 2
+	// 2 - update in DB
+	if coll != nil {
+		queueItem.Status = OperationStatus_CommitDone
+
+		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
+		if err != nil {
+			log.Error("can not save Register tx", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
+			return ErrCommitFailed
+		}
+	}
+
+	return nil
+}
+
+// 2. generate new register tx
+func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	controller, err := aqueue.contracts.ConnectToController(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
@@ -520,7 +545,7 @@ func (aqueue *anynsQueue) NameRegister_CommitWaiting(ctx context.Context, queueI
 		return err
 	}
 
-	// 3 - register
+	// register
 	// TODO: normalize string
 	in := nameRegisterRequestFromQueueItem(*queueItem)
 	var registrantAccount common.Address = common.HexToAddress(in.OwnerEthAddress)
@@ -535,7 +560,7 @@ func (aqueue *anynsQueue) NameRegister_CommitWaiting(ctx context.Context, queueI
 	var secret32 [32]byte
 	copy(secret32[:], secret)
 
-	tx, err = aqueue.contracts.Register(
+	tx, err := aqueue.contracts.Register(
 		authOpts,
 		nameFirstPart,
 		registrantAccount,
@@ -554,7 +579,7 @@ func (aqueue *anynsQueue) NameRegister_CommitWaiting(ctx context.Context, queueI
 	// update item in DB (optional)
 	if coll != nil {
 		queueItem.TxRegisterHash = tx.Hash().String()
-		queueItem.Status = OperationStatus_RegisterWaiting
+		queueItem.Status = OperationStatus_RegisterSent
 
 		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
 		if err != nil {
@@ -576,7 +601,7 @@ func (aqueue *anynsQueue) NameRegister_RegisterWaiting(ctx context.Context, queu
 
 	// 1
 	txHash := common.HexToHash(queueItem.TxRegisterHash)
-	tx, _, err := conn.TransactionByHash(context.Background(), txHash)
+	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
 	if err != nil {
 		log.Error("Failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxRegisterHash))
 		return ErrCommitFailed

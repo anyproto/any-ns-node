@@ -11,6 +11,7 @@ import (
 	anyns_api_server "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 	queue "github.com/anyproto/any-ns-node/queue"
 	app "github.com/anyproto/any-sync/app"
+	ethclient "github.com/ethereum/go-ethereum/ethclient"
 	mongo "go.mongodb.org/mongo-driver/mongo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -67,6 +68,30 @@ func (mr *MockQueueServiceMockRecorder) Close(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockQueueService)(nil).Close), ctx)
 }
 
+// FindAndProcessAllItemsInDb mocks base method.
+func (m *MockQueueService) FindAndProcessAllItemsInDb(ctx context.Context, coll *mongo.Collection) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "FindAndProcessAllItemsInDb", ctx, coll)
+}
+
+// FindAndProcessAllItemsInDb indicates an expected call of FindAndProcessAllItemsInDb.
+func (mr *MockQueueServiceMockRecorder) FindAndProcessAllItemsInDb(ctx, coll interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndProcessAllItemsInDb", reflect.TypeOf((*MockQueueService)(nil).FindAndProcessAllItemsInDb), ctx, coll)
+}
+
+// FindAndProcessAllItemsInDbWithStatus mocks base method.
+func (m *MockQueueService) FindAndProcessAllItemsInDbWithStatus(ctx context.Context, coll *mongo.Collection, status queue.QueueItemStatus) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "FindAndProcessAllItemsInDbWithStatus", ctx, coll, status)
+}
+
+// FindAndProcessAllItemsInDbWithStatus indicates an expected call of FindAndProcessAllItemsInDbWithStatus.
+func (mr *MockQueueServiceMockRecorder) FindAndProcessAllItemsInDbWithStatus(ctx, coll, status interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndProcessAllItemsInDbWithStatus", reflect.TypeOf((*MockQueueService)(nil).FindAndProcessAllItemsInDbWithStatus), ctx, coll, status)
+}
+
 // GetRequestStatus mocks base method.
 func (m *MockQueueService) GetRequestStatus(ctx context.Context, operationId int64) (anyns_api_server.OperationState, error) {
 	m.ctrl.T.Helper()
@@ -94,6 +119,20 @@ func (m *MockQueueService) Init(a *app.App) error {
 func (mr *MockQueueServiceMockRecorder) Init(a interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockQueueService)(nil).Init), a)
+}
+
+// IsStopProcessing mocks base method.
+func (m *MockQueueService) IsStopProcessing(err error, prevState, newState queue.QueueItemStatus) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsStopProcessing", err, prevState, newState)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsStopProcessing indicates an expected call of IsStopProcessing.
+func (mr *MockQueueServiceMockRecorder) IsStopProcessing(err, prevState, newState interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsStopProcessing", reflect.TypeOf((*MockQueueService)(nil).IsStopProcessing), err, prevState, newState)
 }
 
 // Name mocks base method.
@@ -124,46 +163,75 @@ func (mr *MockQueueServiceMockRecorder) NameRegister(ctx, queueItem, coll interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister", reflect.TypeOf((*MockQueueService)(nil).NameRegister), ctx, queueItem, coll)
 }
 
-// ProcessAllItemsInDb mocks base method.
-func (m *MockQueueService) ProcessAllItemsInDb(ctx context.Context, coll *mongo.Collection) error {
+// NameRegisterMoveStateNext mocks base method.
+func (m *MockQueueService) NameRegisterMoveStateNext(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client) (error, queue.QueueItemStatus) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessAllItemsInDb", ctx, coll)
+	ret := m.ctrl.Call(m, "NameRegisterMoveStateNext", ctx, queueItem, coll, conn)
+	ret0, _ := ret[0].(error)
+	ret1, _ := ret[1].(queue.QueueItemStatus)
+	return ret0, ret1
+}
+
+// NameRegisterMoveStateNext indicates an expected call of NameRegisterMoveStateNext.
+func (mr *MockQueueServiceMockRecorder) NameRegisterMoveStateNext(ctx, queueItem, coll, conn interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegisterMoveStateNext", reflect.TypeOf((*MockQueueService)(nil).NameRegisterMoveStateNext), ctx, queueItem, coll, conn)
+}
+
+// NameRegister_CommitSent mocks base method.
+func (m *MockQueueService) NameRegister_CommitSent(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NameRegister_CommitSent", ctx, queueItem, coll, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ProcessAllItemsInDb indicates an expected call of ProcessAllItemsInDb.
-func (mr *MockQueueServiceMockRecorder) ProcessAllItemsInDb(ctx, coll interface{}) *gomock.Call {
+// NameRegister_CommitSent indicates an expected call of NameRegister_CommitSent.
+func (mr *MockQueueServiceMockRecorder) NameRegister_CommitSent(ctx, queueItem, coll, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessAllItemsInDb", reflect.TypeOf((*MockQueueService)(nil).ProcessAllItemsInDb), ctx, coll)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitSent", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitSent), ctx, queueItem, coll, conn)
 }
 
-// ProcessSingleItemInDb mocks base method.
-func (m *MockQueueService) ProcessSingleItemInDb(ctx context.Context, coll *mongo.Collection, queueItem *queue.QueueItem) error {
+// NameRegister_InitialState mocks base method.
+func (m *MockQueueService) NameRegister_InitialState(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessSingleItemInDb", ctx, coll, queueItem)
+	ret := m.ctrl.Call(m, "NameRegister_InitialState", ctx, queueItem, coll, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ProcessSingleItemInDb indicates an expected call of ProcessSingleItemInDb.
-func (mr *MockQueueServiceMockRecorder) ProcessSingleItemInDb(ctx, coll, queueItem interface{}) *gomock.Call {
+// NameRegister_InitialState indicates an expected call of NameRegister_InitialState.
+func (mr *MockQueueServiceMockRecorder) NameRegister_InitialState(ctx, queueItem, coll, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessSingleItemInDb", reflect.TypeOf((*MockQueueService)(nil).ProcessSingleItemInDb), ctx, coll, queueItem)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_InitialState", reflect.TypeOf((*MockQueueService)(nil).NameRegister_InitialState), ctx, queueItem, coll, conn)
 }
 
-// ProcessSingleItemInQueue mocks base method.
-func (m *MockQueueService) ProcessSingleItemInQueue(ctx context.Context, coll *mongo.Collection, itemIndex int64) error {
+// NameRegister_RegisterWaiting mocks base method.
+func (m *MockQueueService) NameRegister_RegisterWaiting(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessSingleItemInQueue", ctx, coll, itemIndex)
+	ret := m.ctrl.Call(m, "NameRegister_RegisterWaiting", ctx, queueItem, coll, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ProcessSingleItemInQueue indicates an expected call of ProcessSingleItemInQueue.
-func (mr *MockQueueServiceMockRecorder) ProcessSingleItemInQueue(ctx, coll, itemIndex interface{}) *gomock.Call {
+// NameRegister_RegisterWaiting indicates an expected call of NameRegister_RegisterWaiting.
+func (mr *MockQueueServiceMockRecorder) NameRegister_RegisterWaiting(ctx, queueItem, coll, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessSingleItemInQueue", reflect.TypeOf((*MockQueueService)(nil).ProcessSingleItemInQueue), ctx, coll, itemIndex)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_RegisterWaiting", reflect.TypeOf((*MockQueueService)(nil).NameRegister_RegisterWaiting), ctx, queueItem, coll, conn)
+}
+
+// ProcessItem mocks base method.
+func (m *MockQueueService) ProcessItem(ctx context.Context, coll *mongo.Collection, queueItem *queue.QueueItem) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcessItem", ctx, coll, queueItem)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ProcessItem indicates an expected call of ProcessItem.
+func (mr *MockQueueServiceMockRecorder) ProcessItem(ctx, coll, queueItem interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessItem", reflect.TypeOf((*MockQueueService)(nil).ProcessItem), ctx, coll, queueItem)
 }
 
 // Run mocks base method.

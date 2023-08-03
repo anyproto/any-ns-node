@@ -50,6 +50,7 @@ type ContractsService interface {
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
 	// Wait for tx and get result
 	WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error)
+	TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error)
 
 	app.Component
 }
@@ -337,6 +338,16 @@ func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclie
 
 	wasMined = acontracts.checkTransactionReceipt(client, tx.Hash())
 	return wasMined, nil
+}
+
+func (acontracts *anynsContracts) TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error) {
+	tx, _, err := client.TransactionByHash(ctx, txHash)
+	if err != nil {
+		log.Error("failed to get tx", zap.Error(err))
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error) {
