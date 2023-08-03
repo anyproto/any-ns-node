@@ -323,7 +323,7 @@ func (acontracts *anynsContracts) Commit(opts *bind.TransactOpts, commitment [32
 		return nil, err
 	}
 
-	log.Info("commit tx sent. Waiting to be mined...", zap.String("TX hash", tx.Hash().Hex()))
+	log.Info("commit tx sent", zap.String("TX hash", tx.Hash().Hex()))
 	return tx, nil
 }
 
@@ -396,6 +396,6 @@ func (acontracts *anynsContracts) Register(authOpts *bind.TransactOpts, nameFirs
 		return nil, err
 	}
 
-	log.Info("register tx sent. Waiting for it to be mined", zap.String("TX hash", tx.Hash().Hex()))
+	log.Info("register tx sent", zap.String("TX hash", tx.Hash().Hex()))
 	return tx, nil
 }

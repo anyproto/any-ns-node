@@ -8,6 +8,9 @@ import (
 
 type QueueItemStatus int32
 
+// when adding new status, don't forget to update these function:
+// 1. StatusToState
+// 2. NameRegisterMoveStateNext
 const (
 	OperationStatus_Initial         QueueItemStatus = 0
 	OperationStatus_CommitWaiting   QueueItemStatus = 1
@@ -38,28 +41,21 @@ func StatusToState(status QueueItemStatus) as.OperationState {
 
 // this structure is saved to mem queue and to DB
 type QueueItem struct {
-	Index           int64           `bson:"index"`
-	FullName        string          `bson:"fullName"`
-	OwnerAnyAddress string          `bson:"ownerAnyAddress"`
-	OwnerEthAddress string          `bson:"ownerEthAddress"`
-	SpaceId         string          `bson:"spaceId"`
-	Status          QueueItemStatus `bson:"status"`
-	TxCommitHash    string          `bson:"txCommitHash"`
-	TxRegisterHash  string          `bson:"txRegisterHash"`
-	DateCreated     int64           `bson:"dateCreated"`
-	DateModified    int64           `bson:"dateModified"`
+	Index           int64  `bson:"index"`
+	FullName        string `bson:"fullName"`
+	OwnerAnyAddress string `bson:"ownerAnyAddress"`
+	OwnerEthAddress string `bson:"ownerEthAddress"`
+	SpaceId         string `bson:"spaceId"`
+	// aux fields
+	SecretBase64   string          `bson:"secretBase64"`
+	Status         QueueItemStatus `bson:"status"`
+	TxCommitHash   string          `bson:"txCommitHash"`
+	TxRegisterHash string          `bson:"txRegisterHash"`
+	DateCreated    int64           `bson:"dateCreated"`
+	DateModified   int64           `bson:"dateModified"`
 }
 
-func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
-	req := as.NameRegisterRequest{
-		FullName:        item.FullName,
-		OwnerAnyAddress: item.OwnerAnyAddress,
-		OwnerEthAddress: item.OwnerEthAddress,
-		SpaceId:         item.SpaceId,
-	}
-	return &req
-}
-
+// convert item to in-memory queue struct from initial dRPC request struct
 func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) QueueItem {
 	currTime := time.Now().Unix()
 
@@ -74,4 +70,15 @@ func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) 
 		DateCreated:  currTime,
 		DateModified: currTime,
 	}
+}
+
+// TODO: remove this
+func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
+	req := as.NameRegisterRequest{
+		FullName:        item.FullName,
+		OwnerAnyAddress: item.OwnerAnyAddress,
+		OwnerEthAddress: item.OwnerEthAddress,
+		SpaceId:         item.SpaceId,
+	}
+	return &req
 }
