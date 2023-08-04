@@ -35,6 +35,11 @@ func StatusToState(status QueueItemStatus) as.OperationState {
 		return as.OperationState_Pending
 	case OperationStatus_Completed:
 		return as.OperationState_Completed
+
+	case OperationStatus_CommitError:
+		return as.OperationState_Error
+	case OperationStatus_RegisterError:
+		return as.OperationState_Error
 	case OperationStatus_Error:
 		return as.OperationState_Error
 	default:

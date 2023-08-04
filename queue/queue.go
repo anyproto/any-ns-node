@@ -109,7 +109,9 @@ func (aqueue *anynsQueue) Run(ctx context.Context) (err error) {
 	log.Info("mongo connected!")
 
 	// 2 - try to process all items in the DB
-	aqueue.FindAndProcessAllItemsInDb(ctx, aqueue.itemColl)
+	if !aqueue.confQueue.SkipExistingItemsInDB {
+		aqueue.FindAndProcessAllItemsInDb(ctx, aqueue.itemColl)
+	}
 
 	// 3 - start one worker
 	if !aqueue.confQueue.SkipBackroundProcessing {
@@ -226,7 +228,6 @@ func (aqueue *anynsQueue) FindAndProcessAllItemsInDbWithStatus(ctx context.Conte
 		Status QueueItemStatus `bson:"status"`
 	}
 
-	// 1
 	log.Info("Process all items in DB with state", zap.Any("Status", status))
 
 	for {
@@ -420,7 +421,7 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 	return nil, queueItem.Status
 }
 
-// 1. send commit tx
+// send commit tx
 func (aqueue *anynsQueue) NameRegister_InitialState(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	controller, err := aqueue.contracts.ConnectToController(conn)
 	if err != nil {
@@ -489,7 +490,7 @@ func (aqueue *anynsQueue) NameRegister_InitialState(ctx context.Context, queueIt
 	return nil
 }
 
-// 1. wait for commit tx
+// wait for commit tx
 func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	if len(queueItem.TxCommitHash) == 0 {
 		return errors.New("tx hash is empty")
@@ -530,7 +531,7 @@ func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem
 	return nil
 }
 
-// 2. generate new register tx
+// generate new register tx
 func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	controller, err := aqueue.contracts.ConnectToController(conn)
 	if err != nil {
@@ -591,7 +592,7 @@ func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem
 	return nil
 }
 
-// 1. wait for register tx
+// wait for register tx
 func (aqueue *anynsQueue) NameRegister_RegisterWaiting(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	if len(queueItem.TxRegisterHash) == 0 {
 		return errors.New("tx hash is empty")
