@@ -38,6 +38,7 @@ type Config struct {
 	Mongo            Mongo                  `yaml:"mongo"`
 	Contracts        Contracts              `yaml:"contracts"`
 	Queue            Queue                  `yaml:"queue"`
+	Nonce            Nonce                  `yaml:"nonce"`
 }
 
 func (c *Config) Init(a *app.App) (err error) {

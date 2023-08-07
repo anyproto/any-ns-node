@@ -48,6 +48,8 @@ type ContractsService interface {
 
 	// aux
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
+	CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error)
+
 	// Wait for tx and get result
 	WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error)
 	TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error)
@@ -276,15 +278,9 @@ func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Clien
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 
 	// 2 - get gas costs, etc
-	nonce, err := conn.PendingNonceAt(context.Background(), fromAddress)
+	gasPrice, nonce, err := acontracts.CalculateTxParams(conn, fromAddress)
 	if err != nil {
-		log.Error("can not get nonce", zap.Error(err))
-		return nil, err
-	}
-
-	gasPrice, err := conn.SuggestGasPrice(context.Background())
-	if err != nil {
-		log.Error("can not get gas price", zap.Error(err))
+		log.Error("can not calculate tx params", zap.Error(err))
 		return nil, err
 	}
 
@@ -301,6 +297,22 @@ func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Clien
 	auth.GasPrice = gasPrice
 
 	return auth, nil
+}
+
+func (acontracts *anynsContracts) CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error) {
+	nonce, err := conn.PendingNonceAt(context.Background(), address)
+	if err != nil {
+		log.Error("can not get nonce", zap.Error(err))
+		return nil, 0, err
+	}
+
+	gasPrice, err := conn.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Error("can not get gas price", zap.Error(err))
+		return nil, 0, err
+	}
+
+	return gasPrice, nonce, nil
 }
 
 func (acontracts *anynsContracts) checkTransactionReceipt(conn *ethclient.Client, txHash common.Hash) bool {

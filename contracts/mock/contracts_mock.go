@@ -6,6 +6,7 @@ package mock_contracts
 
 import (
 	context "context"
+	big "math/big"
 	reflect "reflect"
 
 	anytype_crypto "github.com/anyproto/any-ns-node/anytype_crypto"
@@ -38,6 +39,22 @@ func NewMockContractsService(ctrl *gomock.Controller) *MockContractsService {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockContractsService) EXPECT() *MockContractsServiceMockRecorder {
 	return m.recorder
+}
+
+// CalculateTxParams mocks base method.
+func (m *MockContractsService) CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CalculateTxParams", conn, address)
+	ret0, _ := ret[0].(*big.Int)
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// CalculateTxParams indicates an expected call of CalculateTxParams.
+func (mr *MockContractsServiceMockRecorder) CalculateTxParams(conn, address interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateTxParams", reflect.TypeOf((*MockContractsService)(nil).CalculateTxParams), conn, address)
 }
 
 // Commit mocks base method.
