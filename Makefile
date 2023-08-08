@@ -13,8 +13,11 @@ contracts/mock/contracts_mock.go: contracts/contracts.go
 queue/mock/queue_mock.go: queue/queue.go
 	mockgen -source=queue/queue.go > queue/mock/queue_mock.go
 
+nonce_manager/mock/nonce_manager_mock.go: nonce_manager/nonce_manager.go
+	mockgen -source=nonce_manager/nonce_manager.go > nonce_manager/mock/nonce_manager.go
+
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go
+mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go
 
 .PHONY: test
 test: mocks

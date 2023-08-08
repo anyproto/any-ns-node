@@ -55,12 +55,14 @@ type QueueItem struct {
 	OwnerEthAddress string `bson:"ownerEthAddress"`
 	SpaceId         string `bson:"spaceId"`
 	// aux fields
-	SecretBase64   string          `bson:"secretBase64"`
-	Status         QueueItemStatus `bson:"status"`
-	TxCommitHash   string          `bson:"txCommitHash"`
-	TxRegisterHash string          `bson:"txRegisterHash"`
-	DateCreated    int64           `bson:"dateCreated"`
-	DateModified   int64           `bson:"dateModified"`
+	SecretBase64    string          `bson:"secretBase64"`
+	Status          QueueItemStatus `bson:"status"`
+	TxCommitHash    string          `bson:"txCommitHash"`
+	TxCommitNonce   uint64          `bson:"txCommitNonce"`
+	TxRegisterHash  string          `bson:"txRegisterHash"`
+	TxRegisterNonce uint64          `bson:"txRegisterNonce"`
+	DateCreated     int64           `bson:"dateCreated"`
+	DateModified    int64           `bson:"dateModified"`
 }
 
 // convert item to in-memory queue struct from initial dRPC request struct

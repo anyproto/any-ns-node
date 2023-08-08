@@ -33,16 +33,15 @@ func New() app.Component {
 	return &anynsNonceService{}
 }
 
-// NoncePolicy:
+// Nonce policy:
+// 1. if nonce is specified in the config file:
+// - read it from config and override the value from DB/network
 //
-// if nonce is in DB:
+// 2. if nonce is in DB:
 // - get nonce from DB
 //
-// if nonce is not in DB:
+// 3. if nonce is not in DB:
 // - get nonce from network - mined + pending txs count
-//
-// if nonce is specified in the config file:
-// - read it from config and override the value from DB/network
 //
 // if tx is sent and mined succesfully:
 // - save last nonce to DB
@@ -51,20 +50,23 @@ func New() app.Component {
 // - get nonce from network
 // - send this tx again with +1 nonce
 //
-// if nonce is higher than needed - tx will stuck in the memory pool in pending state until:
-// * other tx fill the gap
-// * node is restarted
+// if nonce is higher than needed - tx will be rejected by the network
 //
-// fix usually requires a manual intervention, but we implement a retry policy in case tx is too OLD!
-// (not implement here)
+// fix usually requires a manual intervention, but we implement a retry policy in case tx is too old!
+// (not implemented here)
 // if pending tx is too old (>N minutes), we:
 // 1. get new nonce from the network
 // 2. increase gas price by 10%
 // 3. resend the same tx with new nonce
 type NonceService interface {
+	// try to determine nonce by looking in DB first, then use network as a fallback
 	GetCurrentNonce(addr ethcommon.Address) (uint64, error)
+
+	// try to determine nonce by looking at current TX count plus pending TXs in the mem pool
+	// (not reliable, but can be used as a fallback)
 	GetCurrentNonceFromNetwork(addr ethcommon.Address) (uint64, error)
 
+	// save nonce to DB
 	SaveNonce(addr ethcommon.Address, newValue uint64) (uint64, error)
 
 	app.Component
@@ -112,7 +114,7 @@ func (anonce *anynsNonceService) Init(a *app.App) (err error) {
 	return nil
 }
 
-func (anonce *anynsNonceService) GetCurrentNonce() (uint64, error) {
+func (anonce *anynsNonceService) GetCurrentNonce(addr ethcommon.Address) (uint64, error) {
 	// 1 - if nonce is specified in the config file:
 	// - read it from config and override the value from DB/network
 	if anonce.confNonce.NonceOverride > 0 {
@@ -120,27 +122,23 @@ func (anonce *anynsNonceService) GetCurrentNonce() (uint64, error) {
 		return anonce.confNonce.NonceOverride, nil
 	}
 
+	itemOut := &NonceDbItem{}
+
 	// 2 - if nonce is in DB:
 	// - get nonce from DB
-	var itemOut NonceDbItem
-	adminAddr := anonce.getAdminAddr()
-
 	ctx := context.Background()
-	err := anonce.nonceColl.FindOne(ctx, findNonceByAddress{Address: adminAddr}).Decode(&itemOut)
+	err := anonce.nonceColl.FindOne(ctx, findNonceByAddress{Address: addr.Hex()}).Decode(&itemOut)
 	if err == nil {
 		// Warning: convert int64 -> uint64
 		return uint64(itemOut.Nonce), nil
 	}
 
 	// 3 - if nonce is not in DB:
-	return anonce.GetCurrentNonceFromNetwork()
+	return anonce.GetCurrentNonceFromNetwork(addr)
 }
 
-func (anonce *anynsNonceService) GetCurrentNonceFromNetwork() (uint64, error) {
-	adminAddr := anonce.getAdminAddr()
-
+func (anonce *anynsNonceService) GetCurrentNonceFromNetwork(addr ethcommon.Address) (uint64, error) {
 	// - get nonce from network - mined + pending txs count
-	fromAddress := ethcommon.HexToAddress(adminAddr)
 	conn, err := anonce.contracts.CreateEthConnection()
 	if err != nil {
 		log.Error("can not create eth connection", zap.Error(err))
@@ -148,7 +146,7 @@ func (anonce *anynsNonceService) GetCurrentNonceFromNetwork() (uint64, error) {
 	}
 
 	// 2 - get gas costs, etc
-	_, nonce, err := anonce.contracts.CalculateTxParams(conn, fromAddress)
+	_, nonce, err := anonce.contracts.CalculateTxParams(conn, addr)
 	if err != nil {
 		log.Error("can not get nonce", zap.Error(err))
 		return 0, err
@@ -157,19 +155,17 @@ func (anonce *anynsNonceService) GetCurrentNonceFromNetwork() (uint64, error) {
 }
 
 // call this method when tx is sent and mined succesfully
-func (anonce *anynsNonceService) SaveNonce(newValue uint64) (uint64, error) {
+func (anonce *anynsNonceService) SaveNonce(addr ethcommon.Address, newValue uint64) (uint64, error) {
 	ctx := context.Background()
-
-	adminAddr := anonce.getAdminAddr()
 	optns := options.Replace().SetUpsert(true)
 
 	dbItem := &NonceDbItem{
-		Address: adminAddr,
+		Address: addr.Hex(),
 		// TODO: conversion
 		Nonce: int64(newValue),
 	}
 
-	_, err := anonce.nonceColl.ReplaceOne(ctx, findNonceByAddress{Address: adminAddr}, dbItem, optns)
+	_, err := anonce.nonceColl.ReplaceOne(ctx, findNonceByAddress{Address: addr.Hex()}, dbItem, optns)
 	if err != nil {
 		log.Error("failed to update item in DB", zap.Error(err))
 		return 0, err

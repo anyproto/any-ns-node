@@ -10,4 +10,6 @@ type Queue struct {
 	SkipProcessing bool `yaml:"skip_processing"`
 
 	SkipBackroundProcessing bool `yaml:"skip_background_processing"`
+
+	NonceRetryCount int `yaml:"nonce_retry_count"`
 }

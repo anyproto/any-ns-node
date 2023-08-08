@@ -43,8 +43,9 @@ type ContractsService interface {
 	ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
 
 	MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error)
-	Commit(opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
-	Register(authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
+
+	Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
+	Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
 
 	// aux
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
@@ -329,11 +330,12 @@ func (acontracts *anynsContracts) checkTransactionReceipt(conn *ethclient.Client
 	return false
 }
 
-func (acontracts *anynsContracts) Commit(opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
 	tx, err := controller.Commit(opts, commitment)
 	if err != nil {
-		log.Error("failed to commit", zap.Error(err))
-		return nil, err
+		// TODO - handle the "replacement transaction underpriced" error
+		log.Error("failed to commit", zap.Error(err), zap.Any("tx", tx))
+		return tx, err
 	}
 
 	log.Info("commit tx sent", zap.String("TX hash", tx.Hash().Hex()))
@@ -348,6 +350,7 @@ func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclie
 		return false, err
 	}
 
+	// please note that transaction receipts are not available for pending transactions
 	wasMined = acontracts.checkTransactionReceipt(client, tx.Hash())
 	return wasMined, nil
 }
@@ -390,7 +393,7 @@ func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registran
 		ownerControlledFuses)
 }
 
-func (acontracts *anynsContracts) Register(authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error) {
+func (acontracts *anynsContracts) Register(ctx context.Context, client *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error) {
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
 
@@ -415,8 +418,8 @@ func (acontracts *anynsContracts) Register(authOpts *bind.TransactOpts, nameFirs
 		ownerControlledFuses)
 
 	if err != nil {
-		log.Error("failed to register", zap.Error(err))
-		return nil, err
+		log.Error("failed to register", zap.Error(err), zap.Any("tx", tx))
+		return tx, err
 	}
 
 	log.Info("register tx sent", zap.String("TX hash", tx.Hash().Hex()))

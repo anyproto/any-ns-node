@@ -58,18 +58,18 @@ func (mr *MockContractsServiceMockRecorder) CalculateTxParams(conn, address inte
 }
 
 // Commit mocks base method.
-func (m *MockContractsService) Commit(opts *bind.TransactOpts, commitment [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+func (m *MockContractsService) Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commit", opts, commitment, controller)
+	ret := m.ctrl.Call(m, "Commit", ctx, conn, opts, commitment, controller)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Commit indicates an expected call of Commit.
-func (mr *MockContractsServiceMockRecorder) Commit(opts, commitment, controller interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Commit(ctx, conn, opts, commitment, controller interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockContractsService)(nil).Commit), opts, commitment, controller)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockContractsService)(nil).Commit), ctx, conn, opts, commitment, controller)
 }
 
 // ConnectToController mocks base method.
@@ -238,18 +238,18 @@ func (mr *MockContractsServiceMockRecorder) Name() *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockContractsService) Register(authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) (*types.Transaction, error) {
+func (m *MockContractsService) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Register", authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	ret := m.ctrl.Call(m, "Register", ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockContractsServiceMockRecorder) Register(authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 }
 
 // TxByHash mocks base method.

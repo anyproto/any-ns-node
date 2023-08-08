@@ -10,6 +10,7 @@ import (
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -41,7 +42,7 @@ func TestNonceManager_GetCurrentNonce(t *testing.T) {
 		require.NoError(t, err)
 
 		// get from DB
-		nonce, err := fx.GetCurrentNonce()
+		nonce, err := fx.GetCurrentNonce(common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
 		require.NoError(t, err)
 		require.Equal(t, uint64(12), nonce)
 	})
@@ -56,7 +57,7 @@ func TestNonceManager_GetCurrentNonce(t *testing.T) {
 		})
 
 		// get from DB
-		nonce, err := fx.GetCurrentNonce()
+		nonce, err := fx.GetCurrentNonce(common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
 		require.NoError(t, err)
 		require.Equal(t, uint64(15), nonce)
 	})
@@ -66,7 +67,7 @@ func TestNonceManager_GetCurrentNonce(t *testing.T) {
 		defer fx.finish(t)
 
 		// get from DB
-		nonce, err := fx.GetCurrentNonce()
+		nonce, err := fx.GetCurrentNonce(common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
 		require.NoError(t, err)
 		require.Equal(t, uint64(19), nonce)
 	})
@@ -83,7 +84,7 @@ func TestNonceManager_GetCurrentNonceFromNetwork(t *testing.T) {
 		})
 
 		// get from DB
-		nonce, err := fx.GetCurrentNonceFromNetwork()
+		nonce, err := fx.GetCurrentNonceFromNetwork(common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
 		require.NoError(t, err)
 		require.Equal(t, uint64(15), nonce)
 	})
@@ -101,12 +102,13 @@ func TestNonceManager_SaveNonce(t *testing.T) {
 		coll := client.Database("any-ns").Collection("nonce")
 
 		// get from DB
-		newNonce, err := fx.SaveNonce(18)
+		newNonce, err := fx.SaveNonce(common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"), 18)
 		require.NoError(t, err)
 		require.Equal(t, uint64(18), newNonce)
 
 		// get from DB
-		nonce, err := fx.GetCurrentNonce()
+		// convert string to ethcommon.Address
+		nonce, err := fx.GetCurrentNonce(common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
 		require.NoError(t, err)
 		require.Equal(t, uint64(18), nonce)
 

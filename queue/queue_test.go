@@ -17,6 +17,8 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
+	"github.com/anyproto/any-ns-node/nonce_manager"
+	mock_nonce_manager "github.com/anyproto/any-ns-node/nonce_manager/mock"
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,7 +36,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			var tx = types.NewTransaction(
 				0,
 				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
@@ -90,7 +92,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// error
 			return nil, errors.New("error")
 		})
@@ -232,7 +234,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// error
 			var tx = types.NewTransaction(
 				0,
@@ -285,7 +287,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -296,7 +298,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// error
 			return nil, errors.New("error")
 		}).AnyTimes()
@@ -344,7 +346,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -355,7 +357,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -416,7 +418,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		pctx := context.Background()
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -427,7 +429,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -573,11 +575,12 @@ func TestAnynsQueue_AddNewRequest(t *testing.T) {
 }
 
 type fixture struct {
-	a         *app.App
-	ctrl      *gomock.Controller
-	ts        *rpctest.TestServer
-	config    *config.Config
-	contracts *mock_contracts.MockContractsService
+	a            *app.App
+	ctrl         *gomock.Controller
+	ts           *rpctest.TestServer
+	config       *config.Config
+	contracts    *mock_contracts.MockContractsService
+	nonceManager *mock_nonce_manager.MockNonceService
 
 	*anynsQueue
 }
@@ -601,6 +604,19 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
+	fx.nonceManager = mock_nonce_manager.NewMockNonceService(fx.ctrl)
+	fx.nonceManager.EXPECT().Init(gomock.Any()).AnyTimes()
+	fx.nonceManager.EXPECT().Name().Return(nonce_manager.CName).AnyTimes()
+
+	fx.nonceManager.EXPECT().GetCurrentNonce(gomock.Any()).DoAndReturn(func(interface{}) (uint64, error) {
+		return 0, nil
+	}).AnyTimes()
+
+	fx.nonceManager.EXPECT().GetCurrentNonceFromNetwork(gomock.Any()).DoAndReturn(func(interface{}) (uint64, error) {
+		return 0, nil
+	}).AnyTimes()
+	fx.nonceManager.EXPECT().SaveNonce(gomock.Any(), gomock.Any()).AnyTimes()
+
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		GethUrl:   "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
@@ -621,6 +637,7 @@ func newFixture(t *testing.T) *fixture {
 	fx.a.Register(fx.ts).
 		Register(fx.contracts).
 		Register(fx.config).
+		Register(fx.nonceManager).
 		Register(fx.anynsQueue)
 
 	require.NoError(t, fx.a.Start(ctx))

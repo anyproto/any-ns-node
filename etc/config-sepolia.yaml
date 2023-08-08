@@ -38,3 +38,4 @@ contracts:
 queue:
   skip_processing: false
   skip_background_processing: false
+  nonce_retry_count: 10

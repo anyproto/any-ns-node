@@ -11,6 +11,7 @@ import (
 	"github.com/anyproto/any-ns-node/client"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
+	"github.com/anyproto/any-ns-node/nonce_manager"
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 	"github.com/anyproto/any-ns-node/queue"
 
@@ -188,6 +189,7 @@ func BootstrapClient(a *app.App) {
 func BootstrapServer(a *app.App) {
 	a.Register(account.New()).
 		Register(contracts.New()).
+		Register(nonce_manager.New()).
 		Register(nodeconf.New()).
 		Register(nodeconfstore.New()).
 		Register(nodeconfsource.New()).

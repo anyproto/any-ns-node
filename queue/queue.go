@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	b64 "encoding/base64"
+	"math/big"
 	"time"
 
 	"github.com/anyproto/any-sync/app"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
+	"github.com/anyproto/any-ns-node/nonce_manager"
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -71,7 +73,8 @@ type anynsQueue struct {
 	confContracts config.Contracts
 	confQueue     config.Queue
 
-	contracts contracts.ContractsService
+	contracts    contracts.ContractsService
+	nonceManager nonce_manager.NonceService
 }
 
 func (aqueue *anynsQueue) Name() (name string) {
@@ -83,7 +86,9 @@ func (aqueue *anynsQueue) Init(a *app.App) (err error) {
 	aqueue.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	aqueue.confQueue = a.MustComponent(config.CName).(*config.Config).GetQueue()
 
+	aqueue.nonceManager = a.MustComponent(nonce_manager.CName).(nonce_manager.NonceService)
 	aqueue.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+
 	aqueue.done = make(chan bool)
 	aqueue.q = mb.New[int64](10) // TODO: queue size -> config
 
@@ -421,8 +426,18 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 	return nil, queueItem.Status
 }
 
-// send commit tx
 func (aqueue *anynsQueue) NameRegister_InitialState(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
+	// get proper nonce (from DB, config file or network)
+	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
+	if err != nil {
+		log.Error("can not get nonce", zap.Error(err))
+		return err
+	}
+	return aqueue.nameRegister_InitialState_WithNonce(ctx, queueItem, coll, conn, nonce, 0)
+}
+
+// send commit tx
+func (aqueue *anynsQueue) nameRegister_InitialState_WithNonce(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error {
 	controller, err := aqueue.contracts.ConnectToController(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
@@ -457,27 +472,57 @@ func (aqueue *anynsQueue) NameRegister_InitialState(ctx context.Context, queueIt
 		return err
 	}
 
-	// get new nonce
 	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin(conn)
 	if err != nil {
 		log.Error("can not get auth params for admin", zap.Error(err))
 		return err
 	}
+	if authOpts != nil {
+		authOpts.Nonce = big.NewInt(int64(nonce))
+	}
+	log.Info("Nonce is", zap.Any("Nonce", nonce))
 
 	// 2 - commit
 	tx, err := aqueue.contracts.Commit(
+		ctx,
+		conn,
 		authOpts,
 		commitment,
 		controller)
-	// TODO: check if tx is nil?
+
 	if err != nil {
-		log.Error("can not Commit tx", zap.Error(err))
+		if (err.Error() == "nonce too low") && (retryCount < aqueue.confQueue.NonceRetryCount) {
+			log.Error("NONCE IS TOO LOW!!! Retrying with new nonce...", zap.Any("retry", retryCount+1))
+
+			// update nonce in the DB immediately, even if TX is still not sent
+			_, err = aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
+			if err != nil {
+				log.Error("can not update nonce in DB!", zap.Error(err))
+				return err
+			}
+
+			return aqueue.nameRegister_InitialState_WithNonce(ctx, queueItem, coll, conn, nonce+1, retryCount+1)
+		}
+
+		if err.Error() == "nonce too low" {
+			log.Error("NONCE IS TOO LOW!!! RETRY COUNT IS TOO BIG, STOP...")
+		}
+
+		log.Error("can not Commit tx", zap.Error(err), zap.Any("tx", tx))
 		return ErrCommitFailed
+	}
+
+	// update nonce
+	_, err = aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
+	if err != nil {
+		log.Error("can not update nonce in DB!", zap.Error(err))
+		return err
 	}
 
 	// 3 - update item in DB (optional)
 	if coll != nil {
 		queueItem.TxCommitHash = tx.Hash().String()
+		queueItem.TxCommitNonce = nonce
 		queueItem.Status = OperationStatus_CommitSent
 
 		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
@@ -502,7 +547,13 @@ func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem
 	txHash := common.HexToHash(queueItem.TxCommitHash)
 	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
 	if err != nil {
-		log.Error("Failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
+		if err.Error() == "not found" {
+			// TODO: handle it!
+			log.Error("tx failed probably because of HIGH NONCE", zap.Any("tx", tx))
+			return ErrCommitFailed
+		}
+
+		log.Error("failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
 		return ErrCommitFailed
 	}
 
@@ -533,6 +584,16 @@ func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem
 
 // generate new register tx
 func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
+	// get proper nonce (from DB, config file or network)
+	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
+	if err != nil {
+		log.Error("can not get nonce", zap.Error(err))
+		return err
+	}
+	return aqueue.nameRegister_CommitDone_WithNonce(ctx, queueItem, coll, conn, nonce, 0)
+}
+
+func (aqueue *anynsQueue) nameRegister_CommitDone_WithNonce(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error {
 	controller, err := aqueue.contracts.ConnectToController(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
@@ -545,6 +606,11 @@ func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem
 		log.Error("can not get auth params for admin", zap.Error(err))
 		return err
 	}
+	if authOpts != nil {
+		authOpts.Nonce = big.NewInt(int64(nonce))
+	}
+
+	log.Info("Nonce is", zap.Any("Nonce", nonce))
 
 	// register
 	// TODO: normalize string
@@ -562,6 +628,8 @@ func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem
 	copy(secret32[:], secret)
 
 	tx, err := aqueue.contracts.Register(
+		ctx,
+		conn,
 		authOpts,
 		nameFirstPart,
 		registrantAccount,
@@ -571,15 +639,38 @@ func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem
 		in.GetOwnerAnyAddress(),
 		in.GetSpaceId())
 
-	// TODO: check if tx is nil?
 	if err != nil {
-		log.Error("can not Commit tx", zap.Error(err))
+		if (err.Error() == "nonce too low") && (retryCount < aqueue.confQueue.NonceRetryCount) {
+			log.Error("NONCE IS TOO LOW!!! Retrying with new nonce...", zap.Any("retry", retryCount+1))
+
+			// update nonce in the DB immediately, even if TX is still not sent
+			_, err = aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
+			if err != nil {
+				log.Error("can not update nonce in DB!", zap.Error(err))
+				return err
+			}
+			return aqueue.nameRegister_CommitDone_WithNonce(ctx, queueItem, coll, conn, nonce+1, retryCount+1)
+		}
+
+		if err.Error() == "nonce too low" {
+			log.Error("NONCE IS TOO LOW!!! RETRY COUNT IS TOO BIG, STOP...")
+		}
+
+		log.Error("can not Regsiter tx", zap.Error(err))
 		return ErrRegisterFailed
+	}
+
+	// update nonce in DB
+	_, err = aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
+	if err != nil {
+		log.Error("can not update nonce in DB!", zap.Error(err))
+		return err
 	}
 
 	// update item in DB (optional)
 	if coll != nil {
 		queueItem.TxRegisterHash = tx.Hash().String()
+		queueItem.TxRegisterNonce = nonce
 		queueItem.Status = OperationStatus_RegisterSent
 
 		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
@@ -604,7 +695,13 @@ func (aqueue *anynsQueue) NameRegister_RegisterWaiting(ctx context.Context, queu
 	txHash := common.HexToHash(queueItem.TxRegisterHash)
 	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
 	if err != nil {
-		log.Error("Failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxRegisterHash))
+		if err.Error() == "not found" {
+			// TODO: handle it!
+			log.Error("tx failed probably because of HIGH NONCE", zap.Any("tx", tx))
+			return ErrCommitFailed
+		}
+
+		log.Error("failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxRegisterHash))
 		return ErrCommitFailed
 	}
 
