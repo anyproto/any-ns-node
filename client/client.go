@@ -17,7 +17,7 @@ const CName = "any-ns.anynsclient"
 var log = logger.NewNamed(CName)
 
 /*
- * This client component can be used to access the Anytype Naming Service (Anyns)
+ * This client component can be used to access the Any Naming System (any-ns)
  * from other components.
  */
 type AnyNsClientService interface {

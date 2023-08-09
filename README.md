@@ -1,4 +1,4 @@
-# Anytype Naming Service node
+# Any Naming System node
 This global singleton node provides access to AnyNS smart contracts. You can call smart contracts directly or by using _this_ dRPC service. 
 
 ## Building and Running
@@ -45,3 +45,20 @@ contracts:
   // Admin key
   admin_pk: XXX
 ```
+
+## Contribution
+
+ Thank you for your desire to develop Anytype together!
+
+ ❤️ This project and everyone involved in it is governed by the [Code of Conduct](https://github.com/anyproto/.github/blob/main/docs/CODE_OF_CONDUCT.md).
+
+ 🧑‍💻 Check out our [contributing guide](https://github.com/anyproto/.github/blob/main/docs/CONTRIBUTING.md) to learn about asking questions, creating issues, or submitting pull requests.
+
+ 🫢 For security findings, please email [security@anytype.io](mailto:security@anytype.io) and refer to our [security guide](https://github.com/anyproto/.github/blob/main/docs/SECURITY.md) for more information.
+
+ 🤝 Follow us on [Github](https://github.com/anyproto) and join the [Contributors Community](https://github.com/orgs/anyproto/discussions).
+
+ ---
+ Original files from ENS are licensed under [MIT](./LICENSE.txt).
+
+ Additions, made by Any — a Swiss association 🇨🇭, are licensed under MIT (see `LICENSE.md` in `anyns-frontend` and `anytype` sub-folders).
