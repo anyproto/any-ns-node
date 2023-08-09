@@ -267,6 +267,20 @@ func (mr *MockContractsServiceMockRecorder) TxByHash(ctx, client, txHash interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TxByHash", reflect.TypeOf((*MockContractsService)(nil).TxByHash), ctx, client, txHash)
 }
 
+// WaitForTxToStartMining mocks base method.
+func (m *MockContractsService) WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForTxToStartMining", ctx, conn, txHash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitForTxToStartMining indicates an expected call of WaitForTxToStartMining.
+func (mr *MockContractsServiceMockRecorder) WaitForTxToStartMining(ctx, conn, txHash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForTxToStartMining", reflect.TypeOf((*MockContractsService)(nil).WaitForTxToStartMining), ctx, conn, txHash)
+}
+
 // WaitMined mocks base method.
 func (m *MockContractsService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (bool, error) {
 	m.ctrl.T.Helper()

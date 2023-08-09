@@ -50,14 +50,11 @@ func New() app.Component {
 // - get nonce from network
 // - send this tx again with +1 nonce
 //
-// if nonce is higher than needed - tx will be rejected by the network
-//
-// fix usually requires a manual intervention, but we implement a retry policy in case tx is too old!
-// (not implemented here)
-// if pending tx is too old (>N minutes), we:
-// 1. get new nonce from the network
-// 2. increase gas price by 10%
-// 3. resend the same tx with new nonce
+// if nonce is higher than needed - tx will be rejected by the network with "not found" error immediately
+// in this case we:
+// - wait for N minutes for all TXs to settle
+// - get new nonce from network
+// - retry sending this tx with new nonce
 type NonceService interface {
 	// try to determine nonce by looking in DB first, then use network as a fallback
 	GetCurrentNonce(addr ethcommon.Address) (uint64, error)

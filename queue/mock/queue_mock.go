@@ -178,6 +178,34 @@ func (mr *MockQueueServiceMockRecorder) NameRegisterMoveStateNext(ctx, queueItem
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegisterMoveStateNext", reflect.TypeOf((*MockQueueService)(nil).NameRegisterMoveStateNext), ctx, queueItem, coll, conn)
 }
 
+// NameRegister_CommitDone_RecoverHighNonce mocks base method.
+func (m *MockQueueService) NameRegister_CommitDone_RecoverHighNonce(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NameRegister_CommitDone_RecoverHighNonce", ctx, queueItem, coll, conn, nonce, retryCount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// NameRegister_CommitDone_RecoverHighNonce indicates an expected call of NameRegister_CommitDone_RecoverHighNonce.
+func (mr *MockQueueServiceMockRecorder) NameRegister_CommitDone_RecoverHighNonce(ctx, queueItem, coll, conn, nonce, retryCount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitDone_RecoverHighNonce", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitDone_RecoverHighNonce), ctx, queueItem, coll, conn, nonce, retryCount)
+}
+
+// NameRegister_CommitDone_RecoverLowNonce mocks base method.
+func (m *MockQueueService) NameRegister_CommitDone_RecoverLowNonce(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NameRegister_CommitDone_RecoverLowNonce", ctx, queueItem, coll, conn, nonce, retryCount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// NameRegister_CommitDone_RecoverLowNonce indicates an expected call of NameRegister_CommitDone_RecoverLowNonce.
+func (mr *MockQueueServiceMockRecorder) NameRegister_CommitDone_RecoverLowNonce(ctx, queueItem, coll, conn, nonce, retryCount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitDone_RecoverLowNonce", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitDone_RecoverLowNonce), ctx, queueItem, coll, conn, nonce, retryCount)
+}
+
 // NameRegister_CommitSent mocks base method.
 func (m *MockQueueService) NameRegister_CommitSent(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
 	m.ctrl.T.Helper()
@@ -190,6 +218,34 @@ func (m *MockQueueService) NameRegister_CommitSent(ctx context.Context, queueIte
 func (mr *MockQueueServiceMockRecorder) NameRegister_CommitSent(ctx, queueItem, coll, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitSent", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitSent), ctx, queueItem, coll, conn)
+}
+
+// NameRegister_CommitSent_RecoverHighNonce mocks base method.
+func (m *MockQueueService) NameRegister_CommitSent_RecoverHighNonce(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NameRegister_CommitSent_RecoverHighNonce", ctx, queueItem, coll, conn, nonce, retryCount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// NameRegister_CommitSent_RecoverHighNonce indicates an expected call of NameRegister_CommitSent_RecoverHighNonce.
+func (mr *MockQueueServiceMockRecorder) NameRegister_CommitSent_RecoverHighNonce(ctx, queueItem, coll, conn, nonce, retryCount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitSent_RecoverHighNonce", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitSent_RecoverHighNonce), ctx, queueItem, coll, conn, nonce, retryCount)
+}
+
+// NameRegister_CommitSent_RecoverLowNonce mocks base method.
+func (m *MockQueueService) NameRegister_CommitSent_RecoverLowNonce(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NameRegister_CommitSent_RecoverLowNonce", ctx, queueItem, coll, conn, nonce, retryCount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// NameRegister_CommitSent_RecoverLowNonce indicates an expected call of NameRegister_CommitSent_RecoverLowNonce.
+func (mr *MockQueueServiceMockRecorder) NameRegister_CommitSent_RecoverLowNonce(ctx, queueItem, coll, conn, nonce, retryCount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitSent_RecoverLowNonce", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitSent_RecoverLowNonce), ctx, queueItem, coll, conn, nonce, retryCount)
 }
 
 // NameRegister_InitialState mocks base method.

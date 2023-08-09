@@ -603,6 +603,7 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.nonceManager = mock_nonce_manager.NewMockNonceService(fx.ctrl)
 	fx.nonceManager.EXPECT().Init(gomock.Any()).AnyTimes()

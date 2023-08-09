@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"math/big"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -51,6 +53,8 @@ type ContractsService interface {
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
 	CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error)
 
+	// Check if tx is even started to mine
+	WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) error
 	// Wait for tx and get result
 	WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error)
 	TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error)
@@ -358,7 +362,8 @@ func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclie
 func (acontracts *anynsContracts) TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error) {
 	tx, _, err := client.TransactionByHash(ctx, txHash)
 	if err != nil {
-		log.Error("failed to get tx", zap.Error(err))
+		// this can happen!
+		log.Warn("failed to get tx", zap.Error(err))
 		return nil, err
 	}
 
@@ -424,4 +429,32 @@ func (acontracts *anynsContracts) Register(ctx context.Context, client *ethclien
 
 	log.Info("register tx sent", zap.String("TX hash", tx.Hash().Hex()))
 	return tx, nil
+}
+
+func (acontracts *anynsContracts) WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) (err error) {
+	// if transaction is not returned by node immediately after it is sent... it is either:
+	// 1. "nonce is too high" error
+	// 2. normal behaviour
+	//
+	// so we will wait N times each X seconds long
+	// if tx is not mined after N*X seconds - we will assume that it is "nonce is too high" error
+	for i := 0; i < 5; i++ {
+		_, err = acontracts.TxByHash(ctx, conn, txHash)
+		if err == nil {
+			// tx mined!
+			return nil
+		}
+
+		if err.Error() == "not found" {
+			// wait and try again
+			log.Warn("tx is still not found. waiting...", zap.Any("tx hash", txHash), zap.Any("try", i))
+
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		// for any other error -> return it
+		return err
+	}
+
+	return errors.New("nonce is too high")
 }

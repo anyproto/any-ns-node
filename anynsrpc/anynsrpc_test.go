@@ -328,6 +328,10 @@ func newFixture(t *testing.T) *fixture {
 	fx.queue.EXPECT().FindAndProcessAllItemsInDbWithStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().ProcessItem(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().SaveItemToDb(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().NameRegister_CommitSent_RecoverLowNonce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().NameRegister_CommitSent_RecoverHighNonce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().NameRegister_CommitDone_RecoverLowNonce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.queue.EXPECT().NameRegister_CommitDone_RecoverHighNonce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
