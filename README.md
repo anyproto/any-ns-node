@@ -58,7 +58,8 @@ contracts:
 
  🤝 Follow us on [Github](https://github.com/anyproto) and join the [Contributors Community](https://github.com/orgs/anyproto/discussions).
 
- ---
- Original files from ENS are licensed under [MIT](./LICENSE.txt).
+---
 
- Additions, made by Any — a Swiss association 🇨🇭, are licensed under MIT (see `LICENSE.md` in `anyns-frontend` and `anytype` sub-folders).
+Made by Any — a Swiss association 🇨🇭
+
+Licensed under [MIT](./LICENSE.md).
