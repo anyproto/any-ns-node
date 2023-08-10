@@ -23,9 +23,9 @@ message NameAvailableResponse {
   // This field is non-empty only if name is "already registered"
   string spaceId = 4;
 
-  // TODO:
-  // when the name will be expired
-  //google.protobuf.Timestamp willBeExpired = 5;
+  // doestn't work with marashalling/unmarshalling
+  //google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true];
+  int64 nameExpires = 5;
 }
 
 message NameRegisterRequest {

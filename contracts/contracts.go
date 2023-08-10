@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"math/big"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -37,11 +38,12 @@ type ContractsService interface {
 	CreateEthConnection() (*ethclient.Client, error)
 
 	GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error)
-	GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, err error)
+	GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error)
 
 	ConnectToRegistryContract(conn *ethclient.Client) (*ac.ENSRegistry, error)
 	ConnectToNamewrapperContract(conn *ethclient.Client) (*ac.AnytypeNameWrapper, error)
 	ConnectToResolver(conn *ethclient.Client) (*ac.AnytypeResolver, error)
+	ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error)
 	ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
 
 	MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error)
@@ -88,7 +90,7 @@ func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh
 	return own, err
 }
 
-func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, err error) {
+func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error) {
 	var res as.NameAvailableResponse
 	res.Available = false
 
@@ -117,7 +119,7 @@ func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, 
 	owner, spaceID, err := acontracts.getAdditionalData(conn, fullName)
 	if err != nil {
 		log.Error("failed to get real additional data of the name", zap.Error(err))
-		return "", "", "", err
+		return "", "", "", nil, err
 	}
 	if owner != nil {
 		ownerAnyAddress = *owner
@@ -126,7 +128,14 @@ func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, 
 		spaceId = *spaceID
 	}
 
-	return ownerEthAddress, ownerAnyAddress, spaceId, nil
+	// 3 - get expiration date
+	expiration, err = acontracts.getExpirationDate(conn, fullName)
+	if err != nil {
+		log.Error("failed to get expiration of the name", zap.Error(err))
+		return "", "", "", nil, err
+	}
+
+	return ownerEthAddress, ownerAnyAddress, spaceId, expiration, nil
 }
 
 func (acontracts *anynsContracts) getRealOwner(conn *ethclient.Client, fullName string) (*string, error) {
@@ -206,6 +215,35 @@ func (acontracts *anynsContracts) getAdditionalData(conn *ethclient.Client, full
 	return &ownerAnyAddressOut, &spaceIDOut, nil
 }
 
+func (acontracts *anynsContracts) getExpirationDate(conn *ethclient.Client, fullName string) (*big.Int, error) {
+	// 1 - connect to contract
+	ar, err := acontracts.ConnectToRegistrar(conn)
+	if err != nil {
+		log.Error("failed to connect to contract", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - convert to name hash
+	parts := strings.Split(fullName, ".")
+	if len(parts) != 2 {
+		return nil, errors.New("invalid full name")
+	}
+
+	label := parts[0]
+	labelHash := crypto.Keccak256([]byte(label))
+	// convert nh (32 bytes array) to big.Int
+	nhAsTokenID := new(big.Int).SetBytes(labelHash[:])
+
+	// 3 - get content hash and space ID
+	callOpts := bind.CallOpts{}
+	out, err := ar.NameExpires(&callOpts, nhAsTokenID)
+	if err != nil {
+		log.Error("can not get nameexpires", zap.Error(err))
+		return nil, err
+	}
+	return out, nil
+}
+
 func (acontracts *anynsContracts) CreateEthConnection() (*ethclient.Client, error) {
 	connStr := acontracts.config.GethUrl
 	conn, err := ethclient.Dial(connStr)
@@ -245,6 +283,19 @@ func (acontracts *anynsContracts) ConnectToResolver(conn *ethclient.Client) (*ac
 	ar, err := ac.NewAnytypeResolver(common.HexToAddress(contractAddr), conn)
 	if err != nil || ar == nil {
 		log.Error("failed to instantiate AnytypeResolver contract", zap.Error(err))
+		return nil, err
+	}
+
+	return ar, err
+}
+
+func (acontracts *anynsContracts) ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error) {
+	// 1 - create new contract instance
+	contractAddr := acontracts.config.AddrRegistrar
+
+	ar, err := ac.NewAnytypeRegistrarImplementation(common.HexToAddress(contractAddr), conn)
+	if err != nil || ar == nil {
+		log.Error("failed to instantiate AnytypeRegistrar contract", zap.Error(err))
 		return nil, err
 	}
 

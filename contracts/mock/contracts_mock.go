@@ -102,6 +102,21 @@ func (mr *MockContractsServiceMockRecorder) ConnectToNamewrapperContract(conn in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToNamewrapperContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToNamewrapperContract), conn)
 }
 
+// ConnectToRegistrar mocks base method.
+func (m *MockContractsService) ConnectToRegistrar(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarImplementation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConnectToRegistrar", conn)
+	ret0, _ := ret[0].(*anytype_crypto.AnytypeRegistrarImplementation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConnectToRegistrar indicates an expected call of ConnectToRegistrar.
+func (mr *MockContractsServiceMockRecorder) ConnectToRegistrar(conn interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistrar", reflect.TypeOf((*MockContractsService)(nil).ConnectToRegistrar), conn)
+}
+
 // ConnectToRegistryContract mocks base method.
 func (m *MockContractsService) ConnectToRegistryContract(conn *ethclient.Client) (*anytype_crypto.ENSRegistry, error) {
 	m.ctrl.T.Helper()
@@ -163,14 +178,15 @@ func (mr *MockContractsServiceMockRecorder) GenerateAuthOptsForAdmin(conn interf
 }
 
 // GetAdditionalNameInfo mocks base method.
-func (m *MockContractsService) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, error) {
+func (m *MockContractsService) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, *big.Int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", conn, currentOwner, fullName)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(string)
-	ret3, _ := ret[3].(error)
-	return ret0, ret1, ret2, ret3
+	ret3, _ := ret[3].(*big.Int)
+	ret4, _ := ret[4].(error)
+	return ret0, ret1, ret2, ret3, ret4
 }
 
 // GetAdditionalNameInfo indicates an expected call of GetAdditionalNameInfo.

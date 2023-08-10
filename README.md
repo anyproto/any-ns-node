@@ -18,7 +18,7 @@ Create an operation to register a new name.
 Parameters: `'{ "FullName": "suppa.any", "OwnerAnyAddress": "A6WVkd1MxX1i7hGQCcDhMFvfEzokPppRzxve2wdhTZ8jZTio", "OwnerEthAddress": "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF", "SpaceId": "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"}'`.
 
 ## .yml Config files
-Please see example in the '/etc' subfolder.
+Please see example in the 'etc' subfolder.
 
 ### Contracts section
 
@@ -32,6 +32,9 @@ contracts:
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeResolver.json
   resolver: 0x34F9c5CB9b6dcc036e045a15af20CEdC0dE4dcB2
+
+  // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeRegistrarImplementation.json
+  registrar: 0x6BA138bb7B1Bdea2B127D55D7C8F0DC9467b424E
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeRegistrarControllerPrivate.json
   private_controller: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732

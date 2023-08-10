@@ -95,17 +95,23 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 
 	// 4 - if name is not available, then get additional info
 	log.Info("name is NOT available...Getting additional info")
-	ea, aa, si, err := arpc.contracts.GetAdditionalNameInfo(conn, addr, in.GetFullName())
+	ea, aa, si, exp, err := arpc.contracts.GetAdditionalNameInfo(conn, addr, in.GetFullName())
 	if err != nil {
 		log.Error("failed to get additional info", zap.Error(err))
 		return nil, err
 	}
+
+	// convert unixtime (big int) to string
+	//timestamp := time.Unix(exp.Int64(), 0)
+	//timeString := timestamp.Format("2001-01-02 15:04:05")
 
 	log.Info("name is already registered...")
 	res.Available = false
 	res.OwnerEthAddress = ea
 	res.OwnerAnyAddress = aa
 	res.SpaceId = si
+	res.NameExpires = exp.Int64()
+
 	return &res, nil
 }
 

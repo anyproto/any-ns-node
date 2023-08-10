@@ -4,6 +4,7 @@ type Contracts struct {
 	GethUrl               string `yaml:"geth_url"`
 	AddrRegistry          string `yaml:"registry"`
 	AddrResolver          string `yaml:"resolver"`
+	AddrRegistrar         string `yaml:"registrar"`
 	AddrPrivateController string `yaml:"private_controller"`
 	AddrNameWrapper       string `yaml:"name_wrapper"`
 

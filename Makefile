@@ -58,6 +58,8 @@ anytype_crypto/ens_registry_stub.go: ../deployments/sepolia/ENSRegistry.json
 	abigen --bin contract.bin --abi contract.abi --pkg anytype_crypto --type ENSRegistry --out anytype_crypto/ens_registry_stub.go
 	rm contract.bin contract.abi
 
+# TODO: fix all ../deployments directories!
+# TODO: remove "sepolia" network dependency
 anytype_crypto/name_wrapper_stub.go: ../deployments/sepolia/AnytypeNameWrapper.json
 	node utils/combined_json_to_abi_and_bin.js ../deployments/sepolia/AnytypeNameWrapper.json
 	abigen --bin contract.bin --abi contract.abi --pkg anytype_crypto --type AnytypeNameWrapper --out anytype_crypto/name_wrapper_stub.go
@@ -73,12 +75,18 @@ anytype_crypto/anytype_controller_private_stub.go: ../deployments/sepolia/Anytyp
 	abigen --bin contract.bin --abi contract.abi --pkg anytype_crypto --type AnytypeRegistrarControllerPrivate --out anytype_crypto/anytype_controller_private_stub.go
 	rm contract.bin contract.abi
 
+anytype_crypto/anytype_registrar_stub.go: ../deployments/sepolia/AnytypeRegistrarImplementation.json
+	node utils/combined_json_to_abi_and_bin.js ../deployments/sepolia/AnytypeRegistrarImplementation.json
+	abigen --bin contract.bin --abi contract.abi --pkg anytype_crypto --type AnytypeRegistrarImplementation --out anytype_crypto/anytype_registrar_stub.go
+	rm contract.bin contract.abi
+
 # Go stubs generated from *.sol files
 anytype_crypto:\
     anytype_crypto/ens_registry_stub.go\
     anytype_crypto/name_wrapper_stub.go\
     anytype_crypto/anytype_resolver_stub.go\
-    anytype_crypto/anytype_controller_private_stub.go
+    anytype_crypto/anytype_controller_private_stub.go\
+    anytype_crypto/anytype_registrar_stub.go
 
 # Build everything
 .PHONY: all

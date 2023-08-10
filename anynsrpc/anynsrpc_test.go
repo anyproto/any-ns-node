@@ -2,6 +2,7 @@ package anynsrpc
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	"github.com/anyproto/any-sync/app"
@@ -172,8 +173,8 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 			return notEmptyAddr, nil
 		})
 
-		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}, owner interface{}) (string, string, string, error) {
-			return "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", nil
+		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
+			return "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", big.NewInt(12390243), nil
 		})
 
 		pctx := context.Background()
