@@ -4,6 +4,7 @@ import (
 	"time"
 
 	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	"go.uber.org/zap"
 )
 
 type QueueItemType int32
@@ -11,7 +12,7 @@ type QueueItemStatus int32
 
 // when adding new status, don't forget to update these function:
 // 1. StatusToState
-// 2. NameRegisterMoveStateNext
+// 2. NameRegisterMoveStateNext (IsStopProcessing in some rare cases)
 const (
 	OperationStatus_Initial    QueueItemStatus = 0
 	OperationStatus_CommitSent QueueItemStatus = 1
@@ -33,24 +34,18 @@ const (
 
 func StatusToState(status QueueItemStatus) as.OperationState {
 	switch status {
-	case OperationStatus_Initial:
+	case OperationStatus_Initial, OperationStatus_CommitSent, OperationStatus_CommitDone, OperationStatus_RegisterSent:
 		return as.OperationState_Pending
-	case OperationStatus_CommitSent:
-		return as.OperationState_Pending
-	case OperationStatus_RegisterSent:
-		return as.OperationState_Pending
+
+	case OperationStatus_CommitError, OperationStatus_RegisterError, OperationStatus_Error:
+		return as.OperationState_Error
+
 	case OperationStatus_Completed:
 		return as.OperationState_Completed
-
-	case OperationStatus_CommitError:
-		return as.OperationState_Error
-	case OperationStatus_RegisterError:
-		return as.OperationState_Error
-	case OperationStatus_Error:
-		return as.OperationState_Error
-	default:
-		return as.OperationState_Pending
 	}
+
+	log.Fatal("unknown status: ", zap.Any("status", status))
+	return as.OperationState_Error
 }
 
 // this structure is saved to mem queue and to DB
@@ -74,6 +69,9 @@ type QueueItem struct {
 	// for ItemType_NameRenew
 	NameRenewDurationSec uint64 `bson:"nameRenewDurationSec"`
 	TxRenewCommitHash    string `bson:"txRenewCommitHash"`
+
+	TxCurrentNonce uint64 `bson:"currentTxNonce"`
+	TxCurrentRetry uint   `bson:"currentTxRetry"`
 }
 
 // convert item to in-memory queue struct from initial dRPC request struct

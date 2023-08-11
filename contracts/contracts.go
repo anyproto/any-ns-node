@@ -400,6 +400,14 @@ func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Cl
 		return tx, err
 	}
 
+	// wait until TX is "seen" by the network (N times)
+	// can return ErrNonceTooHigh or just error
+	err = acontracts.WaitForTxToStartMining(ctx, conn, tx.Hash())
+	if err != nil {
+		log.Error("can not Register tx, can not start", zap.Error(err), zap.Any("tx", tx))
+		return tx, err
+	}
+
 	log.Info("commit tx sent", zap.String("TX hash", tx.Hash().Hex()))
 	return tx, nil
 }
@@ -456,7 +464,7 @@ func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registran
 		ownerControlledFuses)
 }
 
-func (acontracts *anynsContracts) Register(ctx context.Context, client *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error) {
+func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error) {
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
 
@@ -487,6 +495,14 @@ func (acontracts *anynsContracts) Register(ctx context.Context, client *ethclien
 			return tx, ErrNonceTooLow
 		}
 
+		return tx, err
+	}
+
+	// wait until TX is "seen" by the network (N times)
+	// can return ErrNonceTooHigh or just error
+	err = acontracts.WaitForTxToStartMining(ctx, conn, tx.Hash())
+	if err != nil {
+		log.Error("can not Register tx, can not start", zap.Error(err), zap.Any("tx", tx))
 		return tx, err
 	}
 

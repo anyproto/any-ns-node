@@ -46,6 +46,8 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 			return tx, nil
 		})
 
+		fx.itemColl = nil
+
 		pctx := context.Background()
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
@@ -55,7 +57,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				Status:          OperationStatus_Initial,
 			},
-			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -84,7 +85,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				Status: OperationStatus_CommitSent,
 			},
 			nil,
-			nil,
 		)
 		require.Error(t, err)
 		require.Equal(t, OperationStatus_CommitError, newState)
@@ -111,7 +111,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				Status: OperationStatus_CommitDone,
 			},
 			nil,
-			nil,
 		)
 
 		require.Error(t, err)
@@ -126,6 +125,8 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 			return true, nil
 		}).AnyTimes()
 
+		fx.itemColl = nil
+
 		pctx := context.Background()
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
@@ -137,7 +138,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				// wait for register tx
 				Status: OperationStatus_RegisterSent,
 			},
-			nil,
 			nil,
 		)
 
@@ -153,6 +153,8 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 			return true, nil
 		}).AnyTimes()
 
+		fx.itemColl = nil
+
 		pctx := context.Background()
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
@@ -166,7 +168,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				// also, SpaceID is attached to
 				SpaceId: "bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze",
 			},
-			nil,
 			nil,
 		)
 
@@ -220,9 +221,7 @@ func TestAnynsQueue_SaveItemToDb(t *testing.T) {
 
 		// save it
 		item.Status = OperationStatus_CommitSent
-		err = fx.SaveItemToDb(pctx, coll,
-			&item,
-		)
+		err = fx.SaveItemToDb(pctx, &item)
 		require.NoError(t, err)
 
 		// read status
@@ -276,7 +275,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// should move through first states
-		err = fx.NameRegister(pctx, &item, coll)
+		err = fx.NameRegister(pctx, &item)
 		require.NoError(t, err)
 
 		// read state from DB
@@ -336,7 +335,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// should move through first states
-		err = fx.NameRegister(pctx, &item, coll)
+		err = fx.NameRegister(pctx, &item)
 		require.NoError(t, err)
 
 		// read state from DB
@@ -402,7 +401,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// should move through first states
-		err = fx.NameRegister(pctx, &item, coll)
+		err = fx.NameRegister(pctx, &item)
 		require.NoError(t, err)
 
 		// read state from DB
@@ -515,13 +514,11 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		// save it
 		item.Status = OperationStatus_CommitSent
-		err = fx.SaveItemToDb(pctx, coll,
-			&item,
-		)
+		err = fx.SaveItemToDb(pctx, &item)
 		require.NoError(t, err)
 
 		// process
-		fx.FindAndProcessAllItemsInDb(pctx, coll)
+		fx.FindAndProcessAllItemsInDb(pctx)
 
 		// read status
 		s, err := fx.GetRequestStatus(pctx, 1)
@@ -601,10 +598,11 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	fx := &fixture{
-		a:          new(app.App),
-		ctrl:       gomock.NewController(t),
-		ts:         rpctest.NewTestServer(),
-		config:     new(config.Config),
+		a:      new(app.App),
+		ctrl:   gomock.NewController(t),
+		ts:     rpctest.NewTestServer(),
+		config: new(config.Config),
+
 		anynsQueue: New().(*anynsQueue),
 	}
 
