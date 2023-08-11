@@ -50,6 +50,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
+				ItemType:        ItemType_NameRegister,
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				Status:          OperationStatus_Initial,
@@ -75,6 +76,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
+				ItemType:        ItemType_NameRegister,
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				TxCommitHash:    "0x4a8e76e2739c2214eca73b0cfa05d0eb64dcfad0a27c027bf2ecf0ce00110963",
@@ -102,6 +104,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
+				ItemType:        ItemType_NameRegister,
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				// should send register tx
@@ -127,6 +130,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
+				ItemType:        ItemType_NameRegister,
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				TxRegisterHash:  "0x4a8e76e2739c2214eca73b0cfa05d0eb64dcfad0a27c027bf2ecf0ce00110963",
@@ -153,6 +157,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		err, newState := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
+				ItemType:        ItemType_NameRegister,
 				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				TxRegisterHash:  "0x4a8e76e2739c2214eca73b0cfa05d0eb64dcfad0a27c027bf2ecf0ce00110963",
@@ -203,6 +208,7 @@ func TestAnynsQueue_SaveItemToDb(t *testing.T) {
 
 		item := QueueItem{
 			Index:           1,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -259,6 +265,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 
 		item := QueueItem{
 			Index:           1,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -318,6 +325,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 
 		item := QueueItem{
 			Index:           1,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -383,6 +391,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 
 		item := QueueItem{
 			Index:           1,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -453,6 +462,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		item := QueueItem{
 			Index:           1,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -461,6 +471,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		item2 := QueueItem{
 			Index:           2,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -469,6 +480,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		item3 := QueueItem{
 			Index:           3,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -477,6 +489,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		item4 := QueueItem{
 			Index:           4,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
@@ -486,6 +499,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 		// should not process it
 		item5 := QueueItem{
 			Index:           5,
+			ItemType:        ItemType_NameRegister,
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 			OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",

@@ -268,6 +268,21 @@ func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFi
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
 }
 
+// RenewName mocks base method.
+func (m *MockContractsService) RenewName(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, fullName string, durationSec uint64, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RenewName", ctx, conn, opts, fullName, durationSec, controller)
+	ret0, _ := ret[0].(*types.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RenewName indicates an expected call of RenewName.
+func (mr *MockContractsServiceMockRecorder) RenewName(ctx, conn, opts, fullName, durationSec, controller interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenewName", reflect.TypeOf((*MockContractsService)(nil).RenewName), ctx, conn, opts, fullName, durationSec, controller)
+}
+
 // TxByHash mocks base method.
 func (m *MockContractsService) TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error) {
 	m.ctrl.T.Helper()

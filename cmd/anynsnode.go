@@ -135,6 +135,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 		clientNameRegister(client, ctx)
 	case "is-name-available":
 		clientIsNameAvailable(client, ctx)
+	case "name-renew":
+		clientNameRenew(client, ctx)
 	default:
 		log.Fatal("unknown command", zap.String("command", *command))
 	}
@@ -166,6 +168,22 @@ func clientNameRegister(client client.AnyNsClientService, ctx context.Context) {
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.NameRegister(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientNameRenew(client client.AnyNsClientService, ctx context.Context) {
+	var req = &as.NameRenewRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.NameRenew(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}

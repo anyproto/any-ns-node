@@ -41,6 +41,12 @@ message NameRegisterRequest {
   string spaceId = 4;
 }
 
+message NameRenewRequest {
+  string fullName = 1;
+
+  uint64 durationSeconds = 2;
+}
+
 message NameRegisterSignedRequest {
   // NameRegisterRequest struct
   bytes payload = 1;
@@ -89,9 +95,11 @@ service Anyns {
   // Get the async operation with id==X statue
   rpc GetOperationStatus(GetOperationStatusRequest) returns (OperationResponse) {}
 
+  // Renew name without changing the owner
+  rpc NameRenew(NameRenewRequest) returns (OperationResponse) {}
+
 // v2:
   // Add to queue a name update operation
   // rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
-  // rpc RenewName(NameRegisterRequest) returns (OperationResponse) {}
   // rpc GetNameByAddress()
 }

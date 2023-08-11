@@ -51,6 +51,8 @@ type ContractsService interface {
 	Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
 	Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
 
+	RenewName(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, fullName string, durationSec uint64, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
+
 	// aux
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
 	CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error)
@@ -390,6 +392,11 @@ func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Cl
 	if err != nil {
 		// TODO - handle the "replacement transaction underpriced" error
 		log.Error("failed to commit", zap.Error(err), zap.Any("tx", tx))
+
+		if err.Error() == "nonce too low" {
+			return tx, ErrNonceTooLow
+		}
+
 		return tx, err
 	}
 
@@ -475,6 +482,11 @@ func (acontracts *anynsContracts) Register(ctx context.Context, client *ethclien
 
 	if err != nil {
 		log.Error("failed to register", zap.Error(err), zap.Any("tx", tx))
+
+		if err.Error() == "nonce too low" {
+			return tx, ErrNonceTooLow
+		}
+
 		return tx, err
 	}
 
@@ -507,5 +519,25 @@ func (acontracts *anynsContracts) WaitForTxToStartMining(ctx context.Context, co
 		return err
 	}
 
-	return errors.New("nonce is too high")
+	return ErrNonceTooHigh
+}
+
+func (acontracts *anynsContracts) RenewName(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, fullName string, durationSec uint64, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+	tx, err := controller.Renew(
+		authOpts,
+		fullName,
+		big.NewInt(int64(durationSec)),
+	)
+
+	if err != nil {
+		log.Error("failed to renew", zap.Error(err), zap.Any("tx", tx))
+
+		if err.Error() == "nonce too low" {
+			return tx, ErrNonceTooLow
+		}
+		return tx, err
+	}
+
+	log.Info("renew tx sent", zap.String("TX hash", tx.Hash().Hex()))
+	return tx, nil
 }

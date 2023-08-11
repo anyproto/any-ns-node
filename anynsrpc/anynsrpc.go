@@ -202,3 +202,20 @@ func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
 	// everything is OK
 	return nil
 }
+
+func (arpc *anynsRpc) NameRenew(ctx context.Context, in *as.NameRenewRequest) (*as.OperationResponse, error) {
+	// 1 - check all parameters
+	// TODO:
+
+	// 2 - create new operation
+	operationId, err := arpc.queue.AddRenewRequest(ctx, in)
+	if err != nil {
+		log.Error("can not create new operation", zap.Error(err))
+		return nil, err
+	}
+
+	return &as.OperationResponse{
+		OperationState: as.OperationState_Pending,
+		OperationId:    operationId,
+	}, err
+}

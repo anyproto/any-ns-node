@@ -27,6 +27,8 @@ type AnyNsClientService interface {
 	NameRegister(ctx context.Context, in *as.NameRegisterRequest) (out *as.OperationResponse, err error)
 	NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error)
 
+	NameRenew(ctx context.Context, in *as.NameRenewRequest) (out *as.OperationResponse, err error)
+
 	app.ComponentRunnable
 }
 
@@ -115,6 +117,16 @@ func (s *service) NameRegister(ctx context.Context, in *as.NameRegisterRequest) 
 func (s *service) NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error) {
 	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
 		if out, err = cl.NameRegisterSigned(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+func (s *service) NameRenew(ctx context.Context, in *as.NameRenewRequest) (out *as.OperationResponse, err error) {
+	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
+		if out, err = cl.NameRenew(ctx, in); err != nil {
 			return rpcerr.Unwrap(err)
 		}
 		return nil

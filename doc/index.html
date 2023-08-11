@@ -203,6 +203,10 @@
                 </li>
               
                 <li>
+                  <a href="#.NameRenewRequest"><span class="badge">M</span>NameRenewRequest</a>
+                </li>
+              
+                <li>
                   <a href="#.NameUpdateRequest"><span class="badge">M</span>NameUpdateRequest</a>
                 </li>
               
@@ -440,6 +444,37 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
 
         
       
+        <h3 id=".NameRenewRequest">NameRenewRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>fullName</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>durationSeconds</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id=".NameUpdateRequest">NameUpdateRequest</h3>
         <p></p>
 
@@ -578,6 +613,13 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
                 <td><a href="#GetOperationStatusRequest">.GetOperationStatusRequest</a></td>
                 <td><a href="#OperationResponse">.OperationResponse</a></td>
                 <td><p>Get the async operation with id==X statue</p></td>
+              </tr>
+            
+              <tr>
+                <td>NameRenew</td>
+                <td><a href="#NameRenewRequest">.NameRenewRequest</a></td>
+                <td><a href="#OperationResponse">.OperationResponse</a></td>
+                <td><p>Renew name without changing the owner</p></td>
               </tr>
             
           </tbody>

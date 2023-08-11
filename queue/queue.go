@@ -37,9 +37,11 @@ func New() app.Component {
 }
 
 type QueueService interface {
-	// add new request to the queue and process it in the background
+	// 1 - new name registration request
 	AddNewRequest(ctx context.Context, req *as.NameRegisterRequest) (operationId int64, err error)
 	GetRequestStatus(ctx context.Context, operationId int64) (status as.OperationState, err error)
+	// 2 - name renew request
+	AddRenewRequest(ctx context.Context, req *as.NameRenewRequest) (operationId int64, err error)
 
 	// Internal methods (public for tests):
 	// read all "pending" items from DB and try to process em during startup
@@ -51,8 +53,8 @@ type QueueService interface {
 	// just update item status in the DB
 	SaveItemToDb(ctx context.Context, coll *mongo.Collection, queueItem *QueueItem) error
 
-	// process single "name registration" request, will update the status in the DB
-	// with each tx sent
+	// NameRegister functions and states:
+	// TODO: refactor - move to separate file
 	NameRegister(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection) error
 	NameRegisterMoveStateNext(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) (err error, newState QueueItemStatus)
 	IsStopProcessing(err error, prevState QueueItemStatus, newState QueueItemStatus) bool
@@ -61,11 +63,15 @@ type QueueService interface {
 	NameRegister_CommitSent(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
 	NameRegister_RegisterWaiting(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
 
+	// TODO: refactor - eliminate copy-paste here
 	NameRegister_CommitSent_RecoverLowNonce(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error
 	NameRegister_CommitSent_RecoverHighNonce(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error
-
 	NameRegister_CommitDone_RecoverLowNonce(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error
 	NameRegister_CommitDone_RecoverHighNonce(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client, nonce uint64, retryCount int) error
+
+	// NameRenew functions and states:
+	NameRenew(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection) error
+	NameRenewMoveStateNext(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error
 
 	app.ComponentRunnable
 }
@@ -273,9 +279,17 @@ func (aqueue *anynsQueue) ProcessItem(ctx context.Context, coll *mongo.Collectio
 		return aqueue.SaveItemToDb(ctx, coll, queueItem)
 	}
 
-	// 2 - process item
 	log.Info("processing item from DB", zap.Int64("Item Index", queueItem.Index))
-	return aqueue.NameRegister(ctx, queueItem, coll)
+
+	switch queueItem.ItemType {
+	case ItemType_NameRegister:
+		return aqueue.NameRegister(ctx, queueItem, coll)
+	case ItemType_NameRenew:
+		return aqueue.NameRenew(ctx, queueItem, coll)
+	}
+
+	log.Fatal("unknown item type", zap.Any("Item", queueItem))
+	return errors.New("unknown item type")
 }
 
 func (aqueue *anynsQueue) SaveItemToDb(ctx context.Context, coll *mongo.Collection, queueItem *QueueItem) error {
@@ -497,10 +511,10 @@ func (aqueue *anynsQueue) NameRegister_InitialState_WithNonce(ctx context.Contex
 		controller)
 
 	if err != nil {
-		// if we got "nonce is too low" error the tx is immediately rejected. to fix it:
+		// if we got "nonce too low" error the tx is immediately rejected. to fix it:
 		// - get nonce from network
 		// - send this tx again with +1 nonce
-		if err.Error() == "nonce too low" {
+		if err == contracts.ErrNonceTooLow {
 			return aqueue.NameRegister_CommitSent_RecoverLowNonce(ctx, queueItem, coll, conn, nonce, retryCount+1)
 		}
 
@@ -516,7 +530,7 @@ func (aqueue *anynsQueue) NameRegister_InitialState_WithNonce(ctx context.Contex
 		// - wait for N minutes for all TXs to settle
 		// - get new nonce from network
 		// - retry sending this tx with new nonce
-		if err.Error() == "nonce is too high" {
+		if err == contracts.ErrNonceTooHigh {
 			return aqueue.NameRegister_CommitSent_RecoverHighNonce(ctx, queueItem, coll, conn, nonce, retryCount+1)
 		}
 
@@ -689,10 +703,10 @@ func (aqueue *anynsQueue) NameRegister_CommitDone_WithNonce(ctx context.Context,
 		in.GetSpaceId())
 
 	if err != nil {
-		// if we got "nonce is too low" error the tx is immediately rejected. to fix it:
+		// if we got "nonce is low" error the tx is immediately rejected. to fix it:
 		// - get nonce from network
 		// - send this tx again with +1 nonce
-		if err.Error() == "nonce too low" {
+		if err == contracts.ErrNonceTooLow {
 			return aqueue.NameRegister_CommitDone_RecoverLowNonce(ctx, queueItem, coll, conn, nonce, retryCount+1)
 		}
 
@@ -708,7 +722,7 @@ func (aqueue *anynsQueue) NameRegister_CommitDone_WithNonce(ctx context.Context,
 		// - wait for N minutes for all TXs to settle
 		// - get new nonce from network
 		// - retry sending this tx with new nonce
-		if err.Error() == "nonce is too high" {
+		if err == contracts.ErrNonceTooHigh {
 			return aqueue.NameRegister_CommitDone_RecoverHighNonce(ctx, queueItem, coll, conn, nonce, retryCount+1)
 		}
 
@@ -819,5 +833,131 @@ func (aqueue *anynsQueue) NameRegister_RegisterWaiting(ctx context.Context, queu
 	}
 
 	log.Info("operation succeeded!")
+	return nil
+}
+
+func (aqueue *anynsQueue) AddRenewRequest(ctx context.Context, req *as.NameRenewRequest) (operationId int64, err error) {
+	// count all documents in the collection (filter can not be nil)
+	type countAllItemsQuery struct {
+	}
+
+	// find current item count in the queue
+	count, err := aqueue.itemColl.CountDocuments(ctx, countAllItemsQuery{})
+	if err != nil {
+		return 0, err
+	}
+
+	// 1 - insert into Mongo
+	item := queueItemFromNameRenewRequest(req, count)
+
+	_, err = aqueue.itemColl.InsertOne(ctx, item)
+	if err != nil {
+		return 0, err
+	}
+	log.Info("inserted pending renew operation into DB", zap.Int64("Item Index", item.Index))
+
+	// 2 - insert into in-memory queue
+	err = aqueue.q.Add(ctx, item.Index)
+	if err != nil {
+		// TODO: the record in DB will be never processed
+		return 0, err
+	}
+
+	operationId = item.Index
+	return operationId, nil
+}
+
+func (aqueue *anynsQueue) NameRenew(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection) error {
+	conn, err := aqueue.contracts.CreateEthConnection()
+	if err != nil {
+		log.Error("failed to connect to geth", zap.Error(err))
+		return err
+	}
+
+	// just try to renew and finish with this item
+	err = aqueue.NameRenewMoveStateNext(ctx, queueItem, coll, conn)
+	newState := OperationStatus_Completed // success
+
+	if err != nil {
+		newState = OperationStatus_Error
+	}
+	err2 := aqueue.UpdateItemStatus(ctx, coll, queueItem.Index, newState)
+	if err2 != nil {
+		log.Error("failed to update item status in DB", zap.Error(err))
+		return err2
+	}
+
+	return nil
+}
+
+func (aqueue *anynsQueue) NameRenewMoveStateNext(ctx context.Context, queueItem *QueueItem, coll *mongo.Collection, conn *ethclient.Client) error {
+	controller, err := aqueue.contracts.ConnectToController(conn)
+	if err != nil {
+		log.Error("failed to connect to contract", zap.Error(err))
+		return err
+	}
+
+	// 1 - get proper nonce (from DB, config file or network)
+	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
+	if err != nil {
+		log.Error("can not get nonce", zap.Error(err))
+		return err
+	}
+
+	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin(conn)
+	if err != nil {
+		log.Error("can not get auth params for admin", zap.Error(err))
+		return err
+	}
+	if authOpts != nil {
+		authOpts.Nonce = big.NewInt(int64(nonce))
+	}
+	log.Info("Nonce is", zap.Any("Nonce", nonce))
+
+	// 2 - send tx to the network
+	tx, err := aqueue.contracts.RenewName(
+		ctx,
+		conn,
+		authOpts,
+		queueItem.FullName,
+		queueItem.NameRenewDurationSec,
+		controller)
+
+	if err != nil {
+		if err == contracts.ErrNonceTooLow {
+			// TODO:
+		}
+
+		log.Error("can not Regsiter tx", zap.Error(err))
+		return ErrRenewFailed
+	}
+
+	// TODO: check if started to mine?
+
+	// wait for tx to be mined
+	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
+	if err != nil {
+		log.Error("can not wait for register tx", zap.Error(err))
+		return ErrRenewFailed
+	}
+	if !txRes {
+		log.Warn("tx finished with ERROR result", zap.String("tx hash", queueItem.TxRegisterHash))
+		return ErrRenewFailed
+	}
+
+	// TODO: recover from low,high nonce
+
+	// update item in DB (optional)
+	if coll != nil {
+		queueItem.Status = OperationStatus_Completed
+
+		err = aqueue.SaveItemToDb(ctx, coll, queueItem)
+		if err != nil {
+			log.Error("can not save last update", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
+			return ErrRenewFailed
+		}
+	}
+
+	log.Info("renew operation succeeded!")
 	return nil
 }

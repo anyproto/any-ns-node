@@ -9,6 +9,7 @@ import (
 var (
 	ErrCommitFailed   = errors.New("failed to commit name")
 	ErrRegisterFailed = errors.New("failed to register name")
+	ErrRenewFailed    = errors.New("failed to renew name")
 )
 
 func nameRegisterErrToStatus(err error) QueueItemStatus {

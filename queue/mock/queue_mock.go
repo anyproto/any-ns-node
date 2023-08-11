@@ -54,6 +54,21 @@ func (mr *MockQueueServiceMockRecorder) AddNewRequest(ctx, req interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNewRequest", reflect.TypeOf((*MockQueueService)(nil).AddNewRequest), ctx, req)
 }
 
+// AddRenewRequest mocks base method.
+func (m *MockQueueService) AddRenewRequest(ctx context.Context, req *anyns_api_server.NameRenewRequest) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddRenewRequest", ctx, req)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddRenewRequest indicates an expected call of AddRenewRequest.
+func (mr *MockQueueServiceMockRecorder) AddRenewRequest(ctx, req interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRenewRequest", reflect.TypeOf((*MockQueueService)(nil).AddRenewRequest), ctx, req)
+}
+
 // Close mocks base method.
 func (m *MockQueueService) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -274,6 +289,20 @@ func (m *MockQueueService) NameRegister_RegisterWaiting(ctx context.Context, que
 func (mr *MockQueueServiceMockRecorder) NameRegister_RegisterWaiting(ctx, queueItem, coll, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_RegisterWaiting", reflect.TypeOf((*MockQueueService)(nil).NameRegister_RegisterWaiting), ctx, queueItem, coll, conn)
+}
+
+// NameRenew mocks base method.
+func (m *MockQueueService) NameRenew(ctx context.Context, queueItem *queue.QueueItem, coll *mongo.Collection) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NameRenew", ctx, queueItem, coll)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// NameRenew indicates an expected call of NameRenew.
+func (mr *MockQueueServiceMockRecorder) NameRenew(ctx, queueItem, coll interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRenew", reflect.TypeOf((*MockQueueService)(nil).NameRenew), ctx, queueItem, coll)
 }
 
 // ProcessItem mocks base method.
