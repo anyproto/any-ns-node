@@ -178,20 +178,6 @@ func (mr *MockQueueServiceMockRecorder) Name() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockQueueService)(nil).Name))
 }
 
-// NameRegister mocks base method.
-func (m *MockQueueService) NameRegister(ctx context.Context, queueItem *queue.QueueItem) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRegister", ctx, queueItem)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// NameRegister indicates an expected call of NameRegister.
-func (mr *MockQueueServiceMockRecorder) NameRegister(ctx, queueItem interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister", reflect.TypeOf((*MockQueueService)(nil).NameRegister), ctx, queueItem)
-}
-
 // NameRegisterMoveStateNext mocks base method.
 func (m *MockQueueService) NameRegisterMoveStateNext(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) (error, queue.QueueItemStatus) {
 	m.ctrl.T.Helper()
@@ -249,26 +235,13 @@ func (mr *MockQueueServiceMockRecorder) NameRegister_RegisterWaiting(ctx, queueI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_RegisterWaiting", reflect.TypeOf((*MockQueueService)(nil).NameRegister_RegisterWaiting), ctx, queueItem, conn)
 }
 
-// NameRenew mocks base method.
-func (m *MockQueueService) NameRenew(ctx context.Context, queueItem *queue.QueueItem) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRenew", ctx, queueItem)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// NameRenew indicates an expected call of NameRenew.
-func (mr *MockQueueServiceMockRecorder) NameRenew(ctx, queueItem interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRenew", reflect.TypeOf((*MockQueueService)(nil).NameRenew), ctx, queueItem)
-}
-
 // NameRenewMoveStateNext mocks base method.
-func (m *MockQueueService) NameRenewMoveStateNext(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) error {
+func (m *MockQueueService) NameRenewMoveStateNext(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) (error, queue.QueueItemStatus) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NameRenewMoveStateNext", ctx, queueItem, conn)
 	ret0, _ := ret[0].(error)
-	return ret0
+	ret1, _ := ret[1].(queue.QueueItemStatus)
+	return ret0, ret1
 }
 
 // NameRenewMoveStateNext indicates an expected call of NameRenewMoveStateNext.

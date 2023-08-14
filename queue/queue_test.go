@@ -275,7 +275,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// should move through first states
-		err = fx.NameRegister(pctx, &item)
+		err = fx.ProcessItem(pctx, &item)
 		require.NoError(t, err)
 
 		// read state from DB
@@ -335,7 +335,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// should move through first states
-		err = fx.NameRegister(pctx, &item)
+		err = fx.ProcessItem(pctx, &item)
 		require.NoError(t, err)
 
 		// read state from DB
@@ -401,7 +401,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// should move through first states
-		err = fx.NameRegister(pctx, &item)
+		err = fx.ProcessItem(pctx, &item)
 		require.NoError(t, err)
 
 		// read state from DB
@@ -438,14 +438,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 		}).AnyTimes()
 
 		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
-			// no error
-			var tx = types.NewTransaction(
-				0,
-				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-				big.NewInt(0), 0, big.NewInt(0),
-				nil,
-			)
-			return tx, nil
+			return nil, errors.New("some error")
 		}).AnyTimes()
 
 		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
