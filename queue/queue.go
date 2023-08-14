@@ -57,6 +57,7 @@ type QueueService interface {
 	// TODO: refactor - move to separate file
 	NameRegister(ctx context.Context, queueItem *QueueItem) error
 	NameRegisterMoveStateNext(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (err error, newState QueueItemStatus)
+	HandleNonceErrors(err error, prevState QueueItemStatus, newState QueueItemStatus, ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (errOut error, newStatusOut QueueItemStatus)
 	IsStopProcessing(err error, prevState QueueItemStatus, newState QueueItemStatus) bool
 
 	NameRegister_InitialState(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error
@@ -331,7 +332,7 @@ func (aqueue *anynsQueue) RecoverLowNonce(ctx context.Context, queueItem *QueueI
 	retryCount := queueItem.TxCurrentRetry
 	nonce := queueItem.TxCurrentNonce
 
-	if retryCount >= aqueue.confQueue.NonceRetryCount {
+	if retryCount >= aqueue.confQueue.LowNonceRetryCount {
 		return errors.New("NONCE IS TOO LOW but RETRY COUNT IS TOO BIG, STOP...")
 	}
 
@@ -362,9 +363,8 @@ func (aqueue *anynsQueue) RecoverLowNonce(ctx context.Context, queueItem *QueueI
 func (aqueue *anynsQueue) RecoverHighNonce(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
 	retryCount := queueItem.TxCurrentRetry
 
-	// TODO: move to config
-	// do not give more than 2 tries
-	if retryCount >= 2 {
+	// do not give more than N tries
+	if retryCount >= aqueue.confQueue.HighNonceRetryCount {
 		return errors.New("NONCE IS probably TOO HIGH but RETRY COUNT IS TOO BIG, STOP...")
 	}
 
@@ -406,19 +406,10 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 		return err
 	}
 
-	// 1 - init nonce
-	// get nonce (from DB, config file or network)
-	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
+	// 1 - init item - reset retry count, get new nonce
+	err = aqueue.InitNonce(ctx, queueItem)
 	if err != nil {
-		log.Error("can not get nonce", zap.Error(err))
-		return err
-	}
-	queueItem.TxCurrentNonce = nonce
-	queueItem.TxCurrentRetry = 0 // reset retries counter
-
-	err = aqueue.SaveItemToDb(ctx, queueItem)
-	if err != nil {
-		log.Error("failed to save item to DB", zap.Error(err))
+		log.Error("failed to connect to geth", zap.Error(err))
 		return err
 	}
 
@@ -432,28 +423,8 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 		// OperationStatus_RegisterSent -> OperationStatus_Completed
 		err, newState := aqueue.NameRegisterMoveStateNext(ctx, queueItem, conn)
 
-		// 3 - try to recover from errors
-		if err != nil {
-			if err == contracts.ErrNonceTooLow {
-				// if we got "nonce too low" error the tx is immediately rejected. to fix it:
-				// - get nonce from network
-				// - send this tx again with +1 nonce
-				aqueue.RecoverLowNonce(ctx, queueItem, conn)
-
-				newState = prevState // try again with the same state
-				err = nil
-			} else if err == contracts.ErrNonceTooHigh {
-				// if nonce is higher than needed - tx will be rejected by the network with "not found" error immediately
-				// in this case we:
-				// - wait for N minutes for all TXs to settle
-				// - get new nonce from network
-				// - retry sending this tx with new nonce
-				aqueue.RecoverHighNonce(ctx, queueItem, conn)
-
-				newState = prevState // try again with the same state
-				err = nil
-			}
-		}
+		// 3 - handle nonce errors
+		err, newState = aqueue.HandleNonceErrors(err, prevState, newState, ctx, queueItem, conn)
 
 		// 4 - update state in DB
 		if newState != prevState {
@@ -471,6 +442,52 @@ func (aqueue *anynsQueue) NameRegister(ctx context.Context, queueItem *QueueItem
 			return nil
 		}
 	}
+}
+
+func (aqueue *anynsQueue) InitNonce(ctx context.Context, queueItem *QueueItem) error {
+	// get nonce (from DB, config file or network)
+	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
+	if err != nil {
+		log.Error("can not get nonce", zap.Error(err))
+		return err
+	}
+	queueItem.TxCurrentNonce = nonce
+	queueItem.TxCurrentRetry = 0 // reset retries counter
+
+	err = aqueue.SaveItemToDb(ctx, queueItem)
+	if err != nil {
+		log.Error("failed to save item to DB", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (aqueue *anynsQueue) HandleNonceErrors(err error, prevState QueueItemStatus, newState QueueItemStatus, ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (errOut error, newStatusOut QueueItemStatus) {
+	// try to recover from nonoce errors
+	if err != nil {
+		if err == contracts.ErrNonceTooLow {
+			// if we got "nonce too low" error the tx is immediately rejected. to fix it:
+			// - get nonce from network
+			// - send this tx again with +1 nonce
+			aqueue.RecoverLowNonce(ctx, queueItem, conn)
+
+			newState = prevState // try again with the same state
+			err = nil
+		} else if err == contracts.ErrNonceTooHigh {
+			// if nonce is higher than needed - tx will be rejected by the network with "not found" error immediately
+			// in this case we:
+			// - wait for N minutes for all TXs to settle
+			// - get new nonce from network
+			// - retry sending this tx with new nonce
+			aqueue.RecoverHighNonce(ctx, queueItem, conn)
+
+			newState = prevState // try again with the same state
+			err = nil
+		}
+	}
+
+	return err, newState
 }
 
 func (aqueue *anynsQueue) IsStopProcessing(err error, prevState QueueItemStatus, newState QueueItemStatus) bool {
@@ -684,12 +701,7 @@ func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem
 
 // generate new register tx
 func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
-	// get proper nonce (from DB, config file or network)
-	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
-	if err != nil {
-		log.Error("can not get nonce", zap.Error(err))
-		return err
-	}
+	nonce := queueItem.TxCurrentNonce
 
 	controller, err := aqueue.contracts.ConnectToController(conn)
 	if err != nil {

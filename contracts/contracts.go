@@ -394,8 +394,8 @@ func (acontracts *anynsContracts) WaitForTxToStartMining(ctx context.Context, co
 	//
 	// so we will wait N times each X seconds long
 	// if tx is not mined after N*X seconds - we will assume that it is "nonce is too high" error
-	// TODO: move to config
-	for i := 0; i < 5; i++ {
+	var i uint = 0
+	for ; i < acontracts.config.WaitMiningRetryCount; i++ {
 		tx, err := acontracts.TxByHash(ctx, conn, txHash)
 		if (err == nil) && (tx != nil) {
 			// tx mined!

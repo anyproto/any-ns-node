@@ -36,7 +36,9 @@ contracts:
   name_wrapper: 0xFe69BF9B3fD69d09977b37b5953C8B43687f3B23
   admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
   admin_pk: XXX
+  wait_mining_retry_count: 5
 queue:
   skip_processing: false
   skip_background_processing: false
   nonce_retry_count: 10
+  high_nonce_retry_count: 2

@@ -11,5 +11,7 @@ type Queue struct {
 
 	SkipBackroundProcessing bool `yaml:"skip_background_processing"`
 
-	NonceRetryCount uint `yaml:"nonce_retry_count"`
+	LowNonceRetryCount uint `yaml:"nonce_retry_count"`
+
+	HighNonceRetryCount uint `yaml:"high_nonce_retry_count"`
 }

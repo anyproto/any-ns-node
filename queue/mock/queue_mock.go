@@ -121,6 +121,21 @@ func (mr *MockQueueServiceMockRecorder) GetRequestStatus(ctx, operationId interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRequestStatus", reflect.TypeOf((*MockQueueService)(nil).GetRequestStatus), ctx, operationId)
 }
 
+// HandleNonceErrors mocks base method.
+func (m *MockQueueService) HandleNonceErrors(err error, prevState, newState queue.QueueItemStatus, ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) (error, queue.QueueItemStatus) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleNonceErrors", err, prevState, newState, ctx, queueItem, conn)
+	ret0, _ := ret[0].(error)
+	ret1, _ := ret[1].(queue.QueueItemStatus)
+	return ret0, ret1
+}
+
+// HandleNonceErrors indicates an expected call of HandleNonceErrors.
+func (mr *MockQueueServiceMockRecorder) HandleNonceErrors(err, prevState, newState, ctx, queueItem, conn interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleNonceErrors", reflect.TypeOf((*MockQueueService)(nil).HandleNonceErrors), err, prevState, newState, ctx, queueItem, conn)
+}
+
 // Init mocks base method.
 func (m *MockQueueService) Init(a *app.App) error {
 	m.ctrl.T.Helper()
