@@ -4,6 +4,7 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/anyproto/any-sync/app"
@@ -891,12 +892,19 @@ func (aqueue *anynsQueue) NameRenewMoveStateNext(ctx context.Context, queueItem 
 	}
 	log.Info("Nonce is", zap.Any("Nonce", nonce))
 
+	//
+	parts := strings.Split(queueItem.FullName, ".")
+	if len(parts) != 2 {
+		return errors.New("invalid name")
+	}
+	firstPart := parts[0]
+
 	// 2 - send tx to the network
 	tx, err := aqueue.contracts.RenewName(
 		ctx,
 		conn,
 		authOpts,
-		queueItem.FullName,
+		firstPart,
 		queueItem.NameRenewDurationSec,
 		controller)
 
@@ -921,7 +929,7 @@ func (aqueue *anynsQueue) NameRenewMoveStateNext(ctx context.Context, queueItem 
 		return ErrRenewFailed
 	}
 	if !txRes {
-		log.Warn("tx finished with ERROR result", zap.String("tx hash", queueItem.TxRegisterHash))
+		log.Warn("tx finished with ERROR result", zap.String("tx hash", tx.Hash().String()))
 		return ErrRenewFailed
 	}
 

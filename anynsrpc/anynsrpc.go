@@ -205,7 +205,10 @@ func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
 
 func (arpc *anynsRpc) NameRenew(ctx context.Context, in *as.NameRenewRequest) (*as.OperationResponse, error) {
 	// 1 - check all parameters
-	// TODO:
+	if !checkName(in.FullName) {
+		log.Error("invalid name", zap.String("name", in.FullName))
+		return nil, errors.New("invalid name")
+	}
 
 	// 2 - create new operation
 	operationId, err := arpc.queue.AddRenewRequest(ctx, in)
