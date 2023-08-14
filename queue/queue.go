@@ -334,7 +334,7 @@ func (aqueue *anynsQueue) RecoverLowNonce(ctx context.Context, queueItem *QueueI
 		return errors.New("NONCE IS TOO LOW but RETRY COUNT IS TOO BIG, STOP...")
 	}
 
-	log.Error("NONCE IS TOO LOW!!! Retrying with new nonce...", zap.Any("retry", retryCount))
+	log.Warn("NONCE IS TOO LOW!!! Retrying with new nonce...", zap.Any("retry", retryCount))
 
 	// update nonce in the DB immediately, even if TX is still not sent
 	_, err := aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
@@ -361,12 +361,13 @@ func (aqueue *anynsQueue) RecoverLowNonce(ctx context.Context, queueItem *QueueI
 func (aqueue *anynsQueue) RecoverHighNonce(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
 	retryCount := queueItem.TxCurrentRetry
 
+	// TODO: move to config
 	// do not give more than 2 tries
 	if retryCount >= 2 {
 		return errors.New("NONCE IS probably TOO HIGH but RETRY COUNT IS TOO BIG, STOP...")
 	}
 
-	log.Error("NONCE IS probably TOO HIGH!!! Retrying with new nonce...", zap.Any("retry", retryCount))
+	log.Warn("NONCE IS probably TOO HIGH!!! Retrying with new nonce...", zap.Any("retry", retryCount))
 
 	// - get new nonce from network
 	newNonce, err := aqueue.nonceManager.GetCurrentNonceFromNetwork(common.HexToAddress(aqueue.confContracts.AddrAdmin))
@@ -638,11 +639,21 @@ func (aqueue *anynsQueue) NameRegister_CommitSent(ctx context.Context, queueItem
 	}
 
 	log.Info("waiting for commit tx", zap.String("tx hash", queueItem.TxCommitHash), zap.Any("Item", queueItem))
+	txHash := common.HexToHash(queueItem.TxCommitHash)
+
+	// 0 - try to wait for TX first and handle "nonce too high" error
+	// wait until TX is "seen" by the network (N times)
+	// can return ErrNonceTooHigh or just error
+	err := aqueue.contracts.WaitForTxToStartMining(ctx, conn, txHash)
+	if err != nil {
+		log.Error("can not wait for Commit tx, can not start", zap.Error(err))
+		return err
+	}
 
 	// 1
-	txHash := common.HexToHash(queueItem.TxCommitHash)
 	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
 	if err != nil {
+		// TODO: handle it and retry
 		log.Error("failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
 		return ErrCommitFailed
 	}
@@ -728,7 +739,7 @@ func (aqueue *anynsQueue) NameRegister_CommitDone(ctx context.Context, queueItem
 	// can return ErrNonceTooHigh error
 	if err != nil {
 		log.Error("can not Regsiter tx", zap.Error(err))
-		return ErrRegisterFailed
+		return err
 	}
 
 	// update nonce in DB
@@ -762,8 +773,19 @@ func (aqueue *anynsQueue) NameRegister_RegisterWaiting(ctx context.Context, queu
 
 	log.Info("waiting for register tx", zap.String("tx hash", queueItem.TxRegisterHash), zap.Any("Item", queueItem))
 	txHash := common.HexToHash(queueItem.TxRegisterHash)
+
+	// 0 - try to wait for TX first and handle "nonce too high" error
+	// wait until TX is "seen" by the network (N times)
+	// can return ErrNonceTooHigh or just error
+	err := aqueue.contracts.WaitForTxToStartMining(ctx, conn, txHash)
+	if err != nil {
+		log.Error("can not wait for Register tx, can not start", zap.Error(err))
+		return err
+	}
+
 	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
 	if err != nil {
+		// TODO: handle it and retry
 		log.Error("failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxRegisterHash))
 		return ErrRegisterFailed
 	}
@@ -878,16 +900,19 @@ func (aqueue *anynsQueue) NameRenewMoveStateNext(ctx context.Context, queueItem 
 		queueItem.NameRenewDurationSec,
 		controller)
 
+	// can return ErrNonceTooLow error
+	// can return ErrNonceTooHigh error
 	if err != nil {
-		if err == contracts.ErrNonceTooLow {
-			// TODO:
-		}
-
 		log.Error("can not Regsiter tx", zap.Error(err))
-		return ErrRenewFailed
+		return err
 	}
 
-	// TODO: check if started to mine?
+	// update nonce in DB
+	_, err = aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
+	if err != nil {
+		log.Error("can not update nonce in DB!", zap.Error(err))
+		return err
+	}
 
 	// wait for tx to be mined
 	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
@@ -899,8 +924,6 @@ func (aqueue *anynsQueue) NameRenewMoveStateNext(ctx context.Context, queueItem 
 		log.Warn("tx finished with ERROR result", zap.String("tx hash", queueItem.TxRegisterHash))
 		return ErrRenewFailed
 	}
-
-	// TODO: recover from low,high nonce
 
 	// update item in DB
 	queueItem.Status = OperationStatus_Completed

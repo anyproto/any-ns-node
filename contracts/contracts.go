@@ -387,29 +387,36 @@ func (acontracts *anynsContracts) checkTransactionReceipt(conn *ethclient.Client
 	return false
 }
 
-func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
-	tx, err := controller.Commit(opts, commitment)
-	if err != nil {
-		// TODO - handle the "replacement transaction underpriced" error
-		log.Error("failed to commit", zap.Error(err), zap.Any("tx", tx))
-
-		if err.Error() == "nonce too low" {
-			return tx, ErrNonceTooLow
+func (acontracts *anynsContracts) WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) (err error) {
+	// if transaction is not returned by node immediately after it is sent... it is either:
+	// 1. "nonce is too high" error
+	// 2. normal behaviour
+	//
+	// so we will wait N times each X seconds long
+	// if tx is not mined after N*X seconds - we will assume that it is "nonce is too high" error
+	// TODO: move to config
+	for i := 0; i < 5; i++ {
+		tx, err := acontracts.TxByHash(ctx, conn, txHash)
+		if (err == nil) && (tx != nil) {
+			// tx mined!
+			// TODO: sometimes it gives us false positives here :-(((
+			log.Debug("NOT a HIGH NONCE!!!", zap.Any("tx", tx))
+			return nil
 		}
 
-		return tx, err
+		if err.Error() == "not found" {
+			// wait and try again
+			log.Warn("tx is still not found. waiting...", zap.Any("tx hash", txHash), zap.Any("try", i))
+
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		// for any other error -> return it
+		return err
 	}
 
-	// wait until TX is "seen" by the network (N times)
-	// can return ErrNonceTooHigh or just error
-	err = acontracts.WaitForTxToStartMining(ctx, conn, tx.Hash())
-	if err != nil {
-		log.Error("can not Register tx, can not start", zap.Error(err), zap.Any("tx", tx))
-		return tx, err
-	}
-
-	log.Info("commit tx sent", zap.String("TX hash", tx.Hash().Hex()))
-	return tx, nil
+	log.Warn("Probably we have HIGH NONCE...")
+	return ErrNonceTooHigh
 }
 
 func (acontracts *anynsContracts) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error) {
@@ -464,6 +471,31 @@ func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registran
 		ownerControlledFuses)
 }
 
+func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+	tx, err := controller.Commit(opts, commitment)
+	if err != nil {
+		// TODO - handle the "replacement transaction underpriced" error
+		log.Error("failed to commit", zap.Error(err), zap.Any("tx", tx))
+
+		if err.Error() == "nonce too low" {
+			return tx, ErrNonceTooLow
+		}
+
+		return tx, err
+	}
+
+	// wait until TX is "seen" by the network (N times)
+	// can return ErrNonceTooHigh or just error
+	err = acontracts.WaitForTxToStartMining(ctx, conn, tx.Hash())
+	if err != nil {
+		log.Error("can not Commit tx, can not start", zap.Error(err), zap.Any("tx", tx))
+		return tx, err
+	}
+
+	log.Info("commit tx sent", zap.String("TX hash", tx.Hash().Hex()))
+	return tx, nil
+}
+
 func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error) {
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
@@ -510,34 +542,6 @@ func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.
 	return tx, nil
 }
 
-func (acontracts *anynsContracts) WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) (err error) {
-	// if transaction is not returned by node immediately after it is sent... it is either:
-	// 1. "nonce is too high" error
-	// 2. normal behaviour
-	//
-	// so we will wait N times each X seconds long
-	// if tx is not mined after N*X seconds - we will assume that it is "nonce is too high" error
-	for i := 0; i < 5; i++ {
-		_, err = acontracts.TxByHash(ctx, conn, txHash)
-		if err == nil {
-			// tx mined!
-			return nil
-		}
-
-		if err.Error() == "not found" {
-			// wait and try again
-			log.Warn("tx is still not found. waiting...", zap.Any("tx hash", txHash), zap.Any("try", i))
-
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		// for any other error -> return it
-		return err
-	}
-
-	return ErrNonceTooHigh
-}
-
 func (acontracts *anynsContracts) RenewName(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, fullName string, durationSec uint64, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
 	tx, err := controller.Renew(
 		authOpts,
@@ -551,6 +555,14 @@ func (acontracts *anynsContracts) RenewName(ctx context.Context, conn *ethclient
 		if err.Error() == "nonce too low" {
 			return tx, ErrNonceTooLow
 		}
+		return tx, err
+	}
+
+	// wait until TX is "seen" by the network (N times)
+	// can return ErrNonceTooHigh or just error
+	err = acontracts.WaitForTxToStartMining(ctx, conn, tx.Hash())
+	if err != nil {
+		log.Error("can not Register tx, can not start", zap.Error(err), zap.Any("tx", tx))
 		return tx, err
 	}
 
