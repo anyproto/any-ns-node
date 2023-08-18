@@ -29,11 +29,11 @@ log:
   production: false
 contracts:
   geth_url: https://sepolia.infura.io/v3/XXX
-  registry: 0xc0D3c96aE923Da6b45E6d4c21a0424730a20BCA9
-  resolver: 0x34F9c5CB9b6dcc036e045a15af20CEdC0dE4dcB2
-  private_controller: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732
-  registrar: 0x6BA138bb7B1Bdea2B127D55D7C8F0DC9467b424E
-  name_wrapper: 0xFe69BF9B3fD69d09977b37b5953C8B43687f3B23
+  registry: 0xfDA2A52fB6407Ae5c35Dff96837c6d5768c76a79 
+  resolver: 0x2E6B72443612bDDd668BB60b18a030cb6aE806CE 
+  registrar: 0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA 
+  private_controller: 0x1120Ac6114CEc38Ccd66a45e0D612f159876980E 
+  name_wrapper: 0xC68FC50baebA616916C390d035Cf485d8F039d21
   admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
   admin_pk: XXX
   wait_mining_retry_count: 5
