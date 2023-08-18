@@ -195,6 +195,14 @@
                 </li>
               
                 <li>
+                  <a href="#.NameByAddressRequest"><span class="badge">M</span>NameByAddressRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.NameByAddressResponse"><span class="badge">M</span>NameByAddressResponse</a>
+                </li>
+              
+                <li>
                   <a href="#.NameRegisterRequest"><span class="badge">M</span>NameRegisterRequest</a>
                 </li>
               
@@ -359,6 +367,61 @@ This field is non-empty only if name is &#34;already registered&#34; </p></td>
                   <td></td>
                   <td><p>doestn&#39;t work with marashalling/unmarshalling
 google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".NameByAddressRequest">NameByAddressRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that name </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".NameByAddressResponse">NameByAddressResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>found</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -592,6 +655,13 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
                 <td><a href="#NameAvailableRequest">.NameAvailableRequest</a></td>
                 <td><a href="#NameAvailableResponse">.NameAvailableResponse</a></td>
                 <td><p>Check if name is free or get the attached information if not</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetNameByAddress</td>
+                <td><a href="#NameByAddressRequest">.NameByAddressRequest</a></td>
+                <td><a href="#NameByAddressResponse">.NameByAddressResponse</a></td>
+                <td><p></p></td>
               </tr>
             
               <tr>

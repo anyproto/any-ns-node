@@ -41,6 +41,7 @@ type DRPCAnynsClient interface {
 	DRPCConn() drpc.Conn
 
 	IsNameAvailable(ctx context.Context, in *NameAvailableRequest) (*NameAvailableResponse, error)
+	GetNameByAddress(ctx context.Context, in *NameByAddressRequest) (*NameByAddressResponse, error)
 	NameRegister(ctx context.Context, in *NameRegisterRequest) (*OperationResponse, error)
 	NameRegisterSigned(ctx context.Context, in *NameRegisterSignedRequest) (*OperationResponse, error)
 	GetOperationStatus(ctx context.Context, in *GetOperationStatusRequest) (*OperationResponse, error)
@@ -60,6 +61,15 @@ func (c *drpcAnynsClient) DRPCConn() drpc.Conn { return c.cc }
 func (c *drpcAnynsClient) IsNameAvailable(ctx context.Context, in *NameAvailableRequest) (*NameAvailableResponse, error) {
 	out := new(NameAvailableResponse)
 	err := c.cc.Invoke(ctx, "/Anyns/IsNameAvailable", drpcEncoding_File_proto_anyns_api_server_proto{}, in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *drpcAnynsClient) GetNameByAddress(ctx context.Context, in *NameByAddressRequest) (*NameByAddressResponse, error) {
+	out := new(NameByAddressResponse)
+	err := c.cc.Invoke(ctx, "/Anyns/GetNameByAddress", drpcEncoding_File_proto_anyns_api_server_proto{}, in, out)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +114,7 @@ func (c *drpcAnynsClient) NameRenew(ctx context.Context, in *NameRenewRequest) (
 
 type DRPCAnynsServer interface {
 	IsNameAvailable(context.Context, *NameAvailableRequest) (*NameAvailableResponse, error)
+	GetNameByAddress(context.Context, *NameByAddressRequest) (*NameByAddressResponse, error)
 	NameRegister(context.Context, *NameRegisterRequest) (*OperationResponse, error)
 	NameRegisterSigned(context.Context, *NameRegisterSignedRequest) (*OperationResponse, error)
 	GetOperationStatus(context.Context, *GetOperationStatusRequest) (*OperationResponse, error)
@@ -113,6 +124,10 @@ type DRPCAnynsServer interface {
 type DRPCAnynsUnimplementedServer struct{}
 
 func (s *DRPCAnynsUnimplementedServer) IsNameAvailable(context.Context, *NameAvailableRequest) (*NameAvailableResponse, error) {
+	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
+}
+
+func (s *DRPCAnynsUnimplementedServer) GetNameByAddress(context.Context, *NameByAddressRequest) (*NameByAddressResponse, error) {
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
@@ -134,7 +149,7 @@ func (s *DRPCAnynsUnimplementedServer) NameRenew(context.Context, *NameRenewRequ
 
 type DRPCAnynsDescription struct{}
 
-func (DRPCAnynsDescription) NumMethods() int { return 5 }
+func (DRPCAnynsDescription) NumMethods() int { return 6 }
 
 func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver, interface{}, bool) {
 	switch n {
@@ -148,6 +163,15 @@ func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver,
 					)
 			}, DRPCAnynsServer.IsNameAvailable, true
 	case 1:
+		return "/Anyns/GetNameByAddress", drpcEncoding_File_proto_anyns_api_server_proto{},
+			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
+				return srv.(DRPCAnynsServer).
+					GetNameByAddress(
+						ctx,
+						in1.(*NameByAddressRequest),
+					)
+			}, DRPCAnynsServer.GetNameByAddress, true
+	case 2:
 		return "/Anyns/NameRegister", drpcEncoding_File_proto_anyns_api_server_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsServer).
@@ -156,7 +180,7 @@ func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver,
 						in1.(*NameRegisterRequest),
 					)
 			}, DRPCAnynsServer.NameRegister, true
-	case 2:
+	case 3:
 		return "/Anyns/NameRegisterSigned", drpcEncoding_File_proto_anyns_api_server_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsServer).
@@ -165,7 +189,7 @@ func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver,
 						in1.(*NameRegisterSignedRequest),
 					)
 			}, DRPCAnynsServer.NameRegisterSigned, true
-	case 3:
+	case 4:
 		return "/Anyns/GetOperationStatus", drpcEncoding_File_proto_anyns_api_server_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsServer).
@@ -174,7 +198,7 @@ func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver,
 						in1.(*GetOperationStatusRequest),
 					)
 			}, DRPCAnynsServer.GetOperationStatus, true
-	case 4:
+	case 5:
 		return "/Anyns/NameRenew", drpcEncoding_File_proto_anyns_api_server_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsServer).
@@ -202,6 +226,22 @@ type drpcAnyns_IsNameAvailableStream struct {
 }
 
 func (x *drpcAnyns_IsNameAvailableStream) SendAndClose(m *NameAvailableResponse) error {
+	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_server_proto{}); err != nil {
+		return err
+	}
+	return x.CloseSend()
+}
+
+type DRPCAnyns_GetNameByAddressStream interface {
+	drpc.Stream
+	SendAndClose(*NameByAddressResponse) error
+}
+
+type drpcAnyns_GetNameByAddressStream struct {
+	drpc.Stream
+}
+
+func (x *drpcAnyns_GetNameByAddressStream) SendAndClose(m *NameByAddressResponse) error {
 	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_server_proto{}); err != nil {
 		return err
 	}

@@ -195,6 +195,21 @@ func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(conn, currentO
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), conn, currentOwner, fullName)
 }
 
+// GetNameByAddress mocks base method.
+func (m *MockContractsService) GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNameByAddress", conn, address)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNameByAddress indicates an expected call of GetNameByAddress.
+func (mr *MockContractsServiceMockRecorder) GetNameByAddress(conn, address interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameByAddress", reflect.TypeOf((*MockContractsService)(nil).GetNameByAddress), conn, address)
+}
+
 // GetOwnerForNamehash mocks base method.
 func (m *MockContractsService) GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error) {
 	m.ctrl.T.Helper()

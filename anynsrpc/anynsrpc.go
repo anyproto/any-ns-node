@@ -222,3 +222,39 @@ func (arpc *anynsRpc) NameRenew(ctx context.Context, in *as.NameRenewRequest) (*
 		OperationId:    operationId,
 	}, err
 }
+
+func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (*as.NameByAddressResponse, error) {
+	// 0 - check parameters
+	if !common.IsHexAddress(in.OwnerEthAddress) {
+		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
+		return nil, errors.New("invalid ETH address")
+	}
+
+	// 1 - create connection
+	conn, err := arpc.contracts.CreateEthConnection()
+	if err != nil {
+		log.Error("failed to connect to geth", zap.Error(err))
+		return nil, err
+	}
+
+	// convert in.OwnerEthAddress to common.Address
+	var addr = common.HexToAddress(in.OwnerEthAddress)
+
+	name, err := arpc.contracts.GetNameByAddress(conn, addr)
+	if err != nil {
+		log.Error("failed to get name by address", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - return results
+	var res as.NameByAddressResponse
+
+	if name == "" {
+		res.Found = false
+		return &res, nil
+	}
+
+	res.Found = true
+	res.Name = name
+	return &res, nil
+}

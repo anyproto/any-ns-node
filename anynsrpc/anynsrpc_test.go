@@ -3,6 +3,7 @@ package anynsrpc
 import (
 	"context"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/anyproto/any-sync/app"
@@ -292,6 +293,68 @@ func TestAnynsRpc_RegisterName(t *testing.T) {
 
 			require.Error(t, err)
 		}
+	})
+}
+
+func TestAnynsRpc_GetNameByAddress(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+		fx.contracts.EXPECT().GetNameByAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, owner interface{}) (string, error) {
+			return "hello.any", nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.GetNameByAddress(pctx, &as.NameByAddressRequest{
+			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.True(t, resp.Found)
+		assert.Equal(t, resp.Name, "hello.any")
+	})
+
+	t.Run("success even if Eth Address is not in lowercase", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+		fx.contracts.EXPECT().GetNameByAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, owner interface{}) (string, error) {
+			return "hello.any", nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.GetNameByAddress(pctx, &as.NameByAddressRequest{
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.True(t, resp.Found)
+		assert.Equal(t, resp.Name, "hello.any")
+	})
+
+	t.Run("fail", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+		fx.contracts.EXPECT().GetNameByAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, owner interface{}) (string, error) {
+			return "", nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.GetNameByAddress(pctx, &as.NameByAddressRequest{
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.False(t, resp.Found)
+		assert.Equal(t, resp.Name, "")
 	})
 }
 

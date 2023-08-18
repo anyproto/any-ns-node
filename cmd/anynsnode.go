@@ -48,7 +48,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run as client")
-	command        = flag.String("cmd", "", "command to run: [name-register, is-name-available]]")
+	command        = flag.String("cmd", "", "command to run: [name-register, name-renew, is-name-available, name-by-address]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -137,6 +137,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 		clientIsNameAvailable(client, ctx)
 	case "name-renew":
 		clientNameRenew(client, ctx)
+	case "name-by-address":
+		clientNameByAddress(client, ctx)
 	default:
 		log.Fatal("unknown command", zap.String("command", *command))
 	}
@@ -184,6 +186,22 @@ func clientNameRenew(client client.AnyNsClientService, ctx context.Context) {
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.NameRenew(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientNameByAddress(client client.AnyNsClientService, ctx context.Context) {
+	var req = &as.NameByAddressRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.GetNameByAddress(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}

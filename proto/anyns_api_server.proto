@@ -8,6 +8,11 @@ message NameAvailableRequest {
   string fullName = 1;
 }
 
+message NameByAddressRequest {
+  // An Ethereum address that owns that name
+  string ownerEthAddress = 1;
+}
+
 message NameAvailableResponse {
   bool available = 1;
   
@@ -26,6 +31,12 @@ message NameAvailableResponse {
   // doestn't work with marashalling/unmarshalling
   //google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true];
   int64 nameExpires = 5;
+}
+
+message NameByAddressResponse {
+  bool found = 1;
+
+  string name = 2;
 }
 
 message NameRegisterRequest {
@@ -87,6 +98,7 @@ message GetNameRegisterMsgResponse {
 service Anyns {
   // Check if name is free or get the attached information if not
   rpc IsNameAvailable(NameAvailableRequest) returns (NameAvailableResponse) {}
+  rpc GetNameByAddress(NameByAddressRequest) returns (NameByAddressResponse) {}
 
   // TODO: remove this method (it is unsecure) and use NameRegisterRequestSigned
   rpc NameRegister(NameRegisterRequest) returns (OperationResponse) {}
@@ -98,8 +110,9 @@ service Anyns {
   // Renew name without changing the owner
   rpc NameRenew(NameRenewRequest) returns (OperationResponse) {}
 
+
 // v2:
   // Add to queue a name update operation
   // rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
-  // rpc GetNameByAddress()
+  
 }

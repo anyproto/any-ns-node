@@ -53,6 +53,8 @@ type ContractsService interface {
 
 	RenewName(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, fullName string, durationSec uint64, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
 
+	GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error)
+
 	// aux
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
 	CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error)
@@ -454,7 +456,7 @@ func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registran
 		return [32]byte{}, err
 	}
 
-	var isReverseRecord bool = false
+	var isReverseRecord bool = true
 	var ownerControlledFuses uint16 = 0
 	callOpts := bind.CallOpts{}
 	callOpts.From = adminAddr
@@ -506,7 +508,7 @@ func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.
 		return nil, err
 	}
 
-	var isReverseRecord bool = false
+	var isReverseRecord bool = true
 	var ownerControlledFuses uint16 = 0
 
 	tx, err := controller.Register(
@@ -568,4 +570,43 @@ func (acontracts *anynsContracts) RenewName(ctx context.Context, conn *ethclient
 
 	log.Info("renew tx sent", zap.String("TX hash", tx.Hash().Hex()))
 	return tx, nil
+}
+
+func (acontracts *anynsContracts) GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error) {
+	// 1 - connect to contract
+	ar, err := acontracts.ConnectToResolver(conn)
+	if err != nil {
+		log.Error("failed to connect to contract", zap.Error(err))
+		return "", err
+	}
+
+	// 2 - convert address to .addr.reverse
+	// remove 0x
+	fullName := strings.ToLower(address.Hex()[2:] + ".addr.reverse")
+
+	// convert to name hash
+	nh, err := NameHash(fullName)
+	if err != nil {
+		log.Error("can not convert FullName to namehash", zap.Error(err))
+		return "", err
+	}
+
+	// convert namehash from bytes32 to string
+	nhStr := hex.EncodeToString(nh[:])
+
+	log.Info("getting name for address",
+		zap.String("Address", address.Hex()),
+		zap.String("FullName", fullName),
+		zap.String("NameHash", nhStr))
+
+	// 3 - call contract's method
+	callOpts := bind.CallOpts{}
+	name, err := ar.Name(&callOpts, nh)
+	if err != nil {
+		log.Error("can not get SpaceID", zap.Error(err))
+		return "", err
+	}
+	log.Info("got name", zap.String("Name", name))
+
+	return name, nil
 }

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func nameHashPart(prevHash [32]byte, name string) (hash [32]byte, err error) {
+func NameHashPart(prevHash [32]byte, name string) (hash [32]byte, err error) {
 	sha := sha3.NewLegacyKeccak256()
 	if _, err = sha.Write(prevHash[:]); err != nil {
 		return
@@ -37,7 +37,7 @@ func NameHash(name string) (hash [32]byte, err error) {
 
 	parts := strings.Split(name, ".")
 	for i := len(parts) - 1; i >= 0; i-- {
-		if hash, err = nameHashPart(hash, parts[i]); err != nil {
+		if hash, err = NameHashPart(hash, parts[i]); err != nil {
 			return
 		}
 	}
