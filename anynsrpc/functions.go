@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-sync/util/crypto"
 )
 

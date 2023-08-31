@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	anyns_api_server "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	anyns_api_server "github.com/anyproto/any-ns-node/pb/anyns_api"
 	queue "github.com/anyproto/any-ns-node/queue"
 	app "github.com/anyproto/any-sync/app"
 	ethclient "github.com/ethereum/go-ethereum/ethclient"

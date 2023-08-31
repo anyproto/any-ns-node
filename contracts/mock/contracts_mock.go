@@ -11,6 +11,7 @@ import (
 
 	anytype_crypto "github.com/anyproto/any-ns-node/anytype_crypto"
 	app "github.com/anyproto/any-sync/app"
+	ethereum "github.com/ethereum/go-ethereum"
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
@@ -55,6 +56,21 @@ func (m *MockContractsService) CalculateTxParams(conn *ethclient.Client, address
 func (mr *MockContractsServiceMockRecorder) CalculateTxParams(conn, address interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateTxParams", reflect.TypeOf((*MockContractsService)(nil).CalculateTxParams), conn, address)
+}
+
+// CallContract mocks base method.
+func (m *MockContractsService) CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CallContract", ctx, msg)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CallContract indicates an expected call of CallContract.
+func (mr *MockContractsServiceMockRecorder) CallContract(ctx, msg interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallContract", reflect.TypeOf((*MockContractsService)(nil).CallContract), ctx, msg)
 }
 
 // Commit mocks base method.
@@ -193,6 +209,21 @@ func (m *MockContractsService) GetAdditionalNameInfo(conn *ethclient.Client, cur
 func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(conn, currentOwner, fullName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), conn, currentOwner, fullName)
+}
+
+// GetBalanceOf mocks base method.
+func (m *MockContractsService) GetBalanceOf(client *ethclient.Client, tokenAddress, address common.Address) (*big.Int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBalanceOf", client, tokenAddress, address)
+	ret0, _ := ret[0].(*big.Int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBalanceOf indicates an expected call of GetBalanceOf.
+func (mr *MockContractsServiceMockRecorder) GetBalanceOf(client, tokenAddress, address interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalanceOf", reflect.TypeOf((*MockContractsService)(nil).GetBalanceOf), client, tokenAddress, address)
 }
 
 // GetNameByAddress mocks base method.

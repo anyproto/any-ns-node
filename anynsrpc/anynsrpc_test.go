@@ -17,7 +17,7 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
 	mock_queue "github.com/anyproto/any-ns-node/queue/mock"
 )

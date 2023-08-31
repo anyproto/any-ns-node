@@ -3,7 +3,7 @@ package queue
 import (
 	"time"
 
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"go.uber.org/zap"
 )
 

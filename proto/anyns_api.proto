@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "pb/anyns_api_server";
+option go_package = "pb/anyns_api";
 
 //import "google/protobuf/timestamp.proto";
 
@@ -95,12 +95,13 @@ message GetNameRegisterMsgResponse {
   bytes msg = 1;
 }
 
+
 service Anyns {
   // Check if name is free or get the attached information if not
   rpc IsNameAvailable(NameAvailableRequest) returns (NameAvailableResponse) {}
   rpc GetNameByAddress(NameByAddressRequest) returns (NameByAddressResponse) {}
 
-  // TODO: remove this method (it is unsecure) and use NameRegisterRequestSigned
+  // TODO: remove this method (it is insecure) and use NameRegisterRequestSigned
   rpc NameRegister(NameRegisterRequest) returns (OperationResponse) {}
   rpc NameRegisterSigned(NameRegisterSignedRequest) returns (OperationResponse) {}
 
@@ -110,8 +111,7 @@ service Anyns {
   // Renew name without changing the owner
   rpc NameRenew(NameRenewRequest) returns (OperationResponse) {}
 
-
-// v2:
+// TODO:
   // Add to queue a name update operation
   // rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
   

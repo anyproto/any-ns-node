@@ -7,12 +7,14 @@ import (
 	"fmt"
 
 	"github.com/anyproto/any-ns-node/account"
+	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
+	"github.com/anyproto/any-ns-node/anynsaarpc"
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/client"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
 	"github.com/anyproto/any-ns-node/nonce_manager"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
 
 	"github.com/anyproto/any-sync/app"
@@ -236,5 +238,7 @@ func BootstrapServer(a *app.App) {
 		Register(yamux.New()).
 		Register(secureservice.New()).
 		Register(server.New()).
-		Register(anynsrpc.New())
+		Register(accountabstraction.New()).
+		Register(anynsrpc.New()).
+		Register(anynsaarpc.New())
 }

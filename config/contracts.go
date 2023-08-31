@@ -5,6 +5,7 @@ type Contracts struct {
 	AddrRegistry          string `yaml:"registry"`
 	AddrResolver          string `yaml:"resolver"`
 	AddrRegistrar         string `yaml:"registrar"`
+	AddrToken             string `yaml:"token"`
 	AddrPrivateController string `yaml:"private_controller"`
 	AddrNameWrapper       string `yaml:"name_wrapper"`
 

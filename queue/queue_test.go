@@ -19,7 +19,7 @@ import (
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 	"github.com/anyproto/any-ns-node/nonce_manager"
 	mock_nonce_manager "github.com/anyproto/any-ns-node/nonce_manager/mock"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"

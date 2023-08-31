@@ -14,6 +14,8 @@ import (
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -22,7 +24,7 @@ import (
 
 	ac "github.com/anyproto/any-ns-node/anytype_crypto"
 	"github.com/anyproto/any-ns-node/config"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 )
 
 const CName = "any-ns.contracts"
@@ -33,21 +35,19 @@ func New() app.Component {
 	return &anynsContracts{}
 }
 
+// TODO: refactor, split into several interfaces
 // Low-level calls to contracts
 type ContractsService interface {
 	CreateEthConnection() (*ethclient.Client, error)
 
+	// generic method to call any contract
+	CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
+	GetBalanceOf(client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error)
+
+	// ENS methods
 	GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error)
 	GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error)
-
-	ConnectToRegistryContract(conn *ethclient.Client) (*ac.ENSRegistry, error)
-	ConnectToNamewrapperContract(conn *ethclient.Client) (*ac.AnytypeNameWrapper, error)
-	ConnectToResolver(conn *ethclient.Client) (*ac.AnytypeResolver, error)
-	ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error)
-	ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
-
 	MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error)
-
 	Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
 	Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
 
@@ -55,7 +55,13 @@ type ContractsService interface {
 
 	GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error)
 
-	// aux
+	// Aux methods
+	ConnectToRegistryContract(conn *ethclient.Client) (*ac.ENSRegistry, error)
+	ConnectToNamewrapperContract(conn *ethclient.Client) (*ac.AnytypeNameWrapper, error)
+	ConnectToResolver(conn *ethclient.Client) (*ac.AnytypeResolver, error)
+	ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error)
+	ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
+
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
 	CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error)
 
@@ -79,6 +85,61 @@ func (acontracts *anynsContracts) Name() (name string) {
 func (acontracts *anynsContracts) Init(a *app.App) (err error) {
 	acontracts.config = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	return nil
+}
+
+func (acontracts *anynsContracts) CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
+	client, err := ethclient.Dial(acontracts.config.GethUrl)
+	if err != nil {
+		log.Error("failed to dial geth", zap.Error(err))
+		return nil, err
+	}
+
+	res, err := client.CallContract(context.Background(), msg, nil)
+	if err != nil {
+		log.Error("failed to CallContract", zap.Error(err))
+		return nil, err
+	}
+
+	return res, err
+}
+
+func (acontracts *anynsContracts) GetBalanceOf(client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error) {
+	const erc20ABI = `
+		[{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"balanceOf","outputs":[{"name
+	":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]
+	`
+
+	parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
+	if err != nil {
+		return big.NewInt(0), err
+	}
+
+	input, err := parsedABI.Pack("balanceOf", address)
+	if err != nil {
+		return big.NewInt(0), err
+	}
+
+	callMsg := ethereum.CallMsg{
+		To:   &tokenAddress,
+		Data: input,
+	}
+
+	res, err := client.CallContract(context.Background(), callMsg, nil)
+	if err != nil {
+		log.Error("failed to call balanceOf", zap.Error(err))
+		return big.NewInt(0), err
+	}
+
+	out, err := parsedABI.Unpack("balanceOf", res)
+	if err != nil {
+		log.Error("failed to unpack balanceOf", zap.Error(err))
+		return big.NewInt(0), err
+	}
+
+	// convert out to BigInt
+	balance := out[0].(big.Int)
+
+	return &balance, nil
 }
 
 func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh [32]byte) (common.Address, error) {

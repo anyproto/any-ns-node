@@ -15,7 +15,7 @@ import (
 	"github.com/anyproto/any-sync/net/rpc/server"
 
 	contracts "github.com/anyproto/any-ns-node/contracts"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
 )
 

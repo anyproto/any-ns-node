@@ -175,7 +175,46 @@
         
           
           <li>
-            <a href="#proto%2fanyns_api_server.proto">proto/anyns_api_server.proto</a>
+            <a href="#proto%2fanyns_aa_api.proto">proto/anyns_aa_api.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#.AdminFundGasOperationsRequest"><span class="badge">M</span>AdminFundGasOperationsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.AdminFundGasOperationsRequestSigned"><span class="badge">M</span>AdminFundGasOperationsRequestSigned</a>
+                </li>
+              
+                <li>
+                  <a href="#.AdminFundUserAccountRequest"><span class="badge">M</span>AdminFundUserAccountRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.AdminFundUserAccountRequestSigned"><span class="badge">M</span>AdminFundUserAccountRequestSigned</a>
+                </li>
+              
+                <li>
+                  <a href="#.GetUserAccountRequest"><span class="badge">M</span>GetUserAccountRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.UserAccount"><span class="badge">M</span>UserAccount</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#.AnynsAccountAbstraction"><span class="badge">S</span>AnynsAccountAbstraction</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#proto%2fanyns_api.proto">proto/anyns_api.proto</a>
             <ul>
               
                 <li>
@@ -243,7 +282,256 @@
     
       
       <div class="file-heading">
-        <h2 id="proto/anyns_api_server.proto">proto/anyns_api_server.proto</h2><a href="#title">Top</a>
+        <h2 id="proto/anyns_aa_api.proto">proto/anyns_aa_api.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id=".AdminFundGasOperationsRequest">AdminFundGasOperationsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that name </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operationsCount</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Number of gas operations: update name, add new data, etc </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".AdminFundGasOperationsRequestSigned">AdminFundGasOperationsRequestSigned</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>AdminFundGasOperationsRequest struct </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>payload signed by Admin of this service </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".AdminFundUserAccountRequest">AdminFundUserAccountRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that name </p></td>
+                </tr>
+              
+                <tr>
+                  <td>namesCount</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Number of names that user can buy. We will mint him tokens that he can use to buy names
+(one token per name) </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".AdminFundUserAccountRequestSigned">AdminFundUserAccountRequestSigned</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>AdminFundUserAccountReques struct </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>payload signed by Admin of this service </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".GetUserAccountRequest">GetUserAccountRequest</h3>
+        <p>no signature required here</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that account </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".UserAccount">UserAccount</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that account </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ownerSmartContracWalletAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>This smart contract really controls all names
+you can ask .owner() method to get &#39;ownerEthAddress&#39; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>namesCountLeft</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Number of names that user can buy. We will mint him tokens that he can use to buy names
+(one token per name) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operationsCountLeft</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Number of gas operations: update name, add new data, etc </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id=".AnynsAccountAbstraction">AnynsAccountAbstraction</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>AdminFundUserAccount</td>
+                <td><a href="#AdminFundUserAccountRequestSigned">.AdminFundUserAccountRequestSigned</a></td>
+                <td><a href="#UserAccount">.UserAccount</a></td>
+                <td><p>ADMIN METHODS:
+Will send &#34;name tokens&#34; to the user&#39;s account 
+  (user will be able to use these tokens to register his name later directly)</p></td>
+              </tr>
+            
+              <tr>
+                <td>AdminFundGasOperations</td>
+                <td><a href="#AdminFundGasOperationsRequestSigned">.AdminFundGasOperationsRequestSigned</a></td>
+                <td><a href="#UserAccount">.UserAccount</a></td>
+                <td><p>Will add &#34;gas operations&#34; to the user&#39;s AA account 
+  (user will be able to send TXs to EVM chain without having any gas in his wallet)</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetUserAccount</td>
+                <td><a href="#GetUserAccountRequest">.GetUserAccountRequest</a></td>
+                <td><a href="#UserAccount">.UserAccount</a></td>
+                <td><p>USER METHODS:
+Use it:
+1 - get your SmartContractWallet address
+2 - get how many operations you still have</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="proto/anyns_api.proto">proto/anyns_api.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
@@ -668,7 +956,7 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
                 <td>NameRegister</td>
                 <td><a href="#NameRegisterRequest">.NameRegisterRequest</a></td>
                 <td><a href="#OperationResponse">.OperationResponse</a></td>
-                <td><p>TODO: remove this method (it is unsecure) and use NameRegisterRequestSigned</p></td>
+                <td><p>TODO: remove this method (it is insecure) and use NameRegisterRequestSigned</p></td>
               </tr>
             
               <tr>

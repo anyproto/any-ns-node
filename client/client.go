@@ -9,7 +9,7 @@ import (
 	"github.com/anyproto/any-sync/net/rpc/rpcerr"
 	"github.com/anyproto/any-sync/nodeconf"
 
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 )
 
 const CName = "any-ns.anynsclient"

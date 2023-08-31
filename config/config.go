@@ -39,6 +39,7 @@ type Config struct {
 	Contracts        Contracts              `yaml:"contracts"`
 	Queue            Queue                  `yaml:"queue"`
 	Nonce            Nonce                  `yaml:"nonce"`
+	Aa               AA                     `yaml:"accountAbstraction"`
 }
 
 func (c *Config) Init(a *app.App) (err error) {
@@ -75,4 +76,8 @@ func (c *Config) GetDrpc() rpc.Config {
 
 func (c *Config) GetQueue() Queue {
 	return c.Queue
+}
+
+func (c *Config) GetAA() AA {
+	return c.Aa
 }

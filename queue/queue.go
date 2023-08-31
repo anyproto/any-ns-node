@@ -17,7 +17,7 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	"github.com/anyproto/any-ns-node/nonce_manager"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api_server"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
