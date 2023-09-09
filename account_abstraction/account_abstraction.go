@@ -40,13 +40,13 @@ type anynsAA struct {
 type AccountAbstractionService interface {
 	// each EOA has an associated smart wallet address
 	// even if it is not deployed yet - we can determine it
-	GetSmartWalletAddress(eoa common.Address) (address common.Address, err error)
+	GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error)
 	GetNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error)
 
 	VerifyAdminIdentity(payload []byte, signature []byte) (err error)
 
 	// will mint + approve tokens to the specified smart wallet
-	MintAccessTokens(scw common.Address, amount *big.Int) (err error)
+	AdminMintAccessTokens(scw common.Address, amount *big.Int) (err error)
 
 	GetNamesCountLeft(scw common.Address) (count uint64, err error)
 	GetOperationsCountLeft(scw common.Address) (count uint64, err error)
@@ -198,18 +198,23 @@ func (arpc *anynsAA) GetNamesCountLeft(scw common.Address) (count uint64, err er
 
 	balance, err := arpc.contracts.GetBalanceOf(client, tokenAddress, scw)
 	if err != nil {
-		log.Error("failed to get balance of", zap.Error(err))
+		log.Error("failed to get balance of", zap.Error(err), zap.String("scw", scw.String()), zap.String("tokenAddress", tokenAddress.String()))
 		return 0, err
 	}
 
-	// TODO: remove hardcode
+	// TODO: remove hardcode and move to pricing methods
 	// $20 USD per name (current testnet settings)
-	// $1 USD = 10^18 wei
-	oneNamePriceWei := big.NewInt(20).Exp(big.NewInt(10), big.NewInt(18), nil)
+	// $1 USD = 10^6
+	oneNamePriceWei := big.NewInt(20 * 1000000)
 
 	count = balance.Div(balance, oneNamePriceWei).Uint64()
 
-	log.Info("names count left is", zap.String("scw", scw.String()), zap.Uint64("count", count))
+	log.Info("got token balance of SCW",
+		zap.String("scw", scw.String()),
+		zap.Uint64("balance", balance.Uint64()),
+		zap.Uint64("name count left", count),
+	)
+
 	return count, nil
 }
 
@@ -236,15 +241,17 @@ func (arpc *anynsAA) VerifyAdminIdentity(payload []byte, signature []byte) (err 
 	return nil
 }
 
-func (arpc *anynsAA) MintAccessTokens(scw common.Address, namesCount *big.Int) (err error) {
+// Admin sends transaction to mint tokens to the specified smart wallet
+func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesCount *big.Int) (err error) {
 	// settings from config:
 	entryPointAddress := common.HexToAddress(arpc.aaConfig.EntryPoint)
 	erc20tokenAddr := common.HexToAddress(arpc.contractsConfig.AddrToken)
 	registrarController := common.HexToAddress(arpc.contractsConfig.AddrRegistrar)
-
 	alchemyApiKey := arpc.aaConfig.AlchemyApiKey
-	adminPK := arpc.contractsConfig.AdminPk
 	policyID := arpc.aaConfig.GasPolicyId
+
+	adminAddress := common.HexToAddress(arpc.contractsConfig.AddrAdmin)
+	adminPK := arpc.contractsConfig.AdminPk
 
 	var chainID int64 = int64(arpc.aaConfig.ChainID)
 
@@ -253,34 +260,43 @@ func (arpc *anynsAA) MintAccessTokens(scw common.Address, namesCount *big.Int) (
 		return errors.New("names count is 0")
 	}
 
-	// 1 - get nonce
-	nonce, err := arpc.GetNonceForSmartWalletAddress(context.Background(), scw)
+	// TODO: optimize, cache it or move to settings
+	// 1 - determine admin's SCW
+	adminScw, err := arpc.GetSmartWalletAddress(context.Background(), adminAddress)
+	if err != nil {
+		log.Error("failed to get smart wallet address for admin", zap.Error(err))
+		return err
+	}
+
+	// 2 - get nonce (from admin's SCW)
+	nonce, err := arpc.GetNonceForSmartWalletAddress(context.Background(), adminScw)
 	if err != nil {
 		log.Error("failed to get nonce", zap.Error(err))
 		return err
 	}
+	log.Info("Got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
 
-	// 2 - create user operation
+	// 3 - create user operation
 	// TODO: change amount
-	callDataOriginal, err := alchemyaa.GetCallDataForMint(scw, 100)
+	callDataOriginal, err := alchemyaa.GetCallDataForMint(userScwAddress, 100)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return err
 	}
 	log.Info("Prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
 
-	callDataOriginal2, err := alchemyaa.GetCallDataForAprove(scw, registrarController, 100)
+	callDataOriginal2, err := alchemyaa.GetCallDataForAprove(userScwAddress, registrarController, 100)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return err
 	}
-	log.Info("Prepared original call data 2", zap.String("callDataOriginal2", hex.EncodeToString(callDataOriginal2)))
+	log.Debug("Prepared original call data 2", zap.String("callDataOriginal2", hex.EncodeToString(callDataOriginal2)))
 
 	// create array of call data
 	targets := []common.Address{erc20tokenAddr, erc20tokenAddr}
 	callDataOriginals := [][]byte{callDataOriginal, callDataOriginal2}
 
-	// 2 - wrap it into "execute" call
+	// 4 - wrap it into "execute" call
 	callData, err := alchemyaa.GetCallDataForBatchExecute(targets, callDataOriginals)
 	if err != nil {
 		log.Error("failed to get call data", zap.Error(err))
@@ -291,7 +307,7 @@ func (arpc *anynsAA) MintAccessTokens(scw common.Address, namesCount *big.Int) (
 	// TODO: set proper ID here
 	id := 1
 
-	rgapd, err := alchemyaa.CreateRequestGasAndPaymasterData(callData, scw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	rgapd, err := alchemyaa.CreateRequestGasAndPaymasterData(callData, adminScw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -305,13 +321,12 @@ func (arpc *anynsAA) MintAccessTokens(scw common.Address, namesCount *big.Int) (
 
 	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
 
-	// 3 - send it
+	// 5 - send it
 	response, err := alchemyaa.SendRequest(alchemyApiKey, jsonDATAPre)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
 	}
-
 	// parse response
 	responseStruct := alchemyaa.JSONRPCResponseGasAndPaymaster{}
 	err = json.Unmarshal(response, &responseStruct)
@@ -319,11 +334,20 @@ func (arpc *anynsAA) MintAccessTokens(scw common.Address, namesCount *big.Int) (
 		log.Error("failed to unmarshal response", zap.Error(err))
 		return err
 	}
+	// TODO: handle "Error code": -32500  "AA25 invalid account nonce" error
+	if responseStruct.Error.Code != 0 {
+		log.Error("GasAndPaymaster call failed",
+			zap.Int("Error code", responseStruct.Error.Code),
+			zap.String("Error message", responseStruct.Error.Message),
+		)
+		return errors.New(responseStruct.Error.Message)
+	}
+
 	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
 
-	// 4 - now create new transaction
+	// 6 - now create new transaction
 	appendEntryPoint := true
-	jsonDATA, err := alchemyaa.CreateRequest(callData, responseStruct, chainID, entryPointAddress, scw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
+	jsonDATA, err := alchemyaa.CreateRequest(callData, responseStruct, chainID, entryPointAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -340,6 +364,38 @@ func (arpc *anynsAA) MintAccessTokens(scw common.Address, namesCount *big.Int) (
 
 	log.Info("eth_sendUserOperation got response", zap.Any("response", response))
 
-	// TODO: wait for operation to be mined
+	// 7 - get op hash
+	// will handle error in response
+	opHash, err := alchemyaa.DecodeSendUserOperationResponse(response)
+	if err != nil {
+		log.Error("failed to decode response", zap.Error(err))
+		return err
+	}
+	log.Info("decoded response", zap.String("opHash", opHash))
+
+	// TODO: loop
+	// 8 - wait for receipt
+	req, err := alchemyaa.CreateRequestGetUserOperation(opHash, id+2)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return err
+	}
+
+	jsonDATA, err = json.Marshal(req)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return err
+	}
+
+	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
+
+	// send it
+	response, err = alchemyaa.SendRequest(alchemyApiKey, jsonDATA)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return err
+	}
+
+	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response))
 	return nil
 }

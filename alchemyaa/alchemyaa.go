@@ -47,17 +47,16 @@ type JSONRPCRequestGasAndPaymaster struct {
 	Params  []GasAndPaymentStruct `json:"params"`
 }
 
-type JSONRPCRequest struct {
-	ID      int             `json:"id"`
-	JSONRPC string          `json:"jsonrpc"`
-	Method  string          `json:"method"`
-	Params  []UserOperation `json:"params"`
-}
-
 type JSONRPCResponseGasAndPaymaster struct {
 	ID      int    `json:"id"`
 	JSONRPC string `json:"jsonrpc"`
-	Result  struct {
+
+	Error struct {
+		Code    int    `json:"code,omitempty"`
+		Message string `json:"message, omitempty"`
+	} `json:"error, omitempty"`
+
+	Result struct {
 		PreVerificationGas   string `json:"preVerificationGas,omitempty"`
 		CallGasLimit         string `json:"callGasLimit,omitempty"`
 		VerificationGasLimit string `json:"verificationGasLimit,omitempty"`
@@ -65,6 +64,32 @@ type JSONRPCResponseGasAndPaymaster struct {
 		MaxFeePerGas         string `json:"maxFeePerGas,omitempty"`
 		MaxPriorityFeePerGas string `json:"maxPriorityFeePerGas,omitempty"`
 	} `json:"result"`
+}
+
+type JSONRPCRequest struct {
+	ID      int             `json:"id"`
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  []UserOperation `json:"params"`
+}
+
+type JSONRPCResponseUserOpHash struct {
+	ID      int    `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
+
+	Error struct {
+		Code    int    `json:"code,omitempty"`
+		Message string `json:"message,omitempty"`
+	} `json:"error, omitempty"`
+
+	Result string `json:"result"`
+}
+
+type JSONRPCRequestGetUserOperationReceipt struct {
+	ID      int      `json:"id"`
+	JSONRPC string   `json:"jsonrpc"`
+	Method  string   `json:"method"`
+	Hashes  []string `json:"params"`
 }
 
 // should create a GasAndPaymentStruct
@@ -160,6 +185,24 @@ func CreateRequest(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID
 	return jsonDATA, nil
 }
 
+func CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error) {
+	// {"jsonrpc":"2.0","id":11,"method":"eth_getUserOperationReceipt","params":["0x5fad93d239e4e7a7dd634822513b27f04e57ed8ea1be7b3e74df177eefd8beb8"]}
+	var req JSONRPCRequestGetUserOperationReceipt
+	req.ID = id
+	req.JSONRPC = "2.0"
+	req.Method = "eth_getUserOperationReceipt"
+	req.Hashes = append(req.Hashes, operationHash)
+
+	// 2 - convert struct to json
+	jsonDATA, err := json.Marshal(req)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return nil, err
+	}
+
+	return jsonDATA, nil
+}
+
 func SendRequest(apiKey string, jsonDATA []byte) ([]byte, error) {
 	payload := strings.NewReader(string(jsonDATA))
 
@@ -182,6 +225,6 @@ func SendRequest(apiKey string, jsonDATA []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	log.Info("sent...", zap.String("response", string(body)))
+	log.Debug("sent Alchemy request", zap.String("response", string(body)))
 	return body, nil
 }

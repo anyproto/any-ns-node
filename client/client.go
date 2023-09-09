@@ -32,6 +32,10 @@ type AnyNsClientService interface {
 	// reverse resolve
 	GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (out *as.NameByAddressResponse, err error)
 
+	// AccountAbstractions interface
+	GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (out *as.UserAccount, err error)
+	AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (out *as.UserAccount, err error)
+
 	app.ComponentRunnable
 }
 
@@ -87,6 +91,24 @@ func (s *service) doClient(ctx context.Context, fn func(cl as.DRPCAnynsClient) e
 	return fn(as.NewDRPCAnynsClient(dc))
 }
 
+func (s *service) doClientAA(ctx context.Context, fn func(cl as.DRPCAnynsAccountAbstractionClient) error) error {
+	// TODO: https://github.com/orgs/anyproto/projects/3?pane=issue&itemId=34657351
+	// introduce different node type for NS node
+	peer, err := s.pool.Get(ctx, s.nodeconf.CoordinatorPeers()[0])
+
+	if err != nil {
+		return err
+	}
+
+	dc, err := peer.AcquireDrpcConn(ctx)
+	if err != nil {
+		return err
+	}
+	defer peer.ReleaseDrpcConn(dc)
+
+	return fn(as.NewDRPCAnynsAccountAbstractionClient(dc))
+}
+
 func (s *service) IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (out *as.NameAvailableResponse, err error) {
 	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
 		if out, err = cl.IsNameAvailable(ctx, in); err != nil {
@@ -140,6 +162,27 @@ func (s *service) NameRenew(ctx context.Context, in *as.NameRenewRequest) (out *
 func (s *service) GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (out *as.NameByAddressResponse, err error) {
 	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
 		if out, err = cl.GetNameByAddress(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+// AA
+func (s *service) GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (out *as.UserAccount, err error) {
+	err = s.doClientAA(ctx, func(cl as.DRPCAnynsAccountAbstractionClient) error {
+		if out, err = cl.GetUserAccount(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+func (s *service) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (out *as.UserAccount, err error) {
+	err = s.doClientAA(ctx, func(cl as.DRPCAnynsAccountAbstractionClient) error {
+		if out, err = cl.AdminFundUserAccount(ctx, in); err != nil {
 			return rpcerr.Unwrap(err)
 		}
 		return nil

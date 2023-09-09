@@ -40,7 +40,9 @@ func (drpcEncoding_File_proto_anyns_aa_api_proto) JSONUnmarshal(buf []byte, msg 
 type DRPCAnynsAccountAbstractionClient interface {
 	DRPCConn() drpc.Conn
 
+	// requires admin signature
 	AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*UserAccount, error)
+	// requires admin signature
 	AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*UserAccount, error)
 	GetUserAccount(ctx context.Context, in *GetUserAccountRequest) (*UserAccount, error)
 }

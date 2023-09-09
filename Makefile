@@ -17,7 +17,7 @@ nonce_manager/mock/nonce_manager_mock.go: nonce_manager/nonce_manager.go
 	mockgen -source=nonce_manager/nonce_manager.go > nonce_manager/mock/nonce_manager.go
 
 account_abstraction/mock/account_abstraction_mock.go: account_abstraction/account_abstraction.go
-	mockgen -source=account_abstraction/account_abstraction.go > account_abstraction/mock/nonce_manager.go
+	mockgen -source=account_abstraction/account_abstraction.go > account_abstraction/mock/account_abstraction_mock.go
 
 .PHONY: mocks
 mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go account_abstraction/mock/account_abstraction_mock.go
@@ -101,10 +101,15 @@ run:
 	go run ./cmd
 
 # Run a test client that connects to server
-#.PHONY: is-name-avail
-#is-name-avail:
-#	grpcurl -plaintext -d '{"fullName": "hello.any"}' localhost:8080 Anyns/IsNameAvailable
+.PHONY: is-name-avail
+is-name-avail:
+	grpcurl -plaintext -d '{"fullName": "hello.any"}' localhost:8080 Anyns/IsNameAvailable
 
-#.PHONY: reg-test-name
-#reg-test-name:
-#	grpcurl -plaintext -d '{"fullName": "some10.any", "ownerEthAddress": "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF", "ownerAnyAddress": "A6WVkd1MxX1i7hGQCcDhMFvfEzokPppRzxve2wdhTZ8jZTio"}' localhost:8080 Anyns/NameRegister
+.PHONY: reg-test-name
+reg-test-name:
+	grpcurl -plaintext -d '{"fullName": "some10.any", "ownerEthAddress": "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF", "ownerAnyAddress": "A6WVkd1MxX1i7hGQCcDhMFvfEzokPppRzxve2wdhTZ8jZTio"}' localhost:8080 Anyns/NameRegister
+
+.PHONY: aa-get-user-account
+aa-get-user-account:
+	grpcurl -plaintext -d '{"ownerEthAddress": "0xE34230c1f916e9d628D5F9863Eb3F5667D8FcB37"}' localhost:8080 AnynsAccountAbstraction/GetUserAccount
+

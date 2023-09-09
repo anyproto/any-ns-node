@@ -105,8 +105,7 @@ func (acontracts *anynsContracts) CallContract(ctx context.Context, msg ethereum
 
 func (acontracts *anynsContracts) GetBalanceOf(client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error) {
 	const erc20ABI = `
-		[{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"balanceOf","outputs":[{"name
-	":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]
+		[{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]
 	`
 
 	parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
@@ -130,16 +129,9 @@ func (acontracts *anynsContracts) GetBalanceOf(client *ethclient.Client, tokenAd
 		return big.NewInt(0), err
 	}
 
-	out, err := parsedABI.Unpack("balanceOf", res)
-	if err != nil {
-		log.Error("failed to unpack balanceOf", zap.Error(err))
-		return big.NewInt(0), err
-	}
-
-	// convert out to BigInt
-	balance := out[0].(big.Int)
-
-	return &balance, nil
+	balance := big.NewInt(0)
+	balance.SetBytes(res)
+	return balance, nil
 }
 
 func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh [32]byte) (common.Address, error) {

@@ -4,14 +4,13 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/gogo/protobuf/proto"
-	"go.uber.org/zap"
-
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/rpc/server"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/gogo/protobuf/proto"
+	"go.uber.org/zap"
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	contracts "github.com/anyproto/any-ns-node/contracts"
@@ -70,7 +69,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 	}
 
 	// 4 - mint tokens to that SCW
-	err = arpc.aa.MintAccessTokens(common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
+	err = arpc.aa.AdminMintAccessTokens(common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
 		return nil, err
@@ -91,7 +90,7 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 	res.OwnerEthAddress = in.OwnerEthAddress
 
 	// even if SCW is not deployed yet -> it should be returned
-	scwa, err := arpc.aa.GetSmartWalletAddress(common.HexToAddress(in.OwnerEthAddress))
+	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
 	if err != nil {
 		log.Error("failed to get smart wallet address", zap.Error(err))
 		return nil, err

@@ -59,7 +59,7 @@ message GetUserAccountRequest {
 
 service AnynsAccountAbstraction {
 // ADMIN METHODS:
-  // Will send "name tokens" to the user's account 
+  // Will send "name tokens" to the user's account (to his SmartContractWallet)
   //   (user will be able to use these tokens to register his name later directly)
   rpc AdminFundUserAccount(AdminFundUserAccountRequestSigned) returns (UserAccount) {}
   

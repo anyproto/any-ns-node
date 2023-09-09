@@ -146,7 +146,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 			return nil
 		})
 
-		fx.aa.EXPECT().MintAccessTokens(gomock.Any(), gomock.Any()).DoAndReturn(func(scw common.Address, count *big.Int) (err error) {
+		fx.aa.EXPECT().AdminMintAccessTokens(gomock.Any(), gomock.Any()).DoAndReturn(func(scw common.Address, count *big.Int) (err error) {
 			// no error
 			return nil
 		})

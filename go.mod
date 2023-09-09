@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/zeebo/assert v1.3.0
 	go.mongodb.org/mongo-driver v1.12.0
+	go.starlark.net v0.0.0-20230831151029-c9e9adf3fde2
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.11.0

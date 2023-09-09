@@ -401,5 +401,24 @@ func TestAA_CreateRequest(t *testing.T) {
 		assert.Equal(t, out.Params[0].PaymasterAndData, "0xc03aac639bb21233e0139381970328db8bceeb67000064f9ca6c000064f9dad40000000000000000000000000000000000000000796f4ebcef9ae51a6d5131b1344228c971982353cc698f67e309ffb320ef04787ccec730f240788c78e6e1d096e3376a49782f51d38ba28b9eaeed1bca833be01c")
 		assert.Equal(t, out.Params[0].Signature, "0x571ec8a77c9ed42958db1f2f31b3883f773cb4bb6a225208fa13ea8f53dc435939c22e6fae79da717977881d5288bc7de2b840b54b27df6230906244c665e6d51b")
 	})
+}
 
+func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
+	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	defer mt.Close()
+
+	mt.Run("fail if wrong input", func(mt *mtest.T) {
+		// convert string to byte array
+		h := []byte("0x1")
+		_, err := DecodeSendUserOperationResponse(h)
+		assert.Error(t, err)
+	})
+
+	mt.Run("success", func(mt *mtest.T) {
+		respStr := `{"jsonrpc":"2.0","id":2,"result":"0xa417d6e564c27e7803097f7c712490896d093e27c6f9f44b0192252d82522792"}`
+
+		hash, err := DecodeSendUserOperationResponse([]byte(respStr))
+		assert.NoError(t, err)
+		assert.Equal(t, hash, "0xa417d6e564c27e7803097f7c712490896d093e27c6f9f44b0192252d82522792")
+	})
 }

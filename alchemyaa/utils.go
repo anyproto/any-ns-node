@@ -370,7 +370,6 @@ func SignDataHashWithEthereumPrivateKey(dataToSign []byte, privateKeyECDSA *ecds
 
 	// Prepend the "Ethereum Signed Message" prefix.
 	prefix := "\x19Ethereum Signed Message:\n32" + string(dataToSign)
-	log.Info("prefix", zap.String("prefix", prefix))
 
 	// Hash the message using Keccak-256.
 	hash := crypto.Keccak256([]byte(prefix))
@@ -414,4 +413,22 @@ func AppendEntryPointAddress(jsonData []byte, entryPointAddress common.Address) 
 	}
 
 	return nil, outputJSON
+}
+
+func DecodeSendUserOperationResponse(response []byte) (opHash string, err error) {
+	// {"jsonrpc":"2.0","id":2,"result":"0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186"}
+	// 1 - parse JSON
+	var responseStruct2 JSONRPCResponseUserOpHash
+	err = json.Unmarshal(response, &responseStruct2)
+	if err != nil {
+		log.Error("failed to unmarshal response", zap.Error(err))
+		return "", err
+	}
+
+	if responseStruct2.Error.Code != 0 {
+		strErr := fmt.Sprintf("Error: %v - %v", responseStruct2.Error.Code, responseStruct2.Error.Message)
+		return "", errors.New(strErr)
+	}
+
+	return responseStruct2.Result, nil
 }

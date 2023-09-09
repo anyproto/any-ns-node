@@ -111,18 +111,18 @@ func (mr *MockAccountAbstractionServiceMockRecorder) Init(a interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockAccountAbstractionService)(nil).Init), a)
 }
 
-// MintAccessTokens mocks base method.
-func (m *MockAccountAbstractionService) MintAccessTokens(scw common.Address, amount *big.Int) error {
+// AdminMintAccessTokens mocks base method.
+func (m *MockAccountAbstractionService) AdminMintAccessTokens(scw common.Address, amount *big.Int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MintAccessTokens", scw, amount)
+	ret := m.ctrl.Call(m, "AdminMintAccessTokens", scw, amount)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// MintAccessTokens indicates an expected call of MintAccessTokens.
-func (mr *MockAccountAbstractionServiceMockRecorder) MintAccessTokens(scw, amount interface{}) *gomock.Call {
+// AdminMintAccessTokens indicates an expected call of AdminMintAccessTokens.
+func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(scw, amount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).MintAccessTokens), scw, amount)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), scw, amount)
 }
 
 // Name mocks base method.

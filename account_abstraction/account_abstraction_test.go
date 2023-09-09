@@ -318,7 +318,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 
 		// already deployed
 		scw := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a")
-		err := fx.MintAccessTokens(scw, big.NewInt(0))
+		err := fx.AdminMintAccessTokens(scw, big.NewInt(0))
 		assert.Error(t, err)
 	})
 
@@ -339,7 +339,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 
 			// already deployed
 			scw := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a")
-			err := fx.MintAccessTokens(scw, big.NewInt(5))
+			err := fx.AdminMintAccessTokens(scw, big.NewInt(5))
 			assert.NoError(t, err)
 		})
 	*/

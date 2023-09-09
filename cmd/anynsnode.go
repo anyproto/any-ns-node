@@ -16,6 +16,8 @@ import (
 	"github.com/anyproto/any-ns-node/nonce_manager"
 	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
+	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/util/crypto"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -141,6 +143,14 @@ func runAsClient(a *app.App, ctx context.Context) {
 		clientNameRenew(client, ctx)
 	case "name-by-address":
 		clientNameByAddress(client, ctx)
+
+	// AccountAbstraction methods:
+	case "get-user-account":
+		clientGetUserAccount(client, ctx)
+	case "admin-fund-user":
+		// it will pack and sign the request
+		// no need to do that manually
+		adminFundUserAccount(a, client, ctx)
 	default:
 		log.Fatal("unknown command", zap.String("command", *command))
 	}
@@ -204,6 +214,63 @@ func clientNameByAddress(client client.AnyNsClientService, ctx context.Context) 
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.GetNameByAddress(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientGetUserAccount(client client.AnyNsClientService, ctx context.Context) {
+	var req = &as.GetUserAccountRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.GetUserAccount(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func adminFundUserAccount(a *app.App, client client.AnyNsClientService, ctx context.Context) {
+	// 1 - pack request
+	var req = &as.AdminFundUserAccountRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	marshalled, err := req.Marshal()
+	if err != nil {
+		log.Fatal("can't marshal request", zap.Error(err))
+	}
+
+	var reqSigned = &as.AdminFundUserAccountRequestSigned{}
+	reqSigned.Payload = marshalled
+
+	acc := a.MustComponent("config").(commonaccount.ConfigGetter).GetAccount()
+
+	signingKey, err := crypto.DecodeKeyFromString(
+		acc.PeerKey,
+		crypto.UnmarshalEd25519PrivateKey,
+		nil)
+
+	if err != nil {
+		log.Fatal("can't read signing key", zap.Error(err))
+	}
+
+	sign, err := signingKey.Sign(marshalled)
+	if err != nil {
+		log.Fatal("can't sign request", zap.Error(err))
+	}
+	reqSigned.Signature = sign
+
+	// 3 - call
+	resp, err := client.AdminFundUserAccount(ctx, reqSigned)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}
