@@ -37,6 +37,20 @@ func (m *MockAccountAbstractionService) EXPECT() *MockAccountAbstractionServiceM
 	return m.recorder
 }
 
+// AdminMintAccessTokens mocks base method.
+func (m *MockAccountAbstractionService) AdminMintAccessTokens(scw common.Address, amount *big.Int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdminMintAccessTokens", scw, amount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AdminMintAccessTokens indicates an expected call of AdminMintAccessTokens.
+func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(scw, amount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), scw, amount)
+}
+
 // GetNamesCountLeft mocks base method.
 func (m *MockAccountAbstractionService) GetNamesCountLeft(scw common.Address) (uint64, error) {
 	m.ctrl.T.Helper()
@@ -83,18 +97,18 @@ func (mr *MockAccountAbstractionServiceMockRecorder) GetOperationsCountLeft(scw 
 }
 
 // GetSmartWalletAddress mocks base method.
-func (m *MockAccountAbstractionService) GetSmartWalletAddress(eoa common.Address) (common.Address, error) {
+func (m *MockAccountAbstractionService) GetSmartWalletAddress(ctx context.Context, eoa common.Address) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSmartWalletAddress", eoa)
+	ret := m.ctrl.Call(m, "GetSmartWalletAddress", ctx, eoa)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetSmartWalletAddress indicates an expected call of GetSmartWalletAddress.
-func (mr *MockAccountAbstractionServiceMockRecorder) GetSmartWalletAddress(eoa interface{}) *gomock.Call {
+func (mr *MockAccountAbstractionServiceMockRecorder) GetSmartWalletAddress(ctx, eoa interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSmartWalletAddress", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetSmartWalletAddress), eoa)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSmartWalletAddress", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetSmartWalletAddress), ctx, eoa)
 }
 
 // Init mocks base method.
@@ -109,20 +123,6 @@ func (m *MockAccountAbstractionService) Init(a *app.App) error {
 func (mr *MockAccountAbstractionServiceMockRecorder) Init(a interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockAccountAbstractionService)(nil).Init), a)
-}
-
-// AdminMintAccessTokens mocks base method.
-func (m *MockAccountAbstractionService) AdminMintAccessTokens(scw common.Address, amount *big.Int) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AdminMintAccessTokens", scw, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AdminMintAccessTokens indicates an expected call of AdminMintAccessTokens.
-func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(scw, amount interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), scw, amount)
 }
 
 // Name mocks base method.

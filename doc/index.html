@@ -195,6 +195,18 @@
                 </li>
               
                 <li>
+                  <a href="#.CreateUserOperationRequest"><span class="badge">M</span>CreateUserOperationRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.CreateUserOperationRequestSigned"><span class="badge">M</span>CreateUserOperationRequestSigned</a>
+                </li>
+              
+                <li>
+                  <a href="#.GetDataNameRegisterResponse"><span class="badge">M</span>GetDataNameRegisterResponse</a>
+                </li>
+              
+                <li>
                   <a href="#.GetUserAccountRequest"><span class="badge">M</span>GetUserAccountRequest</a>
                 </li>
               
@@ -395,7 +407,7 @@
                   <td>payload</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>AdminFundUserAccountReques struct </p></td>
+                  <td><p>AdminFundUserAccountRequest struct </p></td>
                 </tr>
               
                 <tr>
@@ -403,6 +415,99 @@
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>payload signed by Admin of this service </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".CreateUserOperationRequest">CreateUserOperationRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ownerAnyAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A content hash attached to this name </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that name </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operationData</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>see GetDataNameRegister method for example </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".CreateUserOperationRequestSigned">CreateUserOperationRequestSigned</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>CreateUserOperationRequest struct </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>payload signed with Anytype identity </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".GetDataNameRegisterResponse">GetDataNameRegisterResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -500,17 +605,19 @@ you can ask .owner() method to get &#39;ownerEthAddress&#39; </p></td>
               <tr>
                 <td>AdminFundUserAccount</td>
                 <td><a href="#AdminFundUserAccountRequestSigned">.AdminFundUserAccountRequestSigned</a></td>
-                <td><a href="#UserAccount">.UserAccount</a></td>
+                <td><a href="#OperationResponse">.OperationResponse</a></td>
                 <td><p>ADMIN METHODS:
-Will send &#34;name tokens&#34; to the user&#39;s account 
-  (user will be able to use these tokens to register his name later directly)</p></td>
+Will send &#34;name tokens&#34; to the user&#39;s account (to his SmartContractWallet)
+  (user will be able to use these tokens to register his name later directly)
+blocking, will send TX to EVM chain
+if finished without erro -&gt; please use GetUserAccount to get updated</p></td>
               </tr>
             
               <tr>
                 <td>AdminFundGasOperations</td>
                 <td><a href="#AdminFundGasOperationsRequestSigned">.AdminFundGasOperationsRequestSigned</a></td>
-                <td><a href="#UserAccount">.UserAccount</a></td>
-                <td><p>Will add &#34;gas operations&#34; to the user&#39;s AA account 
+                <td><a href="#OperationResponse">.OperationResponse</a></td>
+                <td><p>Each &#34;operations&#34; is a single TX like &#34;name update&#34;, etc 
   (user will be able to send TXs to EVM chain without having any gas in his wallet)</p></td>
               </tr>
             
@@ -519,9 +626,34 @@ Will send &#34;name tokens&#34; to the user&#39;s account
                 <td><a href="#GetUserAccountRequest">.GetUserAccountRequest</a></td>
                 <td><a href="#UserAccount">.UserAccount</a></td>
                 <td><p>USER METHODS:
-Use it:
+Use it to:
 1 - get your SmartContractWallet address
 2 - get how many operations you still have</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetDataNameRegister</td>
+                <td><a href="#NameRegisterRequest">.NameRegisterRequest</a></td>
+                <td><a href="#GetDataNameRegisterResponse">.GetDataNameRegisterResponse</a></td>
+                <td><p>Example usage:
+1. get data
+2. sign it with your Ethereum private key
+3. send it using CreateUserOperation
+4. check operation status using GetOperationStatus</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetDataNameUpdate</td>
+                <td><a href="#NameUpdateRequest">.NameUpdateRequest</a></td>
+                <td><a href="#GetDataNameRegisterResponse">.GetDataNameRegisterResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateUserOperation</td>
+                <td><a href="#CreateUserOperationRequestSigned">.CreateUserOperationRequestSigned</a></td>
+                <td><a href="#OperationResponse">.OperationResponse</a></td>
+                <td><p></p></td>
               </tr>
             
           </tbody>

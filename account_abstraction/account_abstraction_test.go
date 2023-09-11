@@ -194,11 +194,11 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 
 		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}) (*big.Int, error) {
 			// $20 USD per name (current testnet settings)
-			// $1 USD = 10^18 wei
-			wei := big.NewInt(20).Exp(big.NewInt(10), big.NewInt(18), nil)
-			// divide /2 to get less than 1 name
-			wei = wei.Div(wei, big.NewInt(2))
-			return wei, nil
+			oneNamePriceWei := big.NewInt(20 * 1000000)
+
+			// divide oneNamePriceWei /2 to get less than 1 name
+			out := big.NewInt(0).Div(oneNamePriceWei, big.NewInt(2))
+			return out, nil
 		})
 
 		count, err := fx.GetNamesCountLeft(common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"))
@@ -212,18 +212,17 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}) (*big.Int, error) {
-			// $20 USD per name (current testnet settings)
-			// $1 USD = 10^18 wei
-			wei := big.NewInt(20).Exp(big.NewInt(10), big.NewInt(18), nil)
+			oneNamePriceWei := big.NewInt(20 * 1000000)
 
-			// return
-			return wei, nil
+			// multiply by 12
+			out := big.NewInt(0).Mul(oneNamePriceWei, big.NewInt(12))
+			return out, nil
 		})
 
 		count, err := fx.GetNamesCountLeft(common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"))
 
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(1), count)
+		assert.Equal(t, uint64(12), count)
 	})
 }
 

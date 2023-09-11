@@ -41,6 +41,7 @@ type AccountAbstractionService interface {
 	// each EOA has an associated smart wallet address
 	// even if it is not deployed yet - we can determine it
 	GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error)
+
 	GetNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error)
 
 	VerifyAdminIdentity(payload []byte, signature []byte) (err error)

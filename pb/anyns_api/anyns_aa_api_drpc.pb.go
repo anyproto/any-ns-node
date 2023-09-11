@@ -40,11 +40,12 @@ func (drpcEncoding_File_proto_anyns_aa_api_proto) JSONUnmarshal(buf []byte, msg 
 type DRPCAnynsAccountAbstractionClient interface {
 	DRPCConn() drpc.Conn
 
-	// requires admin signature
-	AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*UserAccount, error)
-	// requires admin signature
-	AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*UserAccount, error)
+	AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*OperationResponse, error)
+	AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*OperationResponse, error)
 	GetUserAccount(ctx context.Context, in *GetUserAccountRequest) (*UserAccount, error)
+	GetDataNameRegister(ctx context.Context, in *NameRegisterRequest) (*GetDataNameRegisterResponse, error)
+	GetDataNameUpdate(ctx context.Context, in *NameUpdateRequest) (*GetDataNameRegisterResponse, error)
+	CreateUserOperation(ctx context.Context, in *CreateUserOperationRequestSigned) (*OperationResponse, error)
 }
 
 type drpcAnynsAccountAbstractionClient struct {
@@ -57,8 +58,8 @@ func NewDRPCAnynsAccountAbstractionClient(cc drpc.Conn) DRPCAnynsAccountAbstract
 
 func (c *drpcAnynsAccountAbstractionClient) DRPCConn() drpc.Conn { return c.cc }
 
-func (c *drpcAnynsAccountAbstractionClient) AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*UserAccount, error) {
-	out := new(UserAccount)
+func (c *drpcAnynsAccountAbstractionClient) AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*OperationResponse, error) {
+	out := new(OperationResponse)
 	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/AdminFundUserAccount", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
 	if err != nil {
 		return nil, err
@@ -66,8 +67,8 @@ func (c *drpcAnynsAccountAbstractionClient) AdminFundUserAccount(ctx context.Con
 	return out, nil
 }
 
-func (c *drpcAnynsAccountAbstractionClient) AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*UserAccount, error) {
-	out := new(UserAccount)
+func (c *drpcAnynsAccountAbstractionClient) AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*OperationResponse, error) {
+	out := new(OperationResponse)
 	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/AdminFundGasOperations", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
 	if err != nil {
 		return nil, err
@@ -84,19 +85,49 @@ func (c *drpcAnynsAccountAbstractionClient) GetUserAccount(ctx context.Context, 
 	return out, nil
 }
 
+func (c *drpcAnynsAccountAbstractionClient) GetDataNameRegister(ctx context.Context, in *NameRegisterRequest) (*GetDataNameRegisterResponse, error) {
+	out := new(GetDataNameRegisterResponse)
+	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/GetDataNameRegister", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *drpcAnynsAccountAbstractionClient) GetDataNameUpdate(ctx context.Context, in *NameUpdateRequest) (*GetDataNameRegisterResponse, error) {
+	out := new(GetDataNameRegisterResponse)
+	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/GetDataNameUpdate", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *drpcAnynsAccountAbstractionClient) CreateUserOperation(ctx context.Context, in *CreateUserOperationRequestSigned) (*OperationResponse, error) {
+	out := new(OperationResponse)
+	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/CreateUserOperation", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 type DRPCAnynsAccountAbstractionServer interface {
-	AdminFundUserAccount(context.Context, *AdminFundUserAccountRequestSigned) (*UserAccount, error)
-	AdminFundGasOperations(context.Context, *AdminFundGasOperationsRequestSigned) (*UserAccount, error)
+	AdminFundUserAccount(context.Context, *AdminFundUserAccountRequestSigned) (*OperationResponse, error)
+	AdminFundGasOperations(context.Context, *AdminFundGasOperationsRequestSigned) (*OperationResponse, error)
 	GetUserAccount(context.Context, *GetUserAccountRequest) (*UserAccount, error)
+	GetDataNameRegister(context.Context, *NameRegisterRequest) (*GetDataNameRegisterResponse, error)
+	GetDataNameUpdate(context.Context, *NameUpdateRequest) (*GetDataNameRegisterResponse, error)
+	CreateUserOperation(context.Context, *CreateUserOperationRequestSigned) (*OperationResponse, error)
 }
 
 type DRPCAnynsAccountAbstractionUnimplementedServer struct{}
 
-func (s *DRPCAnynsAccountAbstractionUnimplementedServer) AdminFundUserAccount(context.Context, *AdminFundUserAccountRequestSigned) (*UserAccount, error) {
+func (s *DRPCAnynsAccountAbstractionUnimplementedServer) AdminFundUserAccount(context.Context, *AdminFundUserAccountRequestSigned) (*OperationResponse, error) {
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
-func (s *DRPCAnynsAccountAbstractionUnimplementedServer) AdminFundGasOperations(context.Context, *AdminFundGasOperationsRequestSigned) (*UserAccount, error) {
+func (s *DRPCAnynsAccountAbstractionUnimplementedServer) AdminFundGasOperations(context.Context, *AdminFundGasOperationsRequestSigned) (*OperationResponse, error) {
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
@@ -104,9 +135,21 @@ func (s *DRPCAnynsAccountAbstractionUnimplementedServer) GetUserAccount(context.
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
+func (s *DRPCAnynsAccountAbstractionUnimplementedServer) GetDataNameRegister(context.Context, *NameRegisterRequest) (*GetDataNameRegisterResponse, error) {
+	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
+}
+
+func (s *DRPCAnynsAccountAbstractionUnimplementedServer) GetDataNameUpdate(context.Context, *NameUpdateRequest) (*GetDataNameRegisterResponse, error) {
+	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
+}
+
+func (s *DRPCAnynsAccountAbstractionUnimplementedServer) CreateUserOperation(context.Context, *CreateUserOperationRequestSigned) (*OperationResponse, error) {
+	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
+}
+
 type DRPCAnynsAccountAbstractionDescription struct{}
 
-func (DRPCAnynsAccountAbstractionDescription) NumMethods() int { return 3 }
+func (DRPCAnynsAccountAbstractionDescription) NumMethods() int { return 6 }
 
 func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver, interface{}, bool) {
 	switch n {
@@ -137,6 +180,33 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 						in1.(*GetUserAccountRequest),
 					)
 			}, DRPCAnynsAccountAbstractionServer.GetUserAccount, true
+	case 3:
+		return "/AnynsAccountAbstraction/GetDataNameRegister", drpcEncoding_File_proto_anyns_aa_api_proto{},
+			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
+				return srv.(DRPCAnynsAccountAbstractionServer).
+					GetDataNameRegister(
+						ctx,
+						in1.(*NameRegisterRequest),
+					)
+			}, DRPCAnynsAccountAbstractionServer.GetDataNameRegister, true
+	case 4:
+		return "/AnynsAccountAbstraction/GetDataNameUpdate", drpcEncoding_File_proto_anyns_aa_api_proto{},
+			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
+				return srv.(DRPCAnynsAccountAbstractionServer).
+					GetDataNameUpdate(
+						ctx,
+						in1.(*NameUpdateRequest),
+					)
+			}, DRPCAnynsAccountAbstractionServer.GetDataNameUpdate, true
+	case 5:
+		return "/AnynsAccountAbstraction/CreateUserOperation", drpcEncoding_File_proto_anyns_aa_api_proto{},
+			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
+				return srv.(DRPCAnynsAccountAbstractionServer).
+					CreateUserOperation(
+						ctx,
+						in1.(*CreateUserOperationRequestSigned),
+					)
+			}, DRPCAnynsAccountAbstractionServer.CreateUserOperation, true
 	default:
 		return "", nil, nil, nil, false
 	}
@@ -148,14 +218,14 @@ func DRPCRegisterAnynsAccountAbstraction(mux drpc.Mux, impl DRPCAnynsAccountAbst
 
 type DRPCAnynsAccountAbstraction_AdminFundUserAccountStream interface {
 	drpc.Stream
-	SendAndClose(*UserAccount) error
+	SendAndClose(*OperationResponse) error
 }
 
 type drpcAnynsAccountAbstraction_AdminFundUserAccountStream struct {
 	drpc.Stream
 }
 
-func (x *drpcAnynsAccountAbstraction_AdminFundUserAccountStream) SendAndClose(m *UserAccount) error {
+func (x *drpcAnynsAccountAbstraction_AdminFundUserAccountStream) SendAndClose(m *OperationResponse) error {
 	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
 		return err
 	}
@@ -164,14 +234,14 @@ func (x *drpcAnynsAccountAbstraction_AdminFundUserAccountStream) SendAndClose(m 
 
 type DRPCAnynsAccountAbstraction_AdminFundGasOperationsStream interface {
 	drpc.Stream
-	SendAndClose(*UserAccount) error
+	SendAndClose(*OperationResponse) error
 }
 
 type drpcAnynsAccountAbstraction_AdminFundGasOperationsStream struct {
 	drpc.Stream
 }
 
-func (x *drpcAnynsAccountAbstraction_AdminFundGasOperationsStream) SendAndClose(m *UserAccount) error {
+func (x *drpcAnynsAccountAbstraction_AdminFundGasOperationsStream) SendAndClose(m *OperationResponse) error {
 	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
 		return err
 	}
@@ -188,6 +258,54 @@ type drpcAnynsAccountAbstraction_GetUserAccountStream struct {
 }
 
 func (x *drpcAnynsAccountAbstraction_GetUserAccountStream) SendAndClose(m *UserAccount) error {
+	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
+		return err
+	}
+	return x.CloseSend()
+}
+
+type DRPCAnynsAccountAbstraction_GetDataNameRegisterStream interface {
+	drpc.Stream
+	SendAndClose(*GetDataNameRegisterResponse) error
+}
+
+type drpcAnynsAccountAbstraction_GetDataNameRegisterStream struct {
+	drpc.Stream
+}
+
+func (x *drpcAnynsAccountAbstraction_GetDataNameRegisterStream) SendAndClose(m *GetDataNameRegisterResponse) error {
+	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
+		return err
+	}
+	return x.CloseSend()
+}
+
+type DRPCAnynsAccountAbstraction_GetDataNameUpdateStream interface {
+	drpc.Stream
+	SendAndClose(*GetDataNameRegisterResponse) error
+}
+
+type drpcAnynsAccountAbstraction_GetDataNameUpdateStream struct {
+	drpc.Stream
+}
+
+func (x *drpcAnynsAccountAbstraction_GetDataNameUpdateStream) SendAndClose(m *GetDataNameRegisterResponse) error {
+	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
+		return err
+	}
+	return x.CloseSend()
+}
+
+type DRPCAnynsAccountAbstraction_CreateUserOperationStream interface {
+	drpc.Stream
+	SendAndClose(*OperationResponse) error
+}
+
+type drpcAnynsAccountAbstraction_CreateUserOperationStream struct {
+	drpc.Stream
+}
+
+func (x *drpcAnynsAccountAbstraction_CreateUserOperationStream) SendAndClose(m *OperationResponse) error {
 	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
 		return err
 	}

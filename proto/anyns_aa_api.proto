@@ -1,6 +1,8 @@
 syntax = "proto3";
 option go_package = "pb/anyns_api";
 
+import "proto/anyns_api.proto";
+
 message UserAccount {
   // An Ethereum address that owns that account
   string ownerEthAddress = 1;
@@ -56,20 +58,54 @@ message GetUserAccountRequest {
   string ownerEthAddress = 1;
 }
 
+message GetDataNameRegisterResponse {
+  bytes data = 1;
+}
+
+message CreateUserOperationRequest {
+  // A content hash attached to this name
+  string ownerAnyAddress = 1;
+
+  // An Ethereum address that owns that name
+  string ownerEthAddress = 2;
+
+  bytes operationData = 3;        // see GetDataNameRegister method for example
+}
+
+message CreateUserOperationRequestSigned {
+  // CreateUserOperationRequest struct
+  bytes payload = 1;
+
+  // payload signed with Anytype identity
+  bytes signature = 2; 
+}
+
 
 service AnynsAccountAbstraction {
 // ADMIN METHODS:
   // Will send "name tokens" to the user's account (to his SmartContractWallet)
   //   (user will be able to use these tokens to register his name later directly)
-  rpc AdminFundUserAccount(AdminFundUserAccountRequestSigned) returns (UserAccount) {}
+  // blocking, will send TX to EVM chain
+  // if finished without erro -> please use GetUserAccount to get updated 
+  rpc AdminFundUserAccount(AdminFundUserAccountRequestSigned) returns (OperationResponse) {}
   
-  // Will add "gas operations" to the user's AA account 
+  // Each "operations" is a single TX like "name update", etc 
   //   (user will be able to send TXs to EVM chain without having any gas in his wallet)
-  rpc AdminFundGasOperations(AdminFundGasOperationsRequestSigned) returns (UserAccount) {}
+  rpc AdminFundGasOperations(AdminFundGasOperationsRequestSigned) returns (OperationResponse) {}
 
 // USER METHODS:
-  // Use it:
+  // Use it to:
   // 1 - get your SmartContractWallet address
   // 2 - get how many operations you still have
   rpc GetUserAccount(GetUserAccountRequest) returns (UserAccount) {}
+
+  // Example usage:
+  // 1. get data
+  // 2. sign it with your Ethereum private key
+  // 3. send it using CreateUserOperation
+  // 4. check operation status using GetOperationStatus
+  rpc GetDataNameRegister(NameRegisterRequest) returns (GetDataNameRegisterResponse) {}
+  rpc GetDataNameUpdate(NameUpdateRequest) returns (GetDataNameRegisterResponse) {}
+
+  rpc CreateUserOperation(CreateUserOperationRequestSigned) returns (OperationResponse) {}
 }

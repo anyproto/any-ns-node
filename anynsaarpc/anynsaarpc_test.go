@@ -81,7 +81,7 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any()).DoAndReturn(func(ctx interface{}) (address common.Address, err error) {
+		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
 			return common.Address{}, errors.New("not found")
 		})
 
@@ -98,7 +98,7 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any()).DoAndReturn(func(ctx interface{}) (address common.Address, err error) {
+		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
 			return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
 		})
 
@@ -129,7 +129,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any()).DoAndReturn(func(ctx interface{}) (address common.Address, err error) {
+		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
 			return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
 		})
 
@@ -174,11 +174,9 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		pctx := context.Background()
 		resp, err := fx.AdminFundUserAccount(pctx, &in)
 
-		// should return previous data
+		// should return "pending" operation
 		require.NoError(t, err)
-		assert.Equal(t, common.HexToAddress(resp.OwnerEthAddress), common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
-		assert.Equal(t, common.HexToAddress(resp.OwnerSmartContracWalletAddress), common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"))
-		assert.Equal(t, resp.NamesCountLeft, uint64(10))
-		assert.Equal(t, resp.OperationsCountLeft, uint64(20))
+		require.Equal(t, resp.OperationId, int64(0))
+		require.Equal(t, resp.OperationState, as.OperationState_Pending)
 	})
 }

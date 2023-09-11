@@ -43,7 +43,36 @@ func (arpc *anynsAARpc) Name() (name string) {
 	return CName
 }
 
-func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (*as.UserAccount, error) {
+func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (*as.UserAccount, error) {
+	var res as.UserAccount
+	res.OwnerEthAddress = in.OwnerEthAddress
+
+	// even if SCW is not deployed yet -> it should be returned
+	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
+	if err != nil {
+		log.Error("failed to get smart wallet address", zap.Error(err))
+		return nil, err
+	}
+
+	res.OwnerSmartContracWalletAddress = scwa.Hex()
+
+	res.NamesCountLeft, err = arpc.aa.GetNamesCountLeft(scwa)
+	if err != nil {
+		log.Error("failed to get names count left", zap.Error(err))
+		return nil, err
+	}
+
+	res.OperationsCountLeft, err = arpc.aa.GetOperationsCountLeft(scwa)
+	if err != nil {
+		log.Error("failed to get operations count left", zap.Error(err))
+		return nil, err
+	}
+
+	// return
+	return &res, nil
+}
+
+func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (*as.OperationResponse, error) {
 	// 1 - unmarshal the signed request
 	var afuar as.AdminFundUserAccountRequest
 	err := proto.Unmarshal(in.Payload, &afuar)
@@ -75,41 +104,35 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 		return nil, err
 	}
 
-	// 3 - return (PREVOIUS DATA before the change)
-	return ua, err
+	// 3 - return
+	// TODO: add to queue
+	var out as.OperationResponse
+	out.OperationId = 0
+	out.OperationState = as.OperationState_Pending
+
+	return &out, err
 }
 
-func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.AdminFundGasOperationsRequestSigned) (*as.UserAccount, error) {
-	// TODO:
+func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.AdminFundGasOperationsRequestSigned) (*as.OperationResponse, error) {
+	// TODO: implement
 
 	return nil, nil
 }
 
-func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (*as.UserAccount, error) {
-	var res as.UserAccount
-	res.OwnerEthAddress = in.OwnerEthAddress
+func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (*as.GetDataNameRegisterResponse, error) {
+	// TODO: implement
 
-	// even if SCW is not deployed yet -> it should be returned
-	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
-	if err != nil {
-		log.Error("failed to get smart wallet address", zap.Error(err))
-		return nil, err
-	}
+	return nil, nil
+}
 
-	res.OwnerSmartContracWalletAddress = scwa.Hex()
+func (arpc *anynsAARpc) GetDataNameUpdate(ctx context.Context, in *as.NameUpdateRequest) (*as.GetDataNameRegisterResponse, error) {
+	// TODO: implement
 
-	res.NamesCountLeft, err = arpc.aa.GetNamesCountLeft(scwa)
-	if err != nil {
-		log.Error("failed to get names count left", zap.Error(err))
-		return nil, err
-	}
+	return nil, nil
+}
 
-	res.OperationsCountLeft, err = arpc.aa.GetOperationsCountLeft(scwa)
-	if err != nil {
-		log.Error("failed to get operations count left", zap.Error(err))
-		return nil, err
-	}
+func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUserOperationRequestSigned) (*as.OperationResponse, error) {
+	// TODO: implement
 
-	// return
-	return &res, nil
+	return nil, nil
 }

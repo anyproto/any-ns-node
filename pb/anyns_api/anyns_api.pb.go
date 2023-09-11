@@ -152,7 +152,7 @@ type NameAvailableResponse struct {
 	// This field is non-empty only if name is "already registered"
 	SpaceId string `protobuf:"bytes,4,opt,name=spaceId,proto3" json:"spaceId,omitempty"`
 	// doestn't work with marashalling/unmarshalling
-	//google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true];
+	// google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true];
 	NameExpires int64 `protobuf:"varint,5,opt,name=nameExpires,proto3" json:"nameExpires,omitempty"`
 }
 

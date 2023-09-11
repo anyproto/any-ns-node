@@ -152,7 +152,7 @@ func (m *AdminFundUserAccountRequest) GetNamesCount() uint64 {
 }
 
 type AdminFundUserAccountRequestSigned struct {
-	// AdminFundUserAccountReques struct
+	// AdminFundUserAccountRequest struct
 	Payload []byte `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
 	// payload signed by Admin of this service
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
@@ -359,6 +359,166 @@ func (m *GetUserAccountRequest) GetOwnerEthAddress() string {
 	return ""
 }
 
+type GetDataNameRegisterResponse struct {
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (m *GetDataNameRegisterResponse) Reset()         { *m = GetDataNameRegisterResponse{} }
+func (m *GetDataNameRegisterResponse) String() string { return proto.CompactTextString(m) }
+func (*GetDataNameRegisterResponse) ProtoMessage()    {}
+func (*GetDataNameRegisterResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_36c3ef0119950453, []int{6}
+}
+func (m *GetDataNameRegisterResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GetDataNameRegisterResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GetDataNameRegisterResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GetDataNameRegisterResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetDataNameRegisterResponse.Merge(m, src)
+}
+func (m *GetDataNameRegisterResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *GetDataNameRegisterResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetDataNameRegisterResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetDataNameRegisterResponse proto.InternalMessageInfo
+
+func (m *GetDataNameRegisterResponse) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
+type CreateUserOperationRequest struct {
+	// A content hash attached to this name
+	OwnerAnyAddress string `protobuf:"bytes,1,opt,name=ownerAnyAddress,proto3" json:"ownerAnyAddress,omitempty"`
+	// An Ethereum address that owns that name
+	OwnerEthAddress string `protobuf:"bytes,2,opt,name=ownerEthAddress,proto3" json:"ownerEthAddress,omitempty"`
+	OperationData   []byte `protobuf:"bytes,3,opt,name=operationData,proto3" json:"operationData,omitempty"`
+}
+
+func (m *CreateUserOperationRequest) Reset()         { *m = CreateUserOperationRequest{} }
+func (m *CreateUserOperationRequest) String() string { return proto.CompactTextString(m) }
+func (*CreateUserOperationRequest) ProtoMessage()    {}
+func (*CreateUserOperationRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_36c3ef0119950453, []int{7}
+}
+func (m *CreateUserOperationRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CreateUserOperationRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CreateUserOperationRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CreateUserOperationRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateUserOperationRequest.Merge(m, src)
+}
+func (m *CreateUserOperationRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *CreateUserOperationRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateUserOperationRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateUserOperationRequest proto.InternalMessageInfo
+
+func (m *CreateUserOperationRequest) GetOwnerAnyAddress() string {
+	if m != nil {
+		return m.OwnerAnyAddress
+	}
+	return ""
+}
+
+func (m *CreateUserOperationRequest) GetOwnerEthAddress() string {
+	if m != nil {
+		return m.OwnerEthAddress
+	}
+	return ""
+}
+
+func (m *CreateUserOperationRequest) GetOperationData() []byte {
+	if m != nil {
+		return m.OperationData
+	}
+	return nil
+}
+
+type CreateUserOperationRequestSigned struct {
+	// CreateUserOperationRequest struct
+	Payload []byte `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
+	// payload signed with Anytype identity
+	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+}
+
+func (m *CreateUserOperationRequestSigned) Reset()         { *m = CreateUserOperationRequestSigned{} }
+func (m *CreateUserOperationRequestSigned) String() string { return proto.CompactTextString(m) }
+func (*CreateUserOperationRequestSigned) ProtoMessage()    {}
+func (*CreateUserOperationRequestSigned) Descriptor() ([]byte, []int) {
+	return fileDescriptor_36c3ef0119950453, []int{8}
+}
+func (m *CreateUserOperationRequestSigned) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CreateUserOperationRequestSigned) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CreateUserOperationRequestSigned.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CreateUserOperationRequestSigned) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateUserOperationRequestSigned.Merge(m, src)
+}
+func (m *CreateUserOperationRequestSigned) XXX_Size() int {
+	return m.Size()
+}
+func (m *CreateUserOperationRequestSigned) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateUserOperationRequestSigned.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateUserOperationRequestSigned proto.InternalMessageInfo
+
+func (m *CreateUserOperationRequestSigned) GetPayload() []byte {
+	if m != nil {
+		return m.Payload
+	}
+	return nil
+}
+
+func (m *CreateUserOperationRequestSigned) GetSignature() []byte {
+	if m != nil {
+		return m.Signature
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*UserAccount)(nil), "UserAccount")
 	proto.RegisterType((*AdminFundUserAccountRequest)(nil), "AdminFundUserAccountRequest")
@@ -366,37 +526,49 @@ func init() {
 	proto.RegisterType((*AdminFundGasOperationsRequest)(nil), "AdminFundGasOperationsRequest")
 	proto.RegisterType((*AdminFundGasOperationsRequestSigned)(nil), "AdminFundGasOperationsRequestSigned")
 	proto.RegisterType((*GetUserAccountRequest)(nil), "GetUserAccountRequest")
+	proto.RegisterType((*GetDataNameRegisterResponse)(nil), "GetDataNameRegisterResponse")
+	proto.RegisterType((*CreateUserOperationRequest)(nil), "CreateUserOperationRequest")
+	proto.RegisterType((*CreateUserOperationRequestSigned)(nil), "CreateUserOperationRequestSigned")
 }
 
 func init() { proto.RegisterFile("proto/anyns_aa_api.proto", fileDescriptor_36c3ef0119950453) }
 
 var fileDescriptor_36c3ef0119950453 = []byte{
-	// 397 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x93, 0xdd, 0x6a, 0xdb, 0x30,
-	0x14, 0xc7, 0xad, 0x2d, 0x6c, 0xe4, 0xcc, 0x64, 0xa0, 0x6d, 0x99, 0xd9, 0x87, 0xc8, 0xbc, 0x11,
-	0x72, 0xe5, 0x8d, 0xed, 0x66, 0xb7, 0x5e, 0x58, 0x02, 0x63, 0x6c, 0xe0, 0x50, 0x0a, 0x2d, 0x25,
-	0x28, 0xb1, 0x9a, 0x1a, 0x12, 0xc9, 0x95, 0x64, 0x4a, 0xde, 0xa2, 0x8f, 0xd5, 0xcb, 0x5c, 0xb6,
-	0x77, 0x25, 0x79, 0x80, 0xbe, 0x42, 0xb1, 0xc8, 0x87, 0xe3, 0x9a, 0xa4, 0x21, 0x97, 0xfa, 0xeb,
-	0x7c, 0xe8, 0xf7, 0x3f, 0x3a, 0xe0, 0xc4, 0x52, 0x68, 0xf1, 0x95, 0xf2, 0x31, 0x57, 0x5d, 0x4a,
-	0xbb, 0x34, 0x8e, 0x3c, 0x23, 0xb9, 0x37, 0x08, 0x5e, 0x1c, 0x28, 0x26, 0xfd, 0x7e, 0x5f, 0x24,
-	0x5c, 0xe3, 0x06, 0xbc, 0x14, 0x17, 0x9c, 0xc9, 0xdf, 0xfa, 0xcc, 0x0f, 0x43, 0xc9, 0x94, 0x72,
-	0x50, 0x0d, 0x35, 0xca, 0x41, 0x5e, 0xc6, 0x2d, 0x20, 0x46, 0xea, 0x8c, 0xa8, 0xd4, 0x4d, 0xc1,
-	0xb5, 0xa4, 0xfd, 0x43, 0x3a, 0x1c, 0x32, 0xbd, 0x48, 0x7c, 0x62, 0x12, 0xb7, 0x44, 0xe1, 0x3a,
-	0x54, 0x38, 0x1d, 0x31, 0xd5, 0x4c, 0xfb, 0xff, 0x65, 0xa7, 0xda, 0x79, 0x5a, 0x43, 0x8d, 0x52,
-	0x90, 0x53, 0xf1, 0x37, 0x78, 0x25, 0x62, 0x26, 0xa9, 0x8e, 0x04, 0xcf, 0x04, 0x97, 0x4c, 0x70,
-	0xd1, 0x95, 0x3b, 0x80, 0xf7, 0x7e, 0x38, 0x8a, 0x78, 0x2b, 0xe1, 0x61, 0x86, 0x31, 0x60, 0xe7,
-	0x09, 0x53, 0xbb, 0xa0, 0x12, 0x80, 0xd5, 0x63, 0x0c, 0x56, 0x29, 0xc8, 0x28, 0xee, 0x31, 0x7c,
-	0xda, 0xd0, 0xa8, 0x13, 0x0d, 0x38, 0x0b, 0xb1, 0x03, 0xcf, 0x63, 0x3a, 0x1e, 0x0a, 0x1a, 0x9a,
-	0x36, 0x76, 0xb0, 0x38, 0xe2, 0x0f, 0x50, 0x56, 0xd1, 0x80, 0x53, 0x9d, 0x48, 0x66, 0xaa, 0xdb,
-	0xc1, 0x4a, 0x70, 0x15, 0x7c, 0x5c, 0x16, 0x6f, 0x53, 0xf5, 0x7f, 0x09, 0xba, 0x3b, 0x47, 0x1a,
-	0xb9, 0xee, 0xd3, 0x1c, 0x26, 0x2f, 0xbb, 0x27, 0xf0, 0x79, 0x63, 0xd3, 0x3d, 0x99, 0x7c, 0x78,
-	0xd3, 0x66, 0x7a, 0x9f, 0x99, 0x7c, 0xbf, 0x43, 0xf0, 0xd6, 0x4f, 0xff, 0xf3, 0xbc, 0x82, 0xdf,
-	0x53, 0xe9, 0xdf, 0x4a, 0x1f, 0x89, 0xff, 0xc0, 0xeb, 0xa2, 0x79, 0x60, 0xd7, 0xdb, 0x3a, 0xa6,
-	0x77, 0xb6, 0x97, 0xb9, 0x72, 0x2d, 0xfc, 0x0f, 0xaa, 0xc5, 0x4e, 0xe0, 0x2f, 0xde, 0x23, 0x2c,
-	0x7a, 0x50, 0xef, 0x27, 0x54, 0xd6, 0xd1, 0x71, 0xd5, 0x2b, 0xf4, 0x22, 0x9f, 0xf9, 0xab, 0x7e,
-	0x35, 0x25, 0x68, 0x32, 0x25, 0xe8, 0x76, 0x4a, 0xd0, 0xe5, 0x8c, 0x58, 0x93, 0x19, 0xb1, 0xae,
-	0x67, 0xc4, 0x3a, 0xb2, 0xe3, 0xde, 0x62, 0xb7, 0xe3, 0xa8, 0xf7, 0xcc, 0x6c, 0xf6, 0x8f, 0xfb,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0xdf, 0xc4, 0xda, 0x66, 0xf5, 0x03, 0x00, 0x00,
+	// 530 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0xb5, 0xdb, 0x08, 0xd4, 0x21, 0x14, 0x31, 0x69, 0x4b, 0x94, 0x16, 0x2b, 0x5d, 0xaa, 0x2a,
+	0x27, 0xf3, 0x75, 0xe1, 0x6a, 0x02, 0xcd, 0x01, 0x54, 0x90, 0x4b, 0x85, 0x54, 0x84, 0xaa, 0x49,
+	0x3c, 0x04, 0x4b, 0xc9, 0xda, 0x78, 0x37, 0x42, 0xf9, 0x17, 0x9c, 0xf8, 0x4d, 0x1c, 0x7b, 0x84,
+	0x1b, 0x24, 0x7f, 0x04, 0xd9, 0xcd, 0x87, 0x13, 0x6d, 0x93, 0x56, 0xb9, 0xd9, 0x6f, 0x67, 0xe7,
+	0xcd, 0x7b, 0xfb, 0x76, 0xa1, 0x1c, 0x27, 0x91, 0x8e, 0x1e, 0x93, 0xec, 0x4b, 0x75, 0x4e, 0x74,
+	0x4e, 0x71, 0xe8, 0x66, 0x50, 0x65, 0x7b, 0x66, 0x65, 0x0c, 0x8b, 0x3f, 0x36, 0xdc, 0x39, 0x55,
+	0x9c, 0x78, 0xad, 0x56, 0xd4, 0x93, 0x1a, 0x6b, 0x70, 0x2f, 0xfa, 0x2e, 0x39, 0x79, 0xad, 0xbf,
+	0x7a, 0x41, 0x90, 0xb0, 0x52, 0x65, 0xbb, 0x6a, 0xd7, 0x36, 0xfc, 0x79, 0x18, 0x8f, 0xc0, 0xc9,
+	0xa0, 0x93, 0x2e, 0x25, 0xba, 0x1e, 0x49, 0x9d, 0x50, 0xeb, 0x23, 0x75, 0x3a, 0xac, 0xc7, 0x1b,
+	0xd7, 0xb2, 0x8d, 0x4b, 0xaa, 0xf0, 0x10, 0x36, 0x25, 0x75, 0x59, 0xd5, 0x53, 0xfe, 0xb7, 0xfc,
+	0x45, 0x97, 0xd7, 0xab, 0x76, 0xad, 0xe0, 0xcf, 0xa1, 0xf8, 0x04, 0x4a, 0x51, 0xcc, 0x09, 0xe9,
+	0x30, 0x92, 0xb9, 0xe2, 0x42, 0x56, 0x6c, 0x5a, 0x12, 0x6d, 0xd8, 0xf5, 0x82, 0x6e, 0x28, 0x8f,
+	0x7a, 0x32, 0xc8, 0x69, 0xf4, 0xf9, 0x5b, 0x8f, 0xd5, 0x4d, 0xa4, 0x3a, 0x00, 0xd3, 0x61, 0x32,
+	0x59, 0x05, 0x3f, 0x87, 0x88, 0x4f, 0xb0, 0xbf, 0x80, 0xe8, 0x24, 0x6c, 0x4b, 0x0e, 0xb0, 0x0c,
+	0xb7, 0x63, 0xea, 0x77, 0x22, 0x0a, 0x32, 0x9a, 0xa2, 0x3f, 0xfe, 0xc5, 0x3d, 0xd8, 0x50, 0x61,
+	0x5b, 0x92, 0xee, 0x25, 0x9c, 0x75, 0x2f, 0xfa, 0x53, 0x40, 0x28, 0x78, 0x38, 0x69, 0xde, 0x20,
+	0xf5, 0x6e, 0x22, 0xf4, 0xe6, 0x3a, 0xd2, 0xca, 0x59, 0x9f, 0x46, 0x62, 0xe6, 0x61, 0xf1, 0x19,
+	0x1e, 0x2d, 0x24, 0x5d, 0x51, 0x93, 0x07, 0xdb, 0x0d, 0xd6, 0xab, 0x9c, 0x89, 0x78, 0x0a, 0xbb,
+	0x0d, 0xd6, 0xaf, 0x48, 0xd3, 0x31, 0x75, 0xd9, 0xe7, 0x76, 0xa8, 0x34, 0x27, 0x3e, 0xab, 0x38,
+	0x92, 0x8a, 0x11, 0xa1, 0x10, 0x90, 0xa6, 0xd1, 0x58, 0xd9, 0xb7, 0xf8, 0x69, 0x43, 0xa5, 0x9e,
+	0x30, 0x69, 0x4e, 0x99, 0x27, 0x9a, 0xe6, 0xb9, 0x3d, 0xd9, 0x37, 0x71, 0x4f, 0x61, 0xd3, 0x94,
+	0x6b, 0x66, 0xc7, 0x0f, 0xe0, 0xee, 0xc4, 0xda, 0x74, 0xd6, 0x2c, 0xdb, 0x45, 0x7f, 0x16, 0x14,
+	0x67, 0x50, 0xbd, 0x7a, 0xae, 0xd5, 0xac, 0x7e, 0xf6, 0x6f, 0x1d, 0x1e, 0x78, 0xe9, 0xa5, 0x1f,
+	0x39, 0xed, 0x35, 0x55, 0x7a, 0x07, 0x53, 0x02, 0x7c, 0x0f, 0x5b, 0xa6, 0xdc, 0xa2, 0x70, 0x97,
+	0xc6, 0xb9, 0x82, 0x6e, 0x6e, 0xd0, 0x4b, 0xd3, 0x85, 0x85, 0x1f, 0x60, 0xc7, 0x9c, 0x1b, 0x3c,
+	0x70, 0xaf, 0x11, 0xa8, 0x2b, 0xba, 0xbe, 0x80, 0xcd, 0xd9, 0xb8, 0xe0, 0x8e, 0x6b, 0xcc, 0x4f,
+	0xa5, 0xe8, 0xe6, 0x40, 0x61, 0xe1, 0x1b, 0x28, 0x19, 0x52, 0x82, 0x5b, 0xee, 0x6c, 0x68, 0x2e,
+	0x37, 0xef, 0xb9, 0x0b, 0x12, 0x25, 0x2c, 0x6c, 0xc0, 0xfd, 0x5c, 0xc1, 0x69, 0x1c, 0x90, 0x66,
+	0x44, 0x77, 0xfa, 0x73, 0xdd, 0x46, 0xc7, 0x50, 0x32, 0x9c, 0x37, 0xee, 0xbb, 0xcb, 0x52, 0x60,
+	0xf6, 0xe7, 0xe5, 0xe1, 0xaf, 0x81, 0x63, 0x5f, 0x0c, 0x1c, 0xfb, 0xef, 0xc0, 0xb1, 0x7f, 0x0c,
+	0x1d, 0xeb, 0x62, 0xe8, 0x58, 0xbf, 0x87, 0x8e, 0x75, 0x56, 0x8c, 0x9b, 0xd3, 0x27, 0xbf, 0x79,
+	0x2b, 0x7b, 0xf3, 0x9f, 0xff, 0x0f, 0x00, 0x00, 0xff, 0xff, 0x74, 0x07, 0x9e, 0x55, 0x26, 0x06,
+	0x00, 0x00,
 }
 
 func (m *UserAccount) Marshal() (dAtA []byte, err error) {
@@ -620,6 +792,117 @@ func (m *GetUserAccountRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *GetDataNameRegisterResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GetDataNameRegisterResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GetDataNameRegisterResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Data) > 0 {
+		i -= len(m.Data)
+		copy(dAtA[i:], m.Data)
+		i = encodeVarintAnynsAaApi(dAtA, i, uint64(len(m.Data)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *CreateUserOperationRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreateUserOperationRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CreateUserOperationRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.OperationData) > 0 {
+		i -= len(m.OperationData)
+		copy(dAtA[i:], m.OperationData)
+		i = encodeVarintAnynsAaApi(dAtA, i, uint64(len(m.OperationData)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.OwnerEthAddress) > 0 {
+		i -= len(m.OwnerEthAddress)
+		copy(dAtA[i:], m.OwnerEthAddress)
+		i = encodeVarintAnynsAaApi(dAtA, i, uint64(len(m.OwnerEthAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.OwnerAnyAddress) > 0 {
+		i -= len(m.OwnerAnyAddress)
+		copy(dAtA[i:], m.OwnerAnyAddress)
+		i = encodeVarintAnynsAaApi(dAtA, i, uint64(len(m.OwnerAnyAddress)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *CreateUserOperationRequestSigned) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreateUserOperationRequestSigned) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CreateUserOperationRequestSigned) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Signature) > 0 {
+		i -= len(m.Signature)
+		copy(dAtA[i:], m.Signature)
+		i = encodeVarintAnynsAaApi(dAtA, i, uint64(len(m.Signature)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Payload) > 0 {
+		i -= len(m.Payload)
+		copy(dAtA[i:], m.Payload)
+		i = encodeVarintAnynsAaApi(dAtA, i, uint64(len(m.Payload)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintAnynsAaApi(dAtA []byte, offset int, v uint64) int {
 	offset -= sovAnynsAaApi(v)
 	base := offset
@@ -727,6 +1010,57 @@ func (m *GetUserAccountRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.OwnerEthAddress)
+	if l > 0 {
+		n += 1 + l + sovAnynsAaApi(uint64(l))
+	}
+	return n
+}
+
+func (m *GetDataNameRegisterResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Data)
+	if l > 0 {
+		n += 1 + l + sovAnynsAaApi(uint64(l))
+	}
+	return n
+}
+
+func (m *CreateUserOperationRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.OwnerAnyAddress)
+	if l > 0 {
+		n += 1 + l + sovAnynsAaApi(uint64(l))
+	}
+	l = len(m.OwnerEthAddress)
+	if l > 0 {
+		n += 1 + l + sovAnynsAaApi(uint64(l))
+	}
+	l = len(m.OperationData)
+	if l > 0 {
+		n += 1 + l + sovAnynsAaApi(uint64(l))
+	}
+	return n
+}
+
+func (m *CreateUserOperationRequestSigned) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Payload)
+	if l > 0 {
+		n += 1 + l + sovAnynsAaApi(uint64(l))
+	}
+	l = len(m.Signature)
 	if l > 0 {
 		n += 1 + l + sovAnynsAaApi(uint64(l))
 	}
@@ -1389,6 +1723,356 @@ func (m *GetUserAccountRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.OwnerEthAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAnynsAaApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GetDataNameRegisterResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAnynsAaApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GetDataNameRegisterResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GetDataNameRegisterResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAnynsAaApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = append(m.Data[:0], dAtA[iNdEx:postIndex]...)
+			if m.Data == nil {
+				m.Data = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAnynsAaApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateUserOperationRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAnynsAaApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateUserOperationRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateUserOperationRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OwnerAnyAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAnynsAaApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.OwnerAnyAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OwnerEthAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAnynsAaApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.OwnerEthAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OperationData", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAnynsAaApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.OperationData = append(m.OperationData[:0], dAtA[iNdEx:postIndex]...)
+			if m.OperationData == nil {
+				m.OperationData = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAnynsAaApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateUserOperationRequestSigned) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAnynsAaApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateUserOperationRequestSigned: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateUserOperationRequestSigned: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Payload", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAnynsAaApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Payload = append(m.Payload[:0], dAtA[iNdEx:postIndex]...)
+			if m.Payload == nil {
+				m.Payload = []byte{}
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Signature", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAnynsAaApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAnynsAaApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Signature = append(m.Signature[:0], dAtA[iNdEx:postIndex]...)
+			if m.Signature == nil {
+				m.Signature = []byte{}
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
