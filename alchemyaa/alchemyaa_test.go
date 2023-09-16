@@ -1,15 +1,44 @@
 package alchemyaa
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"testing"
 
+	"github.com/anyproto/any-sync/app"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+	"go.uber.org/mock/gomock"
 )
+
+var ctx = context.Background()
+
+type fixture struct {
+	a    *app.App
+	ctrl *gomock.Controller
+
+	*alchemyaa
+}
+
+func newFixture(t *testing.T) *fixture {
+	fx := &fixture{
+		a:         new(app.App),
+		ctrl:      gomock.NewController(t),
+		alchemyaa: New().(*alchemyaa),
+	}
+
+	require.NoError(t, fx.a.Start(ctx))
+	return fx
+}
+
+func (fx *fixture) finish(t *testing.T) {
+	assert.NoError(t, fx.a.Close(ctx))
+	fx.ctrl.Finish()
+}
 
 func TestAAS_Keccak256(t *testing.T) {
 	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
@@ -54,90 +83,24 @@ func TestAAS_PackUserOperation(t *testing.T) {
 	})
 }
 
-func TestAAS_GetCallDataForMint(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
-		smartAccountAddress := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
-		var usdToMint uint = 100
-
-		out, err := GetCallDataForMint(smartAccountAddress, usdToMint)
-		outStr := "0x" + hex.EncodeToString(out)
-
-		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064")
-	})
-}
-
-func TestAAS_GetCallDataForAprove(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
-		from := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
-		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
-		var usdToMint uint = 100
-
-		out, err := GetCallDataForAprove(from, registrarController, usdToMint)
-		outStr := "0x" + hex.EncodeToString(out)
-
-		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000005f5e100")
-	})
-}
-
 func TestAAS_GetCallDataForExecute(t *testing.T) {
 	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	defer mt.Close()
 
 	mt.Run("success", func(mt *mtest.T) {
-		smartAccountAddress := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
-		var usdToMint uint = 100
 		erc20tokenAddr := common.HexToAddress("0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6")
 
-		data1, err := GetCallDataForMint(smartAccountAddress, usdToMint)
+		// just some random data
+		data1 := "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064"
+		// convert data1 string to []byte array
+		data1Bytes, err := hex.DecodeString(data1[2:])
+		assert.NoError(t, err)
 
-		out, err := GetCallDataForExecute(erc20tokenAddr, data1)
+		out, err := GetCallDataForExecute(erc20tokenAddr, data1Bytes)
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
 		assert.Equal(t, outStr, "0xb61d27f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000")
-	})
-}
-
-func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
-		smartAccountAddress := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
-		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
-
-		var usdToMint uint = 100
-		erc20tokenAddr := common.HexToAddress("0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6")
-		callDataOriginal1, _ := GetCallDataForMint(smartAccountAddress, usdToMint)
-		callDataOriginal2, _ := GetCallDataForAprove(smartAccountAddress, registrarController, 100)
-
-		// convert []byte to hex string
-		callDataOriginal1Str := "0x" + hex.EncodeToString(callDataOriginal1)
-		callDataOriginal2Str := "0x" + hex.EncodeToString(callDataOriginal2)
-
-		assert.Equal(t, callDataOriginal1Str, "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064")
-		assert.Equal(t, callDataOriginal2Str, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000005f5e100")
-
-		// put address and address2 into array
-		// both are the same
-		addresses := []common.Address{erc20tokenAddr, erc20tokenAddr}
-		// put data1 and callDataOriginal2 into array
-		datas := [][]byte{callDataOriginal1, callDataOriginal2}
-
-		//////
-		out, err := GetCallDataForBatchExecute(addresses, datas)
-		outStr := "0x" + hex.EncodeToString(out)
-
-		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x18dfb3c7000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000020000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f60000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e00000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000642b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000005f5e10000000000000000000000000000000000000000000000000000000000")
 	})
 }
 
@@ -236,34 +199,37 @@ func TestAA_CreateRequestGasAndPaymasterData(t *testing.T) {
 	defer mt.Close()
 
 	mt.Run("success", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
 		/*
-			json := `
-				{
-					"jsonrpc": "2.0",
-					"id": 13,
-					"method": "alchemy_requestGasAndPaymasterAndData",
-					"params": [
-						{
-							"policyId": "22032aca-2101-40d5-8550-14a6a11366ba",
-							"entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-							"userOperation": {
-								"initCode": "0x",
-								"sender": "0x045F756F248799F4413a026100Ae49e5E7F2031E",
-								"nonce": "0x4",
-								"callData": "0xb61d27f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000",
-								"signature": "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c",
-								"paymasterAndData": "0x",
-								"maxFeePerGas": "0x0",
-								"maxPriorityFeePerGas": "0x0",
-								"callGasLimit": "0x0",
-								"preVerificationGas": "0x0",
-								"verificationGasLimit": "0x0"
-							},
-							"dummySignature": "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
-						}
-					]
-				}
-			`
+		   json := `
+		     {
+		       "jsonrpc": "2.0",
+		       "id": 13,
+		       "method": "alchemy_requestGasAndPaymasterAndData",
+		       "params": [
+		         {
+		           "policyId": "22032aca-2101-40d5-8550-14a6a11366ba",
+		           "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+		           "userOperation": {
+		             "initCode": "0x",
+		             "sender": "0x045F756F248799F4413a026100Ae49e5E7F2031E",
+		             "nonce": "0x4",
+		             "callData": "0xb61d27f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000",
+		             "signature": "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c",
+		             "paymasterAndData": "0x",
+		             "maxFeePerGas": "0x0",
+		             "maxPriorityFeePerGas": "0x0",
+		             "callGasLimit": "0x0",
+		             "preVerificationGas": "0x0",
+		             "verificationGasLimit": "0x0"
+		           },
+		           "dummySignature": "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
+		         }
+		       ]
+		     }
+		   `
 		*/
 
 		// convert string to byte array
@@ -274,7 +240,7 @@ func TestAA_CreateRequestGasAndPaymasterData(t *testing.T) {
 
 		policyID := "22032aca-2101-40d5-8550-14a6a11366ba"
 		entryPoint := common.HexToAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
-		out, err := CreateRequestGasAndPaymasterData(callData, sender, nonce, policyID, entryPoint, id)
+		out, err := fx.CreateRequestGasAndPaymasterData(callData, sender, nonce, policyID, entryPoint, id)
 		assert.NoError(t, err)
 
 		assert.Equal(t, out.ID, 13)
@@ -340,25 +306,28 @@ func TestAA_CreateRequest(t *testing.T) {
 	defer mt.Close()
 
 	mt.Run("success", func(mt *mtest.T) {
-		/*
-			{
-				"jsonrpc": "2.0",
-				"id": 32,
-				"method": "eth_sendUserOperation",
-				"params": [
-					{
-						"initCode": "0x",
-						"sender": "0x045F756F248799F4413a026100Ae49e5E7F2031E",
-						"nonce": "0x8",
-						"callData": "0xb61d27f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000",
+		fx := newFixture(t)
+		defer fx.finish(t)
 
-						"signature": "0x985c208f2ce62b0ce1b8e4a2099d86d186ed48edc96b3361e0fbc50361581c565d289b1e477260edb32c89110dd615a721da8ed586470c0e6a253ad3c50f7f3d1b",
-						"paymasterAndData": "0xc03aac639bb21233e0139381970328db8bceeb67000064f9ca6c000064f9dad40000000000000000000000000000000000000000796f4ebcef9ae51a6d5131b1344228c971982353cc698f67e309ffb320ef04787ccec730f240788c78e6e1d096e3376a49782f51d38ba28b9eaeed1bca833be01c",
-					},
-					"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-				]
-			}
-			`
+		/*
+		   {
+		     "jsonrpc": "2.0",
+		     "id": 32,
+		     "method": "eth_sendUserOperation",
+		     "params": [
+		       {
+		         "initCode": "0x",
+		         "sender": "0x045F756F248799F4413a026100Ae49e5E7F2031E",
+		         "nonce": "0x8",
+		         "callData": "0xb61d27f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000",
+
+		         "signature": "0x985c208f2ce62b0ce1b8e4a2099d86d186ed48edc96b3361e0fbc50361581c565d289b1e477260edb32c89110dd615a721da8ed586470c0e6a253ad3c50f7f3d1b",
+		         "paymasterAndData": "0xc03aac639bb21233e0139381970328db8bceeb67000064f9ca6c000064f9dad40000000000000000000000000000000000000000796f4ebcef9ae51a6d5131b1344228c971982353cc698f67e309ffb320ef04787ccec730f240788c78e6e1d096e3376a49782f51d38ba28b9eaeed1bca833be01c",
+		       },
+		       "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+		     ]
+		   }
+		   `
 		*/
 
 		var rgap JSONRPCResponseGasAndPaymaster
@@ -380,10 +349,9 @@ func TestAA_CreateRequest(t *testing.T) {
 		myPK := "ac4bab11ad6b7ec2c84e5e293710828234ab63b62d377a23681228be588fab57"
 		appendEntryPoint := false
 
-		// TODO: params!
 		var chainID int64 = 11155111
 		entryPointAddress := common.HexToAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
-		outBytes, err := CreateRequest(callData, rgap, chainID, entryPointAddress, sender, nonce, id, myPK, appendEntryPoint)
+		outBytes, err := fx.CreateRequestAndSign(callData, rgap, chainID, entryPointAddress, sender, nonce, id, myPK, appendEntryPoint)
 		assert.NoError(t, err)
 
 		// convert byte array to JSON
@@ -408,16 +376,22 @@ func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
 	defer mt.Close()
 
 	mt.Run("fail if wrong input", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
 		// convert string to byte array
 		h := []byte("0x1")
-		_, err := DecodeSendUserOperationResponse(h)
+		_, err := fx.DecodeSendUserOperationResponse(h)
 		assert.Error(t, err)
 	})
 
 	mt.Run("success", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
 		respStr := `{"jsonrpc":"2.0","id":2,"result":"0xa417d6e564c27e7803097f7c712490896d093e27c6f9f44b0192252d82522792"}`
 
-		hash, err := DecodeSendUserOperationResponse([]byte(respStr))
+		hash, err := fx.DecodeSendUserOperationResponse([]byte(respStr))
 		assert.NoError(t, err)
 		assert.Equal(t, hash, "0xa417d6e564c27e7803097f7c712490896d093e27c6f9f44b0192252d82522792")
 	})

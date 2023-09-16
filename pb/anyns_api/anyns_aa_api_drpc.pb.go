@@ -44,7 +44,6 @@ type DRPCAnynsAccountAbstractionClient interface {
 	AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*OperationResponse, error)
 	GetUserAccount(ctx context.Context, in *GetUserAccountRequest) (*UserAccount, error)
 	GetDataNameRegister(ctx context.Context, in *NameRegisterRequest) (*GetDataNameRegisterResponse, error)
-	GetDataNameUpdate(ctx context.Context, in *NameUpdateRequest) (*GetDataNameRegisterResponse, error)
 	CreateUserOperation(ctx context.Context, in *CreateUserOperationRequestSigned) (*OperationResponse, error)
 }
 
@@ -94,15 +93,6 @@ func (c *drpcAnynsAccountAbstractionClient) GetDataNameRegister(ctx context.Cont
 	return out, nil
 }
 
-func (c *drpcAnynsAccountAbstractionClient) GetDataNameUpdate(ctx context.Context, in *NameUpdateRequest) (*GetDataNameRegisterResponse, error) {
-	out := new(GetDataNameRegisterResponse)
-	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/GetDataNameUpdate", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *drpcAnynsAccountAbstractionClient) CreateUserOperation(ctx context.Context, in *CreateUserOperationRequestSigned) (*OperationResponse, error) {
 	out := new(OperationResponse)
 	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/CreateUserOperation", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
@@ -117,7 +107,6 @@ type DRPCAnynsAccountAbstractionServer interface {
 	AdminFundGasOperations(context.Context, *AdminFundGasOperationsRequestSigned) (*OperationResponse, error)
 	GetUserAccount(context.Context, *GetUserAccountRequest) (*UserAccount, error)
 	GetDataNameRegister(context.Context, *NameRegisterRequest) (*GetDataNameRegisterResponse, error)
-	GetDataNameUpdate(context.Context, *NameUpdateRequest) (*GetDataNameRegisterResponse, error)
 	CreateUserOperation(context.Context, *CreateUserOperationRequestSigned) (*OperationResponse, error)
 }
 
@@ -139,17 +128,13 @@ func (s *DRPCAnynsAccountAbstractionUnimplementedServer) GetDataNameRegister(con
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
-func (s *DRPCAnynsAccountAbstractionUnimplementedServer) GetDataNameUpdate(context.Context, *NameUpdateRequest) (*GetDataNameRegisterResponse, error) {
-	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
-}
-
 func (s *DRPCAnynsAccountAbstractionUnimplementedServer) CreateUserOperation(context.Context, *CreateUserOperationRequestSigned) (*OperationResponse, error) {
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
 type DRPCAnynsAccountAbstractionDescription struct{}
 
-func (DRPCAnynsAccountAbstractionDescription) NumMethods() int { return 6 }
+func (DRPCAnynsAccountAbstractionDescription) NumMethods() int { return 5 }
 
 func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver, interface{}, bool) {
 	switch n {
@@ -190,15 +175,6 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 					)
 			}, DRPCAnynsAccountAbstractionServer.GetDataNameRegister, true
 	case 4:
-		return "/AnynsAccountAbstraction/GetDataNameUpdate", drpcEncoding_File_proto_anyns_aa_api_proto{},
-			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
-				return srv.(DRPCAnynsAccountAbstractionServer).
-					GetDataNameUpdate(
-						ctx,
-						in1.(*NameUpdateRequest),
-					)
-			}, DRPCAnynsAccountAbstractionServer.GetDataNameUpdate, true
-	case 5:
 		return "/AnynsAccountAbstraction/CreateUserOperation", drpcEncoding_File_proto_anyns_aa_api_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsAccountAbstractionServer).
@@ -274,22 +250,6 @@ type drpcAnynsAccountAbstraction_GetDataNameRegisterStream struct {
 }
 
 func (x *drpcAnynsAccountAbstraction_GetDataNameRegisterStream) SendAndClose(m *GetDataNameRegisterResponse) error {
-	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
-		return err
-	}
-	return x.CloseSend()
-}
-
-type DRPCAnynsAccountAbstraction_GetDataNameUpdateStream interface {
-	drpc.Stream
-	SendAndClose(*GetDataNameRegisterResponse) error
-}
-
-type drpcAnynsAccountAbstraction_GetDataNameUpdateStream struct {
-	drpc.Stream
-}
-
-func (x *drpcAnynsAccountAbstraction_GetDataNameUpdateStream) SendAndClose(m *GetDataNameRegisterResponse) error {
 	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
 		return err
 	}

@@ -19,8 +19,11 @@ nonce_manager/mock/nonce_manager_mock.go: nonce_manager/nonce_manager.go
 account_abstraction/mock/account_abstraction_mock.go: account_abstraction/account_abstraction.go
 	mockgen -source=account_abstraction/account_abstraction.go > account_abstraction/mock/account_abstraction_mock.go
 
+alchemyaa/mock/alchemyaa_mock.go: alchemyaa/alchemyaa.go
+	mockgen -source=alchemyaa/alchemyaa.go > alchemyaa/mock/alchemyaa_mock.go
+
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go account_abstraction/mock/account_abstraction_mock.go
+mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go account_abstraction/mock/account_abstraction_mock.go alchemyaa/mock/alchemyaa_mock.go
 
 .PHONY: test
 test: mocks

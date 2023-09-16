@@ -6,6 +6,9 @@ import (
 
 	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-sync/util/crypto"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ipfs/go-cid"
+	"go.uber.org/zap"
 )
 
 func VerifyIdentity(in *as.NameRegisterSignedRequest, ownerAnyAddress string) error {
@@ -66,7 +69,40 @@ func isValidAnyAddress(address string) bool {
 	return true
 }
 
-func checkAnyAddress(addr string) bool {
+func СheckRegisterParams(in *as.NameRegisterRequest) error {
+	// 1 - check name
+	if !checkName(in.FullName) {
+		log.Error("invalid name", zap.String("name", in.FullName))
+		return errors.New("invalid name")
+	}
+
+	// 2 - check ETH address
+	if !common.IsHexAddress(in.OwnerEthAddress) {
+		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
+		return errors.New("invalid ETH address")
+	}
+
+	// 3 - check Any address
+	if !СheckAnyAddress(in.OwnerAnyAddress) {
+		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
+		return errors.New("invalid Any address")
+	}
+
+	// 4 - space ID (if not empty)
+	if in.SpaceId != "" {
+		_, err := cid.Decode(in.SpaceId)
+
+		if err != nil {
+			log.Error("invalid SpaceId", zap.String("Any SpaceId", in.SpaceId))
+			return errors.New("invalid SpaceId")
+		}
+	}
+
+	// everything is OK
+	return nil
+}
+
+func СheckAnyAddress(addr string) bool {
 	// in.OwnerAnyAddress should be a ed25519 public key hash
 	return isValidAnyAddress(addr)
 }

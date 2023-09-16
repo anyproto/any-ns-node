@@ -435,24 +435,24 @@
             <tbody>
               
                 <tr>
-                  <td>ownerAnyAddress</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>A content hash attached to this name </p></td>
-                </tr>
-              
-                <tr>
-                  <td>ownerEthAddress</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>An Ethereum address that owns that name </p></td>
-                </tr>
-              
-                <tr>
-                  <td>operationData</td>
+                  <td>data</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>see GetDataNameRegister method for example </p></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signedData</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>context</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -505,6 +505,13 @@
               
                 <tr>
                   <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>context</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -636,17 +643,10 @@ Use it to:
                 <td><a href="#NameRegisterRequest">.NameRegisterRequest</a></td>
                 <td><a href="#GetDataNameRegisterResponse">.GetDataNameRegisterResponse</a></td>
                 <td><p>Example usage:
-1. get data
+1. get data &#43; context
 2. sign it with your Ethereum private key
 3. send it using CreateUserOperation
 4. check operation status using GetOperationStatus</p></td>
-              </tr>
-            
-              <tr>
-                <td>GetDataNameUpdate</td>
-                <td><a href="#NameUpdateRequest">.NameUpdateRequest</a></td>
-                <td><a href="#GetDataNameRegisterResponse">.GetDataNameRegisterResponse</a></td>
-                <td><p></p></td>
               </tr>
             
               <tr>

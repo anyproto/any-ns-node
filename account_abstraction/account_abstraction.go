@@ -10,8 +10,10 @@ import (
 	"strings"
 
 	"github.com/anyproto/any-ns-node/alchemyaa"
+	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
+	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	commonaccount "github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -35,6 +37,7 @@ type anynsAA struct {
 	aaConfig        config.AA
 	contractsConfig config.Contracts
 	contracts       contracts.ContractsService
+	aa              alchemyaa.AlchemyAAService
 }
 
 type AccountAbstractionService interface {
@@ -52,6 +55,11 @@ type AccountAbstractionService interface {
 	GetNamesCountLeft(scw common.Address) (count uint64, err error)
 	GetOperationsCountLeft(scw common.Address) (count uint64, err error)
 
+	GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
+
+	//
+	GetNextAlchemyRequestID() int
+
 	app.Component
 }
 
@@ -60,12 +68,18 @@ func (arpc *anynsAA) Init(a *app.App) (err error) {
 	arpc.aaConfig = a.MustComponent(config.CName).(*config.Config).GetAA()
 	arpc.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+	arpc.aa = a.MustComponent(alchemyaa.CName).(alchemyaa.AlchemyAAService)
 
 	return nil
 }
 
 func (arpc *anynsAA) Name() (name string) {
 	return CName
+}
+
+func (arpc *anynsAA) GetNextAlchemyRequestID() int {
+	// return something real
+	return 1
 }
 
 func (arpc *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error) {
@@ -275,40 +289,39 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 		log.Error("failed to get nonce", zap.Error(err))
 		return err
 	}
-	log.Info("Got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
+	log.Info("got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
 
 	// 3 - create user operation
 	// TODO: change amount
-	callDataOriginal, err := alchemyaa.GetCallDataForMint(userScwAddress, 100)
+	callDataOriginal, err := GetCallDataForMint(userScwAddress, 100)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return err
 	}
-	log.Info("Prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
+	log.Debug("prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
 
-	callDataOriginal2, err := alchemyaa.GetCallDataForAprove(userScwAddress, registrarController, 100)
+	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, 100)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return err
 	}
-	log.Debug("Prepared original call data 2", zap.String("callDataOriginal2", hex.EncodeToString(callDataOriginal2)))
+	log.Debug("prepared original call data 2", zap.String("callDataOriginal2", hex.EncodeToString(callDataOriginal2)))
 
 	// create array of call data
 	targets := []common.Address{erc20tokenAddr, erc20tokenAddr}
 	callDataOriginals := [][]byte{callDataOriginal, callDataOriginal2}
 
 	// 4 - wrap it into "execute" call
-	callData, err := alchemyaa.GetCallDataForBatchExecute(targets, callDataOriginals)
+	callData, err := GetCallDataForBatchExecute(targets, callDataOriginals)
 	if err != nil {
 		log.Error("failed to get call data", zap.Error(err))
 		return err
 	}
 	log.Info("prepared call data", zap.String("callData", hex.EncodeToString(callData)))
 
-	// TODO: set proper ID here
-	id := 1
+	id := arpc.GetNextAlchemyRequestID()
 
-	rgapd, err := alchemyaa.CreateRequestGasAndPaymasterData(callData, adminScw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	rgapd, err := arpc.aa.CreateRequestGasAndPaymasterData(callData, adminScw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -323,11 +336,12 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
 
 	// 5 - send it
-	response, err := alchemyaa.SendRequest(alchemyApiKey, jsonDATAPre)
+	response, err := arpc.aa.SendRequest(alchemyApiKey, jsonDATAPre)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
 	}
+
 	// parse response
 	responseStruct := alchemyaa.JSONRPCResponseGasAndPaymaster{}
 	err = json.Unmarshal(response, &responseStruct)
@@ -348,7 +362,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// 6 - now create new transaction
 	appendEntryPoint := true
-	jsonDATA, err := alchemyaa.CreateRequest(callData, responseStruct, chainID, entryPointAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
+	jsonDATA, err := arpc.aa.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -357,7 +371,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	log.Info("created eth_sendUserOperation request", zap.String("jsonDATA", string(jsonDATA)))
 
 	// send it
-	response, err = alchemyaa.SendRequest(alchemyApiKey, jsonDATA)
+	response, err = arpc.aa.SendRequest(alchemyApiKey, jsonDATA)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
@@ -367,7 +381,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// 7 - get op hash
 	// will handle error in response
-	opHash, err := alchemyaa.DecodeSendUserOperationResponse(response)
+	opHash, err := arpc.aa.DecodeSendUserOperationResponse(response)
 	if err != nil {
 		log.Error("failed to decode response", zap.Error(err))
 		return err
@@ -376,7 +390,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// TODO: loop
 	// 8 - wait for receipt
-	req, err := alchemyaa.CreateRequestGetUserOperation(opHash, id+2)
+	req, err := arpc.aa.CreateRequestGetUserOperation(opHash, id+2)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -391,7 +405,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
 
 	// send it
-	response, err = alchemyaa.SendRequest(alchemyApiKey, jsonDATA)
+	response, err = arpc.aa.SendRequest(alchemyApiKey, jsonDATA)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
@@ -399,4 +413,97 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response))
 	return nil
+}
+
+func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
+	// settings from config:
+	entryPointAddress := common.HexToAddress(arpc.aaConfig.EntryPoint)
+	alchemyApiKey := arpc.aaConfig.AlchemyApiKey
+	policyID := arpc.aaConfig.GasPolicyId
+
+	var chainID int64 = int64(arpc.aaConfig.ChainID)
+	var id int = arpc.GetNextAlchemyRequestID()
+
+	// 0 - check params
+	err = anynsrpc.СheckRegisterParams(in)
+	if err != nil {
+		log.Error("invalid parameters", zap.Error(err))
+		return nil, nil, err
+	}
+
+	// 1 - determine users's SCW
+	scw, err := arpc.GetSmartWalletAddress(context.Background(), common.HexToAddress(in.OwnerEthAddress))
+	if err != nil {
+		log.Error("failed to get smart wallet address for admin", zap.Error(err))
+		return nil, nil, err
+	}
+
+	// 2 - get nonce
+	nonce, err := arpc.GetNonceForSmartWalletAddress(context.Background(), scw)
+	if err != nil {
+		log.Error("failed to get nonce", zap.Error(err))
+		return nil, nil, err
+	}
+	log.Info("got nonce", zap.String("scw", scw.String()), zap.Int64("nonce", nonce.Int64()))
+
+	// 3 - create user operation
+	callData, err := arpc.aa.GetCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId)
+	if err != nil {
+		log.Error("failed to get original call data", zap.Error(err))
+		return nil, nil, err
+	}
+
+	rgapd, err := arpc.aa.CreateRequestGasAndPaymasterData(callData, scw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return nil, nil, err
+	}
+
+	jsonDATAPre, err := json.Marshal(rgapd)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return nil, nil, err
+	}
+
+	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
+
+	// 5 - send it
+	response, err := arpc.aa.SendRequest(alchemyApiKey, jsonDATAPre)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return nil, nil, err
+	}
+	// parse response
+	responseStruct := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+	err = json.Unmarshal(response, &responseStruct)
+	if err != nil {
+		log.Error("failed to unmarshal response", zap.Error(err))
+		return nil, nil, err
+	}
+	// TODO: handle "Error code": -32500  "AA25 invalid account nonce" error
+	if responseStruct.Error.Code != 0 {
+		log.Error("GasAndPaymaster call failed",
+			zap.Int("Error code", responseStruct.Error.Code),
+			zap.String("Error message", responseStruct.Error.Message),
+		)
+		return nil, nil, errors.New(responseStruct.Error.Message)
+	}
+
+	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
+
+	// 6 - get data to sign
+	jsonData, uo, err := arpc.aa.CreateRequestStep1(callData, responseStruct, chainID, entryPointAddress, scw, uint64(nonce.Int64()))
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return nil, nil, err
+	}
+
+	// serialize UserOperation to contextData
+	contextData, err = json.Marshal(uo)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return nil, nil, err
+	}
+
+	return jsonData, contextData, nil
 }

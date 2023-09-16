@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
-	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
 
 	"github.com/anyproto/any-ns-node/config"
@@ -117,7 +116,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 
 func (arpc *anynsRpc) NameRegister(ctx context.Context, in *as.NameRegisterRequest) (*as.OperationResponse, error) {
 	// 1 - check all parameters
-	err := arpc.checkRegisterParams(in)
+	err := СheckRegisterParams(in)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, err
@@ -157,7 +156,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	}
 
 	// 3 - check all parameters
-	err = arpc.checkRegisterParams(&nrr)
+	err = СheckRegisterParams(&nrr)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, err
@@ -168,39 +167,6 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	resp.OperationId = operationId
 	resp.OperationState = as.OperationState_Pending
 	return &resp, err
-}
-
-func (arpc *anynsRpc) checkRegisterParams(in *as.NameRegisterRequest) error {
-	// 1 - check name
-	if !checkName(in.FullName) {
-		log.Error("invalid name", zap.String("name", in.FullName))
-		return errors.New("invalid name")
-	}
-
-	// 2 - check ETH address
-	if !common.IsHexAddress(in.OwnerEthAddress) {
-		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
-		return errors.New("invalid ETH address")
-	}
-
-	// 3 - check Any address
-	if !checkAnyAddress(in.OwnerAnyAddress) {
-		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
-		return errors.New("invalid Any address")
-	}
-
-	// 4 - space ID (if not empty)
-	if in.SpaceId != "" {
-		_, err := cid.Decode(in.SpaceId)
-
-		if err != nil {
-			log.Error("invalid SpaceId", zap.String("Any SpaceId", in.SpaceId))
-			return errors.New("invalid SpaceId")
-		}
-	}
-
-	// everything is OK
-	return nil
 }
 
 func (arpc *anynsRpc) NameRenew(ctx context.Context, in *as.NameRenewRequest) (*as.OperationResponse, error) {

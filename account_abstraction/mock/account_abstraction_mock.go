@@ -9,6 +9,7 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	anyns_api "github.com/anyproto/any-ns-node/pb/anyns_api"
 	app "github.com/anyproto/any-sync/app"
 	common "github.com/ethereum/go-ethereum/common"
 	gomock "go.uber.org/mock/gomock"
@@ -51,6 +52,22 @@ func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(scw, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), scw, amount)
 }
 
+// GetDataNameRegister mocks base method.
+func (m *MockAccountAbstractionService) GetDataNameRegister(ctx context.Context, in *anyns_api.NameRegisterRequest) ([]byte, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDataNameRegister", ctx, in)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetDataNameRegister indicates an expected call of GetDataNameRegister.
+func (mr *MockAccountAbstractionServiceMockRecorder) GetDataNameRegister(ctx, in interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDataNameRegister", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetDataNameRegister), ctx, in)
+}
+
 // GetNamesCountLeft mocks base method.
 func (m *MockAccountAbstractionService) GetNamesCountLeft(scw common.Address) (uint64, error) {
 	m.ctrl.T.Helper()
@@ -64,6 +81,20 @@ func (m *MockAccountAbstractionService) GetNamesCountLeft(scw common.Address) (u
 func (mr *MockAccountAbstractionServiceMockRecorder) GetNamesCountLeft(scw interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamesCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNamesCountLeft), scw)
+}
+
+// GetNextAlchemyRequestID mocks base method.
+func (m *MockAccountAbstractionService) GetNextAlchemyRequestID() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextAlchemyRequestID")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// GetNextAlchemyRequestID indicates an expected call of GetNextAlchemyRequestID.
+func (mr *MockAccountAbstractionServiceMockRecorder) GetNextAlchemyRequestID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextAlchemyRequestID", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNextAlchemyRequestID))
 }
 
 // GetNonceForSmartWalletAddress mocks base method.

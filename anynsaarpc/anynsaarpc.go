@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -120,9 +121,27 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.Admin
 }
 
 func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (*as.GetDataNameRegisterResponse, error) {
-	// TODO: implement
+	// 1 - check params
+	err := anynsrpc.СheckRegisterParams(in)
+	if err != nil {
+		log.Error("invalid parameters", zap.Error(err))
+		return nil, err
+	}
 
-	return nil, nil
+	// 2 - get data to sign
+	dataOut, contextData, err := arpc.aa.GetDataNameRegister(ctx, in)
+	if err != nil {
+		log.Error("failed to mint tokens", zap.Error(err))
+		return nil, err
+	}
+
+	var out as.GetDataNameRegisterResponse
+	// user should sign it
+	out.Data = dataOut
+	// user should pass it back to us
+	out.Context = contextData
+
+	return &out, nil
 }
 
 func (arpc *anynsAARpc) GetDataNameUpdate(ctx context.Context, in *as.NameUpdateRequest) (*as.GetDataNameRegisterResponse, error) {

@@ -3,11 +3,13 @@ package alchemyaa
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
@@ -92,8 +94,42 @@ type JSONRPCRequestGetUserOperationReceipt struct {
 	Hashes  []string `json:"params"`
 }
 
+type alchemyaa struct {
+}
+
+type AlchemyAAService interface {
+	CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, nonce uint64, policyID string, entryPointAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error)
+
+	CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64, id int, myPK string, appendEntryPoint bool) ([]byte, error)
+
+	SendRequest(apiKey string, jsonDATA []byte) ([]byte, error)
+	DecodeSendUserOperationResponse(response []byte) (opHash string, err error)
+
+	CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error)
+
+	GetCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string) ([]byte, error)
+
+	CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error)
+	CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddress common.Address) ([]byte, error)
+
+	app.Component
+}
+
+func New() app.Component {
+	return &alchemyaa{}
+}
+
+func (aa *alchemyaa) Init(a *app.App) (err error) {
+
+	return nil
+}
+
+func (aa *alchemyaa) Name() (name string) {
+	return CName
+}
+
 // should create a GasAndPaymentStruct
-func CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, nonce uint64, policyID string, entryPointAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error) {
+func (aa *alchemyaa) CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, nonce uint64, policyID string, entryPointAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error) {
 	var req JSONRPCRequestGasAndPaymaster
 	req.ID = id
 	req.JSONRPC = "2.0"
@@ -124,7 +160,7 @@ func CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, no
 }
 
 // creates a JSONRPCRequest with "eth_sendUserOperation" formatted data
-func CreateRequest(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64, id int, myPK string, appendEntryPoint bool) ([]byte, error) {
+func (aa *alchemyaa) CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64, id int, myPK string, appendEntryPoint bool) ([]byte, error) {
 	var req JSONRPCRequest
 	req.ID = id
 	req.JSONRPC = "2.0"
@@ -185,7 +221,8 @@ func CreateRequest(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID
 	return jsonDATA, nil
 }
 
-func CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error) {
+// creates a JSONRPCRequest with "eth_getUserOperationReceipt" formatted data
+func (aa *alchemyaa) CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error) {
 	// {"jsonrpc":"2.0","id":11,"method":"eth_getUserOperationReceipt","params":["0x5fad93d239e4e7a7dd634822513b27f04e57ed8ea1be7b3e74df177eefd8beb8"]}
 	var req JSONRPCRequestGetUserOperationReceipt
 	req.ID = id
@@ -203,7 +240,7 @@ func CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error)
 	return jsonDATA, nil
 }
 
-func SendRequest(apiKey string, jsonDATA []byte) ([]byte, error) {
+func (aa *alchemyaa) SendRequest(apiKey string, jsonDATA []byte) ([]byte, error) {
 	payload := strings.NewReader(string(jsonDATA))
 
 	url := "https://eth-sepolia.g.alchemy.com/v2/" + apiKey
@@ -227,4 +264,88 @@ func SendRequest(apiKey string, jsonDATA []byte) ([]byte, error) {
 
 	log.Debug("sent Alchemy request", zap.String("response", string(body)))
 	return body, nil
+}
+
+func (aa *alchemyaa) DecodeSendUserOperationResponse(response []byte) (opHash string, err error) {
+	// {"jsonrpc":"2.0","id":2,"result":"0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186"}
+	// 1 - parse JSON
+	var responseStruct2 JSONRPCResponseUserOpHash
+	err = json.Unmarshal(response, &responseStruct2)
+	if err != nil {
+		log.Error("failed to unmarshal response", zap.Error(err))
+		return "", err
+	}
+
+	if responseStruct2.Error.Code != 0 {
+		strErr := fmt.Sprintf("Error: %v - %v", responseStruct2.Error.Code, responseStruct2.Error.Message)
+		return "", errors.New(strErr)
+	}
+
+	return responseStruct2.Result, nil
+}
+
+func (aa *alchemyaa) GetCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string) ([]byte, error) {
+	// TODO:
+
+	return nil, nil
+}
+
+// creates data to sign with UserOperation
+func (aa *alchemyaa) CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error) {
+	uo = UserOperation{}
+
+	uo.Sender = sender.String()
+	uo.CallData = "0x" + hex.EncodeToString(callData)
+
+	// convert nonce to hex string
+	nonceHexStr := fmt.Sprintf("0x%x", nonce)
+	uo.Nonce = nonceHexStr
+	uo.InitCode = "0x"
+	uo.CallGasLimit = rgap.Result.CallGasLimit
+	uo.VerificationGasLimit = rgap.Result.VerificationGasLimit
+	uo.PreVerificationGas = rgap.Result.PreVerificationGas
+	uo.MaxFeePerGas = rgap.Result.MaxFeePerGas
+	uo.MaxPriorityFeePerGas = rgap.Result.MaxPriorityFeePerGas
+	uo.PaymasterAndData = rgap.Result.PaymasterAndData
+
+	// data should be signed and then set in CreateRequestStep2
+	// uo.Signature =
+
+	dataToSign, err = GetUserOperationHash(uo, chainID, entryPointAddress)
+	if err != nil {
+		log.Error("failed to pack UserOperation", zap.Error(err))
+		return nil, uo, err
+	}
+	log.Debug("dataToSign: ", zap.String("hash", hex.EncodeToString(dataToSign)))
+
+	// user now should sign that data with his PK
+	return dataToSign, uo, nil
+}
+
+func (aa *alchemyaa) CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddress common.Address) ([]byte, error) {
+	var req JSONRPCRequest
+	req.ID = alchemyRequestId
+	req.JSONRPC = "2.0"
+	req.Method = "eth_sendUserOperation"
+
+	uo.Signature = "0x" + hex.EncodeToString(signedByUserData)
+
+	// add our UserOperation to the list
+	req.Params = append(req.Params, uo)
+
+	// convert struct to json
+	jsonDATA, err := json.Marshal(req)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return nil, err
+	}
+
+	// add entryPointAddress
+	err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddress)
+	if err != nil {
+		log.Error("can not append entry point", zap.Error(err))
+		return nil, err
+	}
+
+	return jsonDATA, nil
 }

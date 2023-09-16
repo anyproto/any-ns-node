@@ -8,6 +8,7 @@ import (
 
 	"github.com/anyproto/any-ns-node/account"
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
+	"github.com/anyproto/any-ns-node/alchemyaa"
 	"github.com/anyproto/any-ns-node/anynsaarpc"
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/client"
@@ -300,6 +301,7 @@ func BootstrapServer(a *app.App) {
 		Register(nodeconfsource.New()).
 		Register(coordinatorclient.New()).
 		Register(queue.New()).
+		Register(alchemyaa.New()).
 		Register(pool.New()).
 		Register(peerservice.New()).
 		Register(yamux.New()).

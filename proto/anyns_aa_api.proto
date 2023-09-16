@@ -60,16 +60,16 @@ message GetUserAccountRequest {
 
 message GetDataNameRegisterResponse {
   bytes data = 1;
+
+  bytes context = 2;
 }
 
 message CreateUserOperationRequest {
-  // A content hash attached to this name
-  string ownerAnyAddress = 1;
+  bytes data = 1;
 
-  // An Ethereum address that owns that name
-  string ownerEthAddress = 2;
+  bytes signedData = 2;
 
-  bytes operationData = 3;        // see GetDataNameRegister method for example
+  bytes context = 3;
 }
 
 message CreateUserOperationRequestSigned {
@@ -77,7 +77,7 @@ message CreateUserOperationRequestSigned {
   bytes payload = 1;
 
   // payload signed with Anytype identity
-  bytes signature = 2; 
+  bytes signature = 2;
 }
 
 
@@ -100,12 +100,13 @@ service AnynsAccountAbstraction {
   rpc GetUserAccount(GetUserAccountRequest) returns (UserAccount) {}
 
   // Example usage:
-  // 1. get data
+  // 1. get data + context
   // 2. sign it with your Ethereum private key
   // 3. send it using CreateUserOperation
   // 4. check operation status using GetOperationStatus
   rpc GetDataNameRegister(NameRegisterRequest) returns (GetDataNameRegisterResponse) {}
-  rpc GetDataNameUpdate(NameUpdateRequest) returns (GetDataNameRegisterResponse) {}
+  
+  //rpc GetDataNameUpdate(NameUpdateRequest) returns (GetDataNameRegisterResponse) {}
 
   rpc CreateUserOperation(CreateUserOperationRequestSigned) returns (OperationResponse) {}
 }

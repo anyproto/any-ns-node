@@ -2,6 +2,8 @@ package accountabstraction
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"testing"
@@ -15,6 +17,8 @@ import (
 	"github.com/zeebo/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/anyproto/any-ns-node/alchemyaa"
+	mock_alchemyaa "github.com/anyproto/any-ns-node/alchemyaa/mock"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
@@ -31,6 +35,7 @@ type fixture struct {
 	ts        *rpctest.TestServer
 	config    *config.Config
 	contracts *mock_contracts.MockContractsService
+	aa        *mock_alchemyaa.MockAlchemyAAService
 
 	*anynsAA
 }
@@ -64,9 +69,16 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
+	fx.aa = mock_alchemyaa.NewMockAlchemyAAService(fx.ctrl)
+	fx.aa.EXPECT().Name().Return(alchemyaa.CName).AnyTimes()
+	fx.aa.EXPECT().Init(gomock.Any()).AnyTimes()
+	fx.aa.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	//fx.aa.EXPECT().SendRequest(gomock.Any(), gomock.Any()).AnyTimes()
+
 	fx.a.Register(fx.ts).
 		Register(fx.config).
 		Register(fx.contracts).
+		Register(fx.aa).
 		Register(fx.anynsAA)
 
 	require.NoError(t, fx.a.Start(ctx))
@@ -321,25 +333,278 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	/*
-		mt.Run("success", func(mt *mtest.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
+	mt.Run("success", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
 
-			// nonce is 5
-			fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
-				out := big.NewInt(5)
+		// nonce is 5
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			out := big.NewInt(5)
 
-				byteArr := out.Bytes()
-				return byteArr, nil
-			})
+			byteArr := out.Bytes()
+			return byteArr, nil
+		}).AnyTimes()
 
-			// TODO: mock alchemyaa.SendRequest and uncomment this test
+		fx.aa.EXPECT().DecodeSendUserOperationResponse(gomock.Any()).DoAndReturn(func(one interface{}) (opHash string, err error) {
+			return "0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186", nil
+		}).AnyTimes()
 
-			// already deployed
-			scw := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a")
-			err := fx.AdminMintAccessTokens(scw, big.NewInt(5))
+		fx.aa.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemyaa.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
 			assert.NoError(t, err)
-		})
-	*/
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}) (out []byte, err error) {
+			var req alchemyaa.JSONRPCRequest
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().CreateRequestGetUserOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			var req alchemyaa.JSONRPCRequestGetUserOperationReceipt
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		// already deployed
+		scw := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a")
+		err := fx.AdminMintAccessTokens(scw, big.NewInt(5))
+		assert.NoError(t, err)
+	})
+
+}
+
+func TestAAS_GetDataNameRegister(t *testing.T) {
+	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	defer mt.Close()
+
+	mt.Run("fail if no fullname specified", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().GetCallDataForNameRegister(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(fullName string, ownerEthAddress string, ownerAnyAddress string, spaceId string) ([]byte, error) {
+			// no error
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemyaa.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemyaa.UserOperation, err error) {
+			var uoOut alchemyaa.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	mt.Run("fail if no any address specified", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().GetCallDataForNameRegister(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(fullName string, ownerEthAddress string, ownerAnyAddress string, spaceId string) ([]byte, error) {
+			// no error
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemyaa.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemyaa.UserOperation, err error) {
+			var uoOut alchemyaa.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	mt.Run("success", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		fx.aa.EXPECT().GetCallDataForNameRegister(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(fullName string, ownerEthAddress string, ownerAnyAddress string, spaceId string) ([]byte, error) {
+			// no error
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemyaa.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.aa.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemyaa.UserOperation, err error) {
+			var uoOut alchemyaa.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		dataToSign, contextData, err := fx.GetDataNameRegister(context.Background(), &req)
+		assert.NoError(t, err)
+		assert.NotNil(t, contextData)
+		assert.NotNil(t, dataToSign)
+	})
+}
+
+func TestAAS_GetCallDataForMint(t *testing.T) {
+	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	defer mt.Close()
+
+	mt.Run("success", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		smartAccountAddress := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
+		var usdToMint uint = 100
+
+		out, err := GetCallDataForMint(smartAccountAddress, usdToMint)
+		outStr := "0x" + hex.EncodeToString(out)
+
+		assert.NoError(t, err)
+		assert.Equal(t, outStr, "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064")
+	})
+}
+
+func TestAAS_GetCallDataForAprove(t *testing.T) {
+	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	defer mt.Close()
+
+	mt.Run("success", func(mt *mtest.T) {
+		from := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
+		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
+		var usdToMint uint = 100
+
+		out, err := GetCallDataForAprove(from, registrarController, usdToMint)
+		outStr := "0x" + hex.EncodeToString(out)
+
+		assert.NoError(t, err)
+		assert.Equal(t, outStr, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000005f5e100")
+	})
+}
+
+func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
+	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	defer mt.Close()
+
+	mt.Run("success", func(mt *mtest.T) {
+		erc20tokenAddr := common.HexToAddress("0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6")
+
+		// just some random data
+		data1 := "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064"
+		callDataOriginal1, err := hex.DecodeString(data1[2:])
+		assert.NoError(t, err)
+
+		// just some random data
+		data2 := "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064"
+		callDataOriginal2, err := hex.DecodeString(data2[2:])
+		assert.NoError(t, err)
+
+		// put address and address2 into array
+		// both are the same
+		addresses := []common.Address{erc20tokenAddr, erc20tokenAddr}
+		// put data1 and callDataOriginal2 into array
+		datas := [][]byte{callDataOriginal1, callDataOriginal2}
+
+		out, err := GetCallDataForBatchExecute(addresses, datas)
+		outStr := "0x" + hex.EncodeToString(out)
+
+		assert.NoError(t, err)
+		assert.Equal(t, outStr, "0x18dfb3c7000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000020000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f60000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f60000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004440c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000")
+	})
 }
