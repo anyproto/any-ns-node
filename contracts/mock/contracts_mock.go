@@ -194,9 +194,9 @@ func (mr *MockContractsServiceMockRecorder) GenerateAuthOptsForAdmin(conn interf
 }
 
 // GetAdditionalNameInfo mocks base method.
-func (m *MockContractsService) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, *big.Int, error) {
+func (m *MockContractsService) GetAdditionalNameInfo(ctx context.Context, conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, *big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", conn, currentOwner, fullName)
+	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", ctx, conn, currentOwner, fullName)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(string)
@@ -206,24 +206,24 @@ func (m *MockContractsService) GetAdditionalNameInfo(conn *ethclient.Client, cur
 }
 
 // GetAdditionalNameInfo indicates an expected call of GetAdditionalNameInfo.
-func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(conn, currentOwner, fullName interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(ctx, conn, currentOwner, fullName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), conn, currentOwner, fullName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), ctx, conn, currentOwner, fullName)
 }
 
 // GetBalanceOf mocks base method.
-func (m *MockContractsService) GetBalanceOf(client *ethclient.Client, tokenAddress, address common.Address) (*big.Int, error) {
+func (m *MockContractsService) GetBalanceOf(ctx context.Context, client *ethclient.Client, tokenAddress, address common.Address) (*big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBalanceOf", client, tokenAddress, address)
+	ret := m.ctrl.Call(m, "GetBalanceOf", ctx, client, tokenAddress, address)
 	ret0, _ := ret[0].(*big.Int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBalanceOf indicates an expected call of GetBalanceOf.
-func (mr *MockContractsServiceMockRecorder) GetBalanceOf(client, tokenAddress, address interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetBalanceOf(ctx, client, tokenAddress, address interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalanceOf", reflect.TypeOf((*MockContractsService)(nil).GetBalanceOf), client, tokenAddress, address)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalanceOf", reflect.TypeOf((*MockContractsService)(nil).GetBalanceOf), ctx, client, tokenAddress, address)
 }
 
 // GetNameByAddress mocks base method.
@@ -242,18 +242,18 @@ func (mr *MockContractsServiceMockRecorder) GetNameByAddress(conn, address inter
 }
 
 // GetOwnerForNamehash mocks base method.
-func (m *MockContractsService) GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error) {
+func (m *MockContractsService) GetOwnerForNamehash(ctx context.Context, client *ethclient.Client, namehash [32]byte) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOwnerForNamehash", client, namehash)
+	ret := m.ctrl.Call(m, "GetOwnerForNamehash", ctx, client, namehash)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOwnerForNamehash indicates an expected call of GetOwnerForNamehash.
-func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(client, namehash interface{}) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(ctx, client, namehash interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), client, namehash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), ctx, client, namehash)
 }
 
 // Init mocks base method.

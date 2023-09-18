@@ -1,4 +1,4 @@
-package alchemyaa
+package alchemysdk
 
 import (
 	"crypto/ecdsa"

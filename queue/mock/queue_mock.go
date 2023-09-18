@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	anyns_api_server "github.com/anyproto/any-ns-node/pb/anyns_api"
+	anyns_api "github.com/anyproto/any-ns-node/pb/anyns_api"
 	queue "github.com/anyproto/any-ns-node/queue"
 	app "github.com/anyproto/any-sync/app"
 	ethclient "github.com/ethereum/go-ethereum/ethclient"
@@ -39,7 +39,7 @@ func (m *MockQueueService) EXPECT() *MockQueueServiceMockRecorder {
 }
 
 // AddNewRequest mocks base method.
-func (m *MockQueueService) AddNewRequest(ctx context.Context, req *anyns_api_server.NameRegisterRequest) (int64, error) {
+func (m *MockQueueService) AddNewRequest(ctx context.Context, req *anyns_api.NameRegisterRequest) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddNewRequest", ctx, req)
 	ret0, _ := ret[0].(int64)
@@ -54,7 +54,7 @@ func (mr *MockQueueServiceMockRecorder) AddNewRequest(ctx, req interface{}) *gom
 }
 
 // AddRenewRequest mocks base method.
-func (m *MockQueueService) AddRenewRequest(ctx context.Context, req *anyns_api_server.NameRenewRequest) (int64, error) {
+func (m *MockQueueService) AddRenewRequest(ctx context.Context, req *anyns_api.NameRenewRequest) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddRenewRequest", ctx, req)
 	ret0, _ := ret[0].(int64)
@@ -107,10 +107,10 @@ func (mr *MockQueueServiceMockRecorder) FindAndProcessAllItemsInDbWithStatus(ctx
 }
 
 // GetRequestStatus mocks base method.
-func (m *MockQueueService) GetRequestStatus(ctx context.Context, operationId int64) (anyns_api_server.OperationState, error) {
+func (m *MockQueueService) GetRequestStatus(ctx context.Context, operationId int64) (anyns_api.OperationState, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRequestStatus", ctx, operationId)
-	ret0, _ := ret[0].(anyns_api_server.OperationState)
+	ret0, _ := ret[0].(anyns_api.OperationState)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -119,21 +119,6 @@ func (m *MockQueueService) GetRequestStatus(ctx context.Context, operationId int
 func (mr *MockQueueServiceMockRecorder) GetRequestStatus(ctx, operationId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRequestStatus", reflect.TypeOf((*MockQueueService)(nil).GetRequestStatus), ctx, operationId)
-}
-
-// HandleNonceErrors mocks base method.
-func (m *MockQueueService) HandleNonceErrors(err error, prevState, newState queue.QueueItemStatus, ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) (error, queue.QueueItemStatus) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleNonceErrors", err, prevState, newState, ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	ret1, _ := ret[1].(queue.QueueItemStatus)
-	return ret0, ret1
-}
-
-// HandleNonceErrors indicates an expected call of HandleNonceErrors.
-func (mr *MockQueueServiceMockRecorder) HandleNonceErrors(err, prevState, newState, ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleNonceErrors", reflect.TypeOf((*MockQueueService)(nil).HandleNonceErrors), err, prevState, newState, ctx, queueItem, conn)
 }
 
 // Init mocks base method.
@@ -148,20 +133,6 @@ func (m *MockQueueService) Init(a *app.App) error {
 func (mr *MockQueueServiceMockRecorder) Init(a interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockQueueService)(nil).Init), a)
-}
-
-// IsStopProcessing mocks base method.
-func (m *MockQueueService) IsStopProcessing(err error, prevState, newState queue.QueueItemStatus) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsStopProcessing", err, prevState, newState)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// IsStopProcessing indicates an expected call of IsStopProcessing.
-func (mr *MockQueueServiceMockRecorder) IsStopProcessing(err, prevState, newState interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsStopProcessing", reflect.TypeOf((*MockQueueService)(nil).IsStopProcessing), err, prevState, newState)
 }
 
 // Name mocks base method.
@@ -193,63 +164,6 @@ func (mr *MockQueueServiceMockRecorder) NameRegisterMoveStateNext(ctx, queueItem
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegisterMoveStateNext", reflect.TypeOf((*MockQueueService)(nil).NameRegisterMoveStateNext), ctx, queueItem, conn)
 }
 
-// NameRegister_CommitSent mocks base method.
-func (m *MockQueueService) NameRegister_CommitSent(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRegister_CommitSent", ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// NameRegister_CommitSent indicates an expected call of NameRegister_CommitSent.
-func (mr *MockQueueServiceMockRecorder) NameRegister_CommitSent(ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_CommitSent", reflect.TypeOf((*MockQueueService)(nil).NameRegister_CommitSent), ctx, queueItem, conn)
-}
-
-// NameRegister_InitialState mocks base method.
-func (m *MockQueueService) NameRegister_InitialState(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRegister_InitialState", ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// NameRegister_InitialState indicates an expected call of NameRegister_InitialState.
-func (mr *MockQueueServiceMockRecorder) NameRegister_InitialState(ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_InitialState", reflect.TypeOf((*MockQueueService)(nil).NameRegister_InitialState), ctx, queueItem, conn)
-}
-
-// NameRegister_RegisterWaiting mocks base method.
-func (m *MockQueueService) NameRegister_RegisterWaiting(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRegister_RegisterWaiting", ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// NameRegister_RegisterWaiting indicates an expected call of NameRegister_RegisterWaiting.
-func (mr *MockQueueServiceMockRecorder) NameRegister_RegisterWaiting(ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegister_RegisterWaiting", reflect.TypeOf((*MockQueueService)(nil).NameRegister_RegisterWaiting), ctx, queueItem, conn)
-}
-
-// NameRenewMoveStateNext mocks base method.
-func (m *MockQueueService) NameRenewMoveStateNext(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) (error, queue.QueueItemStatus) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRenewMoveStateNext", ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	ret1, _ := ret[1].(queue.QueueItemStatus)
-	return ret0, ret1
-}
-
-// NameRenewMoveStateNext indicates an expected call of NameRenewMoveStateNext.
-func (mr *MockQueueServiceMockRecorder) NameRenewMoveStateNext(ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRenewMoveStateNext", reflect.TypeOf((*MockQueueService)(nil).NameRenewMoveStateNext), ctx, queueItem, conn)
-}
-
 // ProcessItem mocks base method.
 func (m *MockQueueService) ProcessItem(ctx context.Context, queueItem *queue.QueueItem) error {
 	m.ctrl.T.Helper()
@@ -262,34 +176,6 @@ func (m *MockQueueService) ProcessItem(ctx context.Context, queueItem *queue.Que
 func (mr *MockQueueServiceMockRecorder) ProcessItem(ctx, queueItem interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessItem", reflect.TypeOf((*MockQueueService)(nil).ProcessItem), ctx, queueItem)
-}
-
-// RecoverHighNonce mocks base method.
-func (m *MockQueueService) RecoverHighNonce(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecoverHighNonce", ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RecoverHighNonce indicates an expected call of RecoverHighNonce.
-func (mr *MockQueueServiceMockRecorder) RecoverHighNonce(ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverHighNonce", reflect.TypeOf((*MockQueueService)(nil).RecoverHighNonce), ctx, queueItem, conn)
-}
-
-// RecoverLowNonce mocks base method.
-func (m *MockQueueService) RecoverLowNonce(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecoverLowNonce", ctx, queueItem, conn)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RecoverLowNonce indicates an expected call of RecoverLowNonce.
-func (mr *MockQueueServiceMockRecorder) RecoverLowNonce(ctx, queueItem, conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverLowNonce", reflect.TypeOf((*MockQueueService)(nil).RecoverLowNonce), ctx, queueItem, conn)
 }
 
 // Run mocks base method.

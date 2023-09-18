@@ -9,7 +9,7 @@ import (
 
 	"strings"
 
-	"github.com/anyproto/any-ns-node/alchemyaa"
+	"github.com/anyproto/any-ns-node/alchemysdk"
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
@@ -37,52 +37,50 @@ type anynsAA struct {
 	aaConfig        config.AA
 	contractsConfig config.Contracts
 	contracts       contracts.ContractsService
-	aa              alchemyaa.AlchemyAAService
+	alchemy         alchemysdk.AlchemyAAService
 }
 
 type AccountAbstractionService interface {
 	// each EOA has an associated smart wallet address
 	// even if it is not deployed yet - we can determine it
 	GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error)
+	GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
+	GetOperationsCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 
-	GetNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error)
+	// TODO: implement
+	//SendUserOperation(ctx context.Context, uo UserOperation, signedByUserData []byte) (err error)
 
-	VerifyAdminIdentity(payload []byte, signature []byte) (err error)
-
+	// will return error if signature is invalid
+	AdminVerifyIdentity(payload []byte, signature []byte) (err error)
 	// will mint + approve tokens to the specified smart wallet
-	AdminMintAccessTokens(scw common.Address, amount *big.Int) (err error)
+	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (err error)
 
-	GetNamesCountLeft(scw common.Address) (count uint64, err error)
-	GetOperationsCountLeft(scw common.Address) (count uint64, err error)
-
+	// get data to sign
 	GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
-
-	//
-	GetNextAlchemyRequestID() int
 
 	app.Component
 }
 
-func (arpc *anynsAA) Init(a *app.App) (err error) {
-	arpc.accountConfig = a.MustComponent(config.CName).(*config.Config).GetAccount()
-	arpc.aaConfig = a.MustComponent(config.CName).(*config.Config).GetAA()
-	arpc.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
-	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
-	arpc.aa = a.MustComponent(alchemyaa.CName).(alchemyaa.AlchemyAAService)
+func (aa *anynsAA) Init(a *app.App) (err error) {
+	aa.accountConfig = a.MustComponent(config.CName).(*config.Config).GetAccount()
+	aa.aaConfig = a.MustComponent(config.CName).(*config.Config).GetAA()
+	aa.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
+	aa.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+	aa.alchemy = a.MustComponent(alchemysdk.CName).(alchemysdk.AlchemyAAService)
 
 	return nil
 }
 
-func (arpc *anynsAA) Name() (name string) {
+func (aa *anynsAA) Name() (name string) {
 	return CName
 }
 
-func (arpc *anynsAA) GetNextAlchemyRequestID() int {
-	// return something real
+func (aa *anynsAA) getNextAlchemyRequestID() int {
+	// TODO: return real operation ID
 	return 1
 }
 
-func (arpc *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error) {
+func (aa *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error) {
 	factoryContractABI := `
 		[
 			{
@@ -122,13 +120,13 @@ func (arpc *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Addre
 		return common.Address{}, err
 	}
 
-	addr := common.HexToAddress(arpc.aaConfig.AccountFactory)
+	addr := common.HexToAddress(aa.aaConfig.AccountFactory)
 	callMsg := ethereum.CallMsg{
 		To:   &addr,
 		Data: input,
 	}
 
-	res, err := arpc.contracts.CallContract(ctx, callMsg)
+	res, err := aa.contracts.CallContract(ctx, callMsg)
 	if err != nil {
 		log.Error("failed to call getAddress", zap.Error(err))
 		return common.Address{}, err
@@ -144,7 +142,7 @@ func (arpc *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Addre
 	return out, nil
 }
 
-func (arpc *anynsAA) GetNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error) {
+func (aa *anynsAA) getNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error) {
 
 	entryPointJSON := `
 		[
@@ -185,13 +183,13 @@ func (arpc *anynsAA) GetNonceForSmartWalletAddress(ctx context.Context, scw comm
 		return nil, err
 	}
 
-	addr := common.HexToAddress(arpc.aaConfig.EntryPoint)
+	addr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	callMsg := ethereum.CallMsg{
 		To:   &addr,
 		Data: input,
 	}
 
-	res, err := arpc.contracts.CallContract(ctx, callMsg)
+	res, err := aa.contracts.CallContract(ctx, callMsg)
 	if err != nil {
 		log.Error("failed to call getNonce", zap.Error(err))
 		return nil, err
@@ -202,16 +200,16 @@ func (arpc *anynsAA) GetNonceForSmartWalletAddress(ctx context.Context, scw comm
 	return out, nil
 }
 
-func (arpc *anynsAA) GetNamesCountLeft(scw common.Address) (count uint64, err error) {
-	tokenAddress := common.HexToAddress(arpc.contractsConfig.AddrToken)
+func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error) {
+	tokenAddress := common.HexToAddress(aa.contractsConfig.AddrToken)
 
-	client, err := arpc.contracts.CreateEthConnection()
+	client, err := aa.contracts.CreateEthConnection()
 	if err != nil {
 		log.Error("failed to create eth connection", zap.Error(err))
 		return 0, err
 	}
 
-	balance, err := arpc.contracts.GetBalanceOf(client, tokenAddress, scw)
+	balance, err := aa.contracts.GetBalanceOf(ctx, client, tokenAddress, scw)
 	if err != nil {
 		log.Error("failed to get balance of", zap.Error(err), zap.String("scw", scw.String()), zap.String("tokenAddress", tokenAddress.String()))
 		return 0, err
@@ -233,13 +231,15 @@ func (arpc *anynsAA) GetNamesCountLeft(scw common.Address) (count uint64, err er
 	return count, nil
 }
 
-func (arpc *anynsAA) GetOperationsCountLeft(scw common.Address) (count uint64, err error) {
+func (aa *anynsAA) GetOperationsCountLeft(ctx context.Context, scw common.Address) (count uint64, err error) {
+	// TODO: implement
+
 	return 0, nil
 }
 
-func (arpc *anynsAA) VerifyAdminIdentity(payload []byte, signature []byte) (err error) {
+func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err error) {
 	// 1 - load public key of admin
-	ownerAnyIdentity, err := crypto.DecodePeerId(arpc.accountConfig.PeerId)
+	ownerAnyIdentity, err := crypto.DecodePeerId(aa.accountConfig.PeerId)
 
 	if err != nil {
 		log.Error("failed to unmarshal public key", zap.Error(err))
@@ -257,18 +257,18 @@ func (arpc *anynsAA) VerifyAdminIdentity(payload []byte, signature []byte) (err 
 }
 
 // Admin sends transaction to mint tokens to the specified smart wallet
-func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesCount *big.Int) (err error) {
+func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress common.Address, namesCount *big.Int) (err error) {
 	// settings from config:
-	entryPointAddress := common.HexToAddress(arpc.aaConfig.EntryPoint)
-	erc20tokenAddr := common.HexToAddress(arpc.contractsConfig.AddrToken)
-	registrarController := common.HexToAddress(arpc.contractsConfig.AddrRegistrar)
-	alchemyApiKey := arpc.aaConfig.AlchemyApiKey
-	policyID := arpc.aaConfig.GasPolicyId
+	entryPointAddress := common.HexToAddress(aa.aaConfig.EntryPoint)
+	erc20tokenAddr := common.HexToAddress(aa.contractsConfig.AddrToken)
+	registrarController := common.HexToAddress(aa.contractsConfig.AddrRegistrar)
+	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+	policyID := aa.aaConfig.GasPolicyId
 
-	adminAddress := common.HexToAddress(arpc.contractsConfig.AddrAdmin)
-	adminPK := arpc.contractsConfig.AdminPk
+	adminAddress := common.HexToAddress(aa.contractsConfig.AddrAdmin)
+	adminPK := aa.contractsConfig.AdminPk
 
-	var chainID int64 = int64(arpc.aaConfig.ChainID)
+	var chainID int64 = int64(aa.aaConfig.ChainID)
 
 	// 0 - check params
 	if namesCount.Cmp(big.NewInt(0)) == 0 {
@@ -277,14 +277,14 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// TODO: optimize, cache it or move to settings
 	// 1 - determine admin's SCW
-	adminScw, err := arpc.GetSmartWalletAddress(context.Background(), adminAddress)
+	adminScw, err := aa.GetSmartWalletAddress(ctx, adminAddress)
 	if err != nil {
 		log.Error("failed to get smart wallet address for admin", zap.Error(err))
 		return err
 	}
 
 	// 2 - get nonce (from admin's SCW)
-	nonce, err := arpc.GetNonceForSmartWalletAddress(context.Background(), adminScw)
+	nonce, err := aa.getNonceForSmartWalletAddress(ctx, adminScw)
 	if err != nil {
 		log.Error("failed to get nonce", zap.Error(err))
 		return err
@@ -319,9 +319,9 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	}
 	log.Info("prepared call data", zap.String("callData", hex.EncodeToString(callData)))
 
-	id := arpc.GetNextAlchemyRequestID()
+	id := aa.getNextAlchemyRequestID()
 
-	rgapd, err := arpc.aa.CreateRequestGasAndPaymasterData(callData, adminScw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, adminScw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -336,14 +336,14 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
 
 	// 5 - send it
-	response, err := arpc.aa.SendRequest(alchemyApiKey, jsonDATAPre)
+	response, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATAPre)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
 	}
 
 	// parse response
-	responseStruct := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+	responseStruct := alchemysdk.JSONRPCResponseGasAndPaymaster{}
 	err = json.Unmarshal(response, &responseStruct)
 	if err != nil {
 		log.Error("failed to unmarshal response", zap.Error(err))
@@ -362,7 +362,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// 6 - now create new transaction
 	appendEntryPoint := true
-	jsonDATA, err := arpc.aa.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
+	jsonDATA, err := aa.alchemy.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -371,7 +371,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	log.Info("created eth_sendUserOperation request", zap.String("jsonDATA", string(jsonDATA)))
 
 	// send it
-	response, err = arpc.aa.SendRequest(alchemyApiKey, jsonDATA)
+	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
@@ -381,7 +381,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// 7 - get op hash
 	// will handle error in response
-	opHash, err := arpc.aa.DecodeSendUserOperationResponse(response)
+	opHash, err := aa.alchemy.DecodeSendUserOperationResponse(response)
 	if err != nil {
 		log.Error("failed to decode response", zap.Error(err))
 		return err
@@ -390,7 +390,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 
 	// TODO: loop
 	// 8 - wait for receipt
-	req, err := arpc.aa.CreateRequestGetUserOperation(opHash, id+2)
+	req, err := aa.alchemy.CreateRequestGetUserOperation(opHash, id+2)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -405,7 +405,7 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
 
 	// send it
-	response, err = arpc.aa.SendRequest(alchemyApiKey, jsonDATA)
+	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return err
@@ -415,14 +415,14 @@ func (arpc *anynsAA) AdminMintAccessTokens(userScwAddress common.Address, namesC
 	return nil
 }
 
-func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
+func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
 	// settings from config:
-	entryPointAddress := common.HexToAddress(arpc.aaConfig.EntryPoint)
-	alchemyApiKey := arpc.aaConfig.AlchemyApiKey
-	policyID := arpc.aaConfig.GasPolicyId
+	entryPointAddress := common.HexToAddress(aa.aaConfig.EntryPoint)
+	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+	policyID := aa.aaConfig.GasPolicyId
 
-	var chainID int64 = int64(arpc.aaConfig.ChainID)
-	var id int = arpc.GetNextAlchemyRequestID()
+	var chainID int64 = int64(aa.aaConfig.ChainID)
+	var id int = aa.getNextAlchemyRequestID()
 
 	// 0 - check params
 	err = anynsrpc.СheckRegisterParams(in)
@@ -432,14 +432,14 @@ func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegiste
 	}
 
 	// 1 - determine users's SCW
-	scw, err := arpc.GetSmartWalletAddress(context.Background(), common.HexToAddress(in.OwnerEthAddress))
+	scw, err := aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
 	if err != nil {
 		log.Error("failed to get smart wallet address for admin", zap.Error(err))
 		return nil, nil, err
 	}
 
 	// 2 - get nonce
-	nonce, err := arpc.GetNonceForSmartWalletAddress(context.Background(), scw)
+	nonce, err := aa.getNonceForSmartWalletAddress(ctx, scw)
 	if err != nil {
 		log.Error("failed to get nonce", zap.Error(err))
 		return nil, nil, err
@@ -447,13 +447,13 @@ func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegiste
 	log.Info("got nonce", zap.String("scw", scw.String()), zap.Int64("nonce", nonce.Int64()))
 
 	// 3 - create user operation
-	callData, err := arpc.aa.GetCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId)
+	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return nil, nil, err
 	}
 
-	rgapd, err := arpc.aa.CreateRequestGasAndPaymasterData(callData, scw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, scw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return nil, nil, err
@@ -468,13 +468,13 @@ func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegiste
 	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
 
 	// 5 - send it
-	response, err := arpc.aa.SendRequest(alchemyApiKey, jsonDATAPre)
+	response, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATAPre)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
 		return nil, nil, err
 	}
 	// parse response
-	responseStruct := alchemyaa.JSONRPCResponseGasAndPaymaster{}
+	responseStruct := alchemysdk.JSONRPCResponseGasAndPaymaster{}
 	err = json.Unmarshal(response, &responseStruct)
 	if err != nil {
 		log.Error("failed to unmarshal response", zap.Error(err))
@@ -492,7 +492,7 @@ func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegiste
 	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
 
 	// 6 - get data to sign
-	jsonData, uo, err := arpc.aa.CreateRequestStep1(callData, responseStruct, chainID, entryPointAddress, scw, uint64(nonce.Int64()))
+	jsonData, uo, err := aa.alchemy.CreateRequestStep1(callData, responseStruct, chainID, entryPointAddress, scw, uint64(nonce.Int64()))
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return nil, nil, err
@@ -506,4 +506,91 @@ func (arpc *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegiste
 	}
 
 	return jsonData, contextData, nil
+}
+
+func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string) ([]byte, error) {
+	registrarController := common.HexToAddress(aa.contractsConfig.AddrRegistrar)
+	resolverAddress := common.HexToAddress(aa.contractsConfig.AddrResolver)
+	registrantAccount := common.HexToAddress(ownerEthAddress)
+
+	var nameFirstPart string = contracts.RemoveTLD(fullName)
+	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
+	var isReverseRecord bool = true
+	var ownerControlledFuses uint16 = 0
+
+	// 1 - get new random secret
+	secret32, err := contracts.GenerateRandomSecret()
+	if err != nil {
+		log.Error("can not generate random secret", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - create a commitment
+	conn, err := aa.contracts.CreateEthConnection()
+	if err != nil {
+		log.Error("failed to connect to geth", zap.Error(err))
+		return nil, err
+	}
+
+	controller, err := aa.contracts.ConnectToController(conn)
+	if err != nil {
+		log.Error("failed to connect to contract", zap.Error(err))
+		return nil, err
+	}
+
+	commitment, err := aa.contracts.MakeCommitment(
+		nameFirstPart,
+		registrantAccount,
+		secret32,
+		controller,
+		fullName,
+		ownerAnyAddress,
+		ownerEthAddress)
+
+	if err != nil {
+		log.Error("can not calculate a commitment", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - generate original callData (that will set name)
+	callData, err := contracts.PrepareCallData_SetContentHashSpaceID(fullName, ownerAnyAddress, spaceID)
+	if err != nil {
+		log.Error("can not prepare call data", zap.Error(err))
+		return nil, err
+	}
+
+	// 4 - now prepare 2 operations
+	callDataOriginal1, err := GetCallDataForCommit(commitment)
+	if err != nil {
+		log.Error("failed to get original call data", zap.Error(err))
+		return nil, err
+	}
+
+	callDataOriginal2, err := GetCallDataForRegister(
+		nameFirstPart,
+		registrantAccount,
+		REGISTRATION_TIME,
+		secret32,
+		resolverAddress,
+		callData,
+		isReverseRecord,
+		ownerControlledFuses)
+
+	if err != nil {
+		log.Error("failed to get original call data", zap.Error(err))
+		return nil, err
+	}
+
+	// create array of call data
+	targets := []common.Address{registrarController, registrarController}
+	callDataOriginals := [][]byte{callDataOriginal1, callDataOriginal2}
+
+	// 4 - wrap it into "execute" call
+	executeCallDataOut, err := GetCallDataForBatchExecute(targets, callDataOriginals)
+	if err != nil {
+		log.Error("failed to get call data", zap.Error(err))
+		return nil, err
+	}
+
+	return executeCallDataOut, nil
 }

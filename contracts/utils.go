@@ -63,10 +63,9 @@ func GenerateRandomSecret() ([32]byte, error) {
 	return byteArray, nil
 }
 
-func PrepareCallData(fullName string, contentHash string, spaceID string) ([][]byte, error) {
+func PrepareCallData_SetContentHashSpaceID(fullName string, contentHash string, spaceID string) ([][]byte, error) {
 	var out [][]byte
 
-	// 1 -
 	const jsondata = `
 		[
 			{

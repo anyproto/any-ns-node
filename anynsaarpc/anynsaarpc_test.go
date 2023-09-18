@@ -102,11 +102,11 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 			return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
 		})
 
-		fx.aa.EXPECT().GetNamesCountLeft(gomock.Any()).DoAndReturn(func(ctx interface{}) (count uint64, err error) {
+		fx.aa.EXPECT().GetNamesCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
 			return uint64(10), nil
 		})
 
-		fx.aa.EXPECT().GetOperationsCountLeft(gomock.Any()).DoAndReturn(func(ctx interface{}) (count uint64, err error) {
+		fx.aa.EXPECT().GetOperationsCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
 			return uint64(20), nil
 		})
 
@@ -133,20 +133,20 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 			return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
 		})
 
-		fx.aa.EXPECT().GetNamesCountLeft(gomock.Any()).DoAndReturn(func(ctx interface{}) (count uint64, err error) {
+		fx.aa.EXPECT().GetNamesCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
 			return uint64(10), nil
 		})
 
-		fx.aa.EXPECT().GetOperationsCountLeft(gomock.Any()).DoAndReturn(func(ctx interface{}) (count uint64, err error) {
+		fx.aa.EXPECT().GetOperationsCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
 			return uint64(20), nil
 		})
 
-		fx.aa.EXPECT().VerifyAdminIdentity(gomock.Any(), gomock.Any()).DoAndReturn(func(payload []byte, signature []byte) (err error) {
+		fx.aa.EXPECT().AdminVerifyIdentity(gomock.Any(), gomock.Any()).DoAndReturn(func(payload []byte, signature []byte) (err error) {
 			// no error, IT IS THE ADMIN!
 			return nil
 		})
 
-		fx.aa.EXPECT().AdminMintAccessTokens(gomock.Any(), gomock.Any()).DoAndReturn(func(scw common.Address, count *big.Int) (err error) {
+		fx.aa.EXPECT().AdminMintAccessTokens(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, scw common.Address, count *big.Int) (err error) {
 			// no error
 			return nil
 		})

@@ -57,13 +57,13 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 
 	res.OwnerSmartContracWalletAddress = scwa.Hex()
 
-	res.NamesCountLeft, err = arpc.aa.GetNamesCountLeft(scwa)
+	res.NamesCountLeft, err = arpc.aa.GetNamesCountLeft(ctx, scwa)
 	if err != nil {
 		log.Error("failed to get names count left", zap.Error(err))
 		return nil, err
 	}
 
-	res.OperationsCountLeft, err = arpc.aa.GetOperationsCountLeft(scwa)
+	res.OperationsCountLeft, err = arpc.aa.GetOperationsCountLeft(ctx, scwa)
 	if err != nil {
 		log.Error("failed to get operations count left", zap.Error(err))
 		return nil, err
@@ -83,7 +83,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 	}
 
 	// 2 - check signature
-	err = arpc.aa.VerifyAdminIdentity(in.Payload, in.Signature)
+	err = arpc.aa.AdminVerifyIdentity(in.Payload, in.Signature)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, err
@@ -99,7 +99,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 	}
 
 	// 4 - mint tokens to that SCW
-	err = arpc.aa.AdminMintAccessTokens(common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
+	err = arpc.aa.AdminMintAccessTokens(ctx, common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
 		return nil, err
@@ -150,8 +150,29 @@ func (arpc *anynsAARpc) GetDataNameUpdate(ctx context.Context, in *as.NameUpdate
 	return nil, nil
 }
 
+// once user got data by using method like GetDataNameRegister, and signed it, now he can create a new operation
 func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUserOperationRequestSigned) (*as.OperationResponse, error) {
-	// TODO: implement
+	// 1 - unmarshal the signed request
+	var cuor as.CreateUserOperationRequest
+	err := proto.Unmarshal(in.Payload, &cuor)
+	if err != nil {
+		log.Error("can not unmarshal CreateUserOperationRequest", zap.Error(err))
+		return nil, err
+	}
 
+	// TODO:
+	// 2 - check signature
+	/*
+		err = arpc.aa.VerifyIdentity(in.Payload, in.Signature, cuor)
+		if err != nil {
+			log.Error("not an Admin!!!", zap.Error(err))
+			return nil, err
+		}
+	*/
+
+	// TODO:
+	// 3 - check if user has enough "GetOperationsCountLeft"
+
+	// 4 -
 	return nil, nil
 }

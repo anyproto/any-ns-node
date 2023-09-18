@@ -149,7 +149,7 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 		// if this return empty address -> it means address is free
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
 			return common.Address{}, nil
 		})
 
@@ -169,12 +169,12 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 		// if this returns some address -> it means name is taken
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
 			notEmptyAddr := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 			return notEmptyAddr, nil
 		})
 
-		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
+		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
 			return "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", big.NewInt(12390243), nil
 		})
 

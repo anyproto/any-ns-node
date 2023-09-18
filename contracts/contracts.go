@@ -42,17 +42,16 @@ type ContractsService interface {
 
 	// generic method to call any contract
 	CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
-	GetBalanceOf(client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error)
+	GetBalanceOf(ctx context.Context, client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error)
 
 	// ENS methods
-	GetOwnerForNamehash(client *ethclient.Client, namehash [32]byte) (common.Address, error)
-	GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error)
+	GetOwnerForNamehash(ctx context.Context, client *ethclient.Client, namehash [32]byte) (common.Address, error)
+	GetAdditionalNameInfo(ctx context.Context, conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error)
+
 	MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) ([32]byte, error)
 	Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
 	Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
-
 	RenewName(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, fullName string, durationSec uint64, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
-
 	GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error)
 
 	// Aux methods
@@ -67,7 +66,6 @@ type ContractsService interface {
 
 	// Check if tx is even started to mine
 	WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) error
-	// Wait for tx and get result
 	WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (wasMined bool, err error)
 	TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error)
 
@@ -94,7 +92,7 @@ func (acontracts *anynsContracts) CallContract(ctx context.Context, msg ethereum
 		return nil, err
 	}
 
-	res, err := client.CallContract(context.Background(), msg, nil)
+	res, err := client.CallContract(ctx, msg, nil)
 	if err != nil {
 		log.Error("failed to CallContract", zap.Error(err))
 		return nil, err
@@ -103,7 +101,7 @@ func (acontracts *anynsContracts) CallContract(ctx context.Context, msg ethereum
 	return res, err
 }
 
-func (acontracts *anynsContracts) GetBalanceOf(client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error) {
+func (acontracts *anynsContracts) GetBalanceOf(ctx context.Context, client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error) {
 	const erc20ABI = `
 		[{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]
 	`
@@ -123,7 +121,7 @@ func (acontracts *anynsContracts) GetBalanceOf(client *ethclient.Client, tokenAd
 		Data: input,
 	}
 
-	res, err := client.CallContract(context.Background(), callMsg, nil)
+	res, err := client.CallContract(ctx, callMsg, nil)
 	if err != nil {
 		log.Error("failed to call balanceOf", zap.Error(err))
 		return big.NewInt(0), err
@@ -134,7 +132,7 @@ func (acontracts *anynsContracts) GetBalanceOf(client *ethclient.Client, tokenAd
 	return balance, nil
 }
 
-func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh [32]byte) (common.Address, error) {
+func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, conn *ethclient.Client, nh [32]byte) (common.Address, error) {
 	reg, err := acontracts.ConnectToRegistryContract(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
@@ -147,7 +145,7 @@ func (acontracts *anynsContracts) GetOwnerForNamehash(conn *ethclient.Client, nh
 	return own, err
 }
 
-func (acontracts *anynsContracts) GetAdditionalNameInfo(conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error) {
+func (acontracts *anynsContracts) GetAdditionalNameInfo(ctx context.Context, conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error) {
 	var res as.NameAvailableResponse
 	res.Available = false
 
@@ -503,7 +501,7 @@ func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registran
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
 
-	callData, err := PrepareCallData(fullName, ownerAnyAddr, spaceId)
+	callData, err := PrepareCallData_SetContentHashSpaceID(fullName, ownerAnyAddr, spaceId)
 	if err != nil {
 		log.Error("can not prepare call data", zap.Error(err))
 		return [32]byte{}, err
@@ -555,7 +553,7 @@ func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
 
-	callData, err := PrepareCallData(fullName, ownerAnyAddr, spaceId)
+	callData, err := PrepareCallData_SetContentHashSpaceID(fullName, ownerAnyAddr, spaceId)
 	if err != nil {
 		log.Error("can not prepare call data", zap.Error(err))
 		return nil, err

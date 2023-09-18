@@ -73,7 +73,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 
 	// 2 - call contract's method
 	log.Info("getting owner for name", zap.String("FullName", in.GetFullName()))
-	addr, err := arpc.contracts.GetOwnerForNamehash(conn, nh)
+	addr, err := arpc.contracts.GetOwnerForNamehash(ctx, conn, nh)
 	if err != nil {
 		log.Error("failed to get owner", zap.Error(err))
 		return nil, err
@@ -94,7 +94,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 
 	// 4 - if name is not available, then get additional info
 	log.Info("name is NOT available...Getting additional info")
-	ea, aa, si, exp, err := arpc.contracts.GetAdditionalNameInfo(conn, addr, in.GetFullName())
+	ea, aa, si, exp, err := arpc.contracts.GetAdditionalNameInfo(ctx, conn, addr, in.GetFullName())
 	if err != nil {
 		log.Error("failed to get additional info", zap.Error(err))
 		return nil, err

@@ -39,17 +39,31 @@ func (m *MockAccountAbstractionService) EXPECT() *MockAccountAbstractionServiceM
 }
 
 // AdminMintAccessTokens mocks base method.
-func (m *MockAccountAbstractionService) AdminMintAccessTokens(scw common.Address, amount *big.Int) error {
+func (m *MockAccountAbstractionService) AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AdminMintAccessTokens", scw, amount)
+	ret := m.ctrl.Call(m, "AdminMintAccessTokens", ctx, scw, amount)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AdminMintAccessTokens indicates an expected call of AdminMintAccessTokens.
-func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(scw, amount interface{}) *gomock.Call {
+func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(ctx, scw, amount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), scw, amount)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), ctx, scw, amount)
+}
+
+// AdminVerifyIdentity mocks base method.
+func (m *MockAccountAbstractionService) AdminVerifyIdentity(payload, signature []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdminVerifyIdentity", payload, signature)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AdminVerifyIdentity indicates an expected call of AdminVerifyIdentity.
+func (mr *MockAccountAbstractionServiceMockRecorder) AdminVerifyIdentity(payload, signature interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminVerifyIdentity", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminVerifyIdentity), payload, signature)
 }
 
 // GetDataNameRegister mocks base method.
@@ -69,62 +83,33 @@ func (mr *MockAccountAbstractionServiceMockRecorder) GetDataNameRegister(ctx, in
 }
 
 // GetNamesCountLeft mocks base method.
-func (m *MockAccountAbstractionService) GetNamesCountLeft(scw common.Address) (uint64, error) {
+func (m *MockAccountAbstractionService) GetNamesCountLeft(ctx context.Context, scw common.Address) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNamesCountLeft", scw)
+	ret := m.ctrl.Call(m, "GetNamesCountLeft", ctx, scw)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetNamesCountLeft indicates an expected call of GetNamesCountLeft.
-func (mr *MockAccountAbstractionServiceMockRecorder) GetNamesCountLeft(scw interface{}) *gomock.Call {
+func (mr *MockAccountAbstractionServiceMockRecorder) GetNamesCountLeft(ctx, scw interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamesCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNamesCountLeft), scw)
-}
-
-// GetNextAlchemyRequestID mocks base method.
-func (m *MockAccountAbstractionService) GetNextAlchemyRequestID() int {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNextAlchemyRequestID")
-	ret0, _ := ret[0].(int)
-	return ret0
-}
-
-// GetNextAlchemyRequestID indicates an expected call of GetNextAlchemyRequestID.
-func (mr *MockAccountAbstractionServiceMockRecorder) GetNextAlchemyRequestID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextAlchemyRequestID", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNextAlchemyRequestID))
-}
-
-// GetNonceForSmartWalletAddress mocks base method.
-func (m *MockAccountAbstractionService) GetNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNonceForSmartWalletAddress", ctx, scw)
-	ret0, _ := ret[0].(*big.Int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetNonceForSmartWalletAddress indicates an expected call of GetNonceForSmartWalletAddress.
-func (mr *MockAccountAbstractionServiceMockRecorder) GetNonceForSmartWalletAddress(ctx, scw interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNonceForSmartWalletAddress", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNonceForSmartWalletAddress), ctx, scw)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamesCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNamesCountLeft), ctx, scw)
 }
 
 // GetOperationsCountLeft mocks base method.
-func (m *MockAccountAbstractionService) GetOperationsCountLeft(scw common.Address) (uint64, error) {
+func (m *MockAccountAbstractionService) GetOperationsCountLeft(ctx context.Context, scw common.Address) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOperationsCountLeft", scw)
+	ret := m.ctrl.Call(m, "GetOperationsCountLeft", ctx, scw)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOperationsCountLeft indicates an expected call of GetOperationsCountLeft.
-func (mr *MockAccountAbstractionServiceMockRecorder) GetOperationsCountLeft(scw interface{}) *gomock.Call {
+func (mr *MockAccountAbstractionServiceMockRecorder) GetOperationsCountLeft(ctx, scw interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOperationsCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetOperationsCountLeft), scw)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOperationsCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetOperationsCountLeft), ctx, scw)
 }
 
 // GetSmartWalletAddress mocks base method.
@@ -168,18 +153,4 @@ func (m *MockAccountAbstractionService) Name() string {
 func (mr *MockAccountAbstractionServiceMockRecorder) Name() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockAccountAbstractionService)(nil).Name))
-}
-
-// VerifyAdminIdentity mocks base method.
-func (m *MockAccountAbstractionService) VerifyAdminIdentity(payload, signature []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyAdminIdentity", payload, signature)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// VerifyAdminIdentity indicates an expected call of VerifyAdminIdentity.
-func (mr *MockAccountAbstractionServiceMockRecorder) VerifyAdminIdentity(payload, signature interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyAdminIdentity", reflect.TypeOf((*MockAccountAbstractionService)(nil).VerifyAdminIdentity), payload, signature)
 }

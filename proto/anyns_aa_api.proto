@@ -64,9 +64,10 @@ message GetDataNameRegisterResponse {
   bytes context = 2;
 }
 
-message CreateUserOperationRequest {
+message CreateUserOperationRequest { 
   bytes data = 1;
 
+  // "data" signed with Ethereum private key
   bytes signedData = 2;
 
   bytes context = 3;
@@ -79,7 +80,6 @@ message CreateUserOperationRequestSigned {
   // payload signed with Anytype identity
   bytes signature = 2;
 }
-
 
 service AnynsAccountAbstraction {
 // ADMIN METHODS:

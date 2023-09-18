@@ -1,4 +1,4 @@
-package alchemyaa
+package alchemysdk
 
 import (
 	"context"
@@ -21,14 +21,14 @@ type fixture struct {
 	a    *app.App
 	ctrl *gomock.Controller
 
-	*alchemyaa
+	*alchemysdk
 }
 
 func newFixture(t *testing.T) *fixture {
 	fx := &fixture{
-		a:         new(app.App),
-		ctrl:      gomock.NewController(t),
-		alchemyaa: New().(*alchemyaa),
+		a:          new(app.App),
+		ctrl:       gomock.NewController(t),
+		alchemysdk: New().(*alchemysdk),
 	}
 
 	require.NoError(t, fx.a.Start(ctx))
