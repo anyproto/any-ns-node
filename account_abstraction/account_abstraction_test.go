@@ -620,10 +620,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
 
 			// set error
-			response.Error = &alchemysdk.JSONRPCError{
-				Code:    1,
-				Message: "error",
-			}
+			response.Error.Code = 123
+			response.Error.Message = "Something really bad happened, sorry"
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -801,7 +799,6 @@ func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
 	})
 }
 
-// TODO: fix test
 func TestAAS_GetCallDataForCommit(t *testing.T) {
 	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	defer mt.Close()
@@ -870,5 +867,294 @@ func TestAAS_GetCallDataForNameRegister(t *testing.T) {
 		// the result has some randomness in it (secret)
 		//outStr := "0x" + hex.EncodeToString(data)
 		//assert.Equal(t, outStr, "0x6a3b8f2a000")
+	})
+}
+
+func TestAAS_SendUserOperation(t *testing.T) {
+	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	defer mt.Close()
+
+	mt.Run("fail if context is not a valid JSON", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.alchemy.EXPECT().DecodeSendUserOperationResponse(gomock.Any()).DoAndReturn(func(one interface{}) (opHash string, err error) {
+			return "0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186", nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequest
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGetUserOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		contextData := []byte("123A")
+		signedData, _ := hex.DecodeString("12AF")
+
+		err := fx.SendUserOperation(ctx, contextData, signedData)
+		assert.Error(t, err)
+	})
+
+	mt.Run("fail if CreateRequestStep2 failed", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.alchemy.EXPECT().DecodeSendUserOperationResponse(gomock.Any()).DoAndReturn(func(one interface{}) (opHash string, err error) {
+			return "0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186", nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequest
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGetUserOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}) (out []byte, err error) {
+			return []byte{}, errors.New("fail")
+		}).AnyTimes()
+
+		// contextData is a marshalled UserOperation
+		var uo alchemysdk.UserOperation
+		contextData, err := json.Marshal(uo)
+		assert.NoError(t, err)
+
+		signedData, _ := hex.DecodeString("12AF")
+
+		err = fx.SendUserOperation(ctx, contextData, signedData)
+		assert.Error(t, err)
+	})
+
+	mt.Run("fail if SendRequest returns error", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.alchemy.EXPECT().DecodeSendUserOperationResponse(gomock.Any()).DoAndReturn(func(one interface{}) (opHash string, err error) {
+			return "0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186", nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			return nil, errors.New("i cannot")
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequest
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGetUserOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		// contextData is a marshalled UserOperation
+		var uo alchemysdk.UserOperation
+		contextData, err := json.Marshal(uo)
+		assert.NoError(t, err)
+
+		signedData, _ := hex.DecodeString("12AF")
+
+		err = fx.SendUserOperation(ctx, contextData, signedData)
+		assert.Error(t, err)
+	})
+
+	mt.Run("fail if CreateRequestGetUserOperation fails", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.alchemy.EXPECT().DecodeSendUserOperationResponse(gomock.Any()).DoAndReturn(func(one interface{}) (opHash string, err error) {
+			return "0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186", nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequest
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGetUserOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			return nil, errors.New("i cannot")
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		// contextData is a marshalled UserOperation
+		var uo alchemysdk.UserOperation
+		contextData, err := json.Marshal(uo)
+		assert.NoError(t, err)
+
+		signedData, _ := hex.DecodeString("12AF")
+
+		err = fx.SendUserOperation(ctx, contextData, signedData)
+		assert.Error(t, err)
+	})
+
+	mt.Run("success", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.alchemy.EXPECT().DecodeSendUserOperationResponse(gomock.Any()).DoAndReturn(func(one interface{}) (opHash string, err error) {
+			return "0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186", nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequest
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGetUserOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(req)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		// contextData is a marshalled UserOperation
+		var uo alchemysdk.UserOperation
+		contextData, err := json.Marshal(uo)
+		assert.NoError(t, err)
+
+		signedData, _ := hex.DecodeString("12AF")
+
+		err = fx.SendUserOperation(ctx, contextData, signedData)
+		assert.NoError(t, err)
 	})
 }

@@ -47,16 +47,17 @@ type AccountAbstractionService interface {
 	GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 	GetOperationsCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 
-	// TODO: implement
-	//SendUserOperation(ctx context.Context, uo UserOperation, signedByUserData []byte) (err error)
-
 	// will return error if signature is invalid
 	AdminVerifyIdentity(payload []byte, signature []byte) (err error)
 	// will mint + approve tokens to the specified smart wallet
 	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (err error)
 
-	// get data to sign
+	// get data to sign with your PK
 	GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
+
+	// after data is signed - now you are ready to send it
+	// contextData was received from functions like GetDataNameRegister and should be left intact
+	SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (err error)
 
 	app.Component
 }
@@ -593,4 +594,69 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	}
 
 	return executeCallDataOut, nil
+}
+
+// after data is signed - now you are ready to send it
+func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (err error) {
+	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+	entryPointAddress := common.HexToAddress(aa.aaConfig.EntryPoint)
+	requestId := aa.getNextAlchemyRequestID()
+
+	// 1 - Unmarshal UserOperations from contextData
+	var uo alchemysdk.UserOperation
+	err = json.Unmarshal(contextData, &uo)
+	if err != nil {
+		log.Error("can not unmarshal JSON", zap.Error(err))
+		return err
+	}
+
+	// TODO: check that data is signed by user correctly with Eth private key?
+
+	data, err := aa.alchemy.CreateRequestStep2(requestId, signedByUserData, uo, entryPointAddress)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return err
+	}
+
+	// 2 - send it
+	response, err := aa.alchemy.SendRequest(aa.aaConfig.AlchemyApiKey, data)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return err
+	}
+
+	// 3 - get op hash
+	// will handle error in response
+	opHash, err := aa.alchemy.DecodeSendUserOperationResponse(response)
+	if err != nil {
+		log.Error("failed to decode response", zap.Error(err))
+		return err
+	}
+	log.Info("decoded response", zap.String("opHash", opHash))
+
+	// TODO: loop
+	// 4 - wait for receipt
+	req, err := aa.alchemy.CreateRequestGetUserOperation(opHash, requestId+1)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return err
+	}
+
+	jsonDATA, err := json.Marshal(req)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return err
+	}
+
+	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
+
+	// 5 - send it
+	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return err
+	}
+
+	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response))
+	return nil
 }

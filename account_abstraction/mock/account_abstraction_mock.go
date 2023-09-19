@@ -154,3 +154,17 @@ func (mr *MockAccountAbstractionServiceMockRecorder) Name() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockAccountAbstractionService)(nil).Name))
 }
+
+// SendUserOperation mocks base method.
+func (m *MockAccountAbstractionService) SendUserOperation(ctx context.Context, contextData, signedByUserData []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendUserOperation", ctx, contextData, signedByUserData)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendUserOperation indicates an expected call of SendUserOperation.
+func (mr *MockAccountAbstractionServiceMockRecorder) SendUserOperation(ctx, contextData, signedByUserData interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendUserOperation", reflect.TypeOf((*MockAccountAbstractionService)(nil).SendUserOperation), ctx, contextData, signedByUserData)
+}

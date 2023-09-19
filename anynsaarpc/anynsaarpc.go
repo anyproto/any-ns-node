@@ -161,7 +161,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 	}
 
 	// TODO:
-	// 2 - check signature
+	// 2 - check users's signature
 	/*
 		err = arpc.aa.VerifyIdentity(in.Payload, in.Signature, cuor)
 		if err != nil {
@@ -173,6 +173,18 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 	// TODO:
 	// 3 - check if user has enough "GetOperationsCountLeft"
 
-	// 4 -
+	// 4 - now send it!
+	err = arpc.aa.SendUserOperation(ctx, cuor.Context, cuor.SignedData)
+	if err != nil {
+		log.Error("failed to send user operation", zap.Error(err))
+		return nil, err
+	}
+
+	// TODO: add to queue
+	// 5 - return result
+	var out as.OperationResponse
+	out.OperationId = 0
+	out.OperationState = as.OperationState_Pending
+
 	return nil, nil
 }

@@ -105,7 +105,9 @@ type AlchemyAAService interface {
 	SendRequest(apiKey string, jsonDATA []byte) ([]byte, error)
 	DecodeSendUserOperationResponse(response []byte) (opHash string, err error)
 
+	// creates a UserOperation and data to sign with user's private key
 	CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error)
+	// adds signature to UserOperation and creates final JSONRPCRequest that can be sent with 'SendRequest'
 	CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddress common.Address) ([]byte, error)
 
 	app.Component
