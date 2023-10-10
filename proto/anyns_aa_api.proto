@@ -83,14 +83,15 @@ message CreateUserOperationRequestSigned {
 
 service AnynsAccountAbstraction {
 // ADMIN METHODS:
-  // Will send "name tokens" to the user's account (to his SmartContractWallet)
-  //   (user will be able to use these tokens to register his name later directly)
-  // blocking, will send TX to EVM chain
-  // if finished without erro -> please use GetUserAccount to get updated 
+  // Will send "access tokens" to the user's account (to his SmartContractWallet).
+  // User will be able to use these "access tokens" to register his name later directly.
+  // 
+  // Blocking, will send TX to EVM chain
+  // If finished without error -> please use GetUserAccount to get updated info
   rpc AdminFundUserAccount(AdminFundUserAccountRequestSigned) returns (OperationResponse) {}
   
-  // Each "operations" is a single TX like "name update", etc 
-  //   (user will be able to send TXs to EVM chain without having any gas in his wallet)
+  // Each operation is a single blockchain TX like "name update".
+  // User will be able to send operations without having any gas in his wallet later
   rpc AdminFundGasOperations(AdminFundGasOperationsRequestSigned) returns (OperationResponse) {}
 
 // USER METHODS:
