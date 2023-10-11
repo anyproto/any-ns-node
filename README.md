@@ -1,5 +1,7 @@
 # Any Naming System node
-This global singleton node provides access to AnyNS smart contracts. You can call smart contracts directly or by using _this_ dRPC service. 
+Please see [Any Naming System repository](https://github.com/anyproto/any-ns) for rationale and more info.
+
+This global singleton node provides access to AnyNS smart contracts. You can call smart contracts either directly or by using _this_ dRPC service. 
 
 ## Building and Running
 1. To build: `make build`

@@ -48,6 +48,7 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 	var res as.UserAccount
 	res.OwnerEthAddress = in.OwnerEthAddress
 
+	// 1 - get SCW address
 	// even if SCW is not deployed yet -> it should be returned
 	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
 	if err != nil {
@@ -57,6 +58,20 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 
 	res.OwnerSmartContracWalletAddress = scwa.Hex()
 
+	// 2 - check if SCW is deployed
+	client, err := arpc.contracts.CreateEthConnection()
+	if err != nil {
+		log.Error("failed to create eth connection", zap.Error(err))
+		return nil, err
+	}
+
+	res.OwnerSmartContracWalletDeployed, err = arpc.contracts.IsContractDeployed(ctx, client, scwa)
+	if err != nil {
+		log.Error("failed to check if contract is deployed", zap.Error(err))
+		return nil, err
+	}
+
+	// 3 - the rest
 	res.NamesCountLeft, err = arpc.aa.GetNamesCountLeft(ctx, scwa)
 	if err != nil {
 		log.Error("failed to get names count left", zap.Error(err))
@@ -181,6 +196,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 	}
 
 	// TODO: add to queue
+
 	// 5 - return result
 	var out as.OperationResponse
 	out.OperationId = 0

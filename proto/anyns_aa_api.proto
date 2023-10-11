@@ -11,12 +11,17 @@ message UserAccount {
   // you can ask .owner() method to get 'ownerEthAddress'
   string ownerSmartContracWalletAddress = 2;
 
-  // Number of names that user can buy. We will mint him tokens that he can use to buy names
+  // The ownerSmartContracWalletAddress field is calculated automatically
+  // from ownerEthAddress even if SCW is not deployed yet
+  // SCW is deployed automatically after first operation
+  bool ownerSmartContracWalletDeployed = 3;
+
+  // Number of names that the user can buy. We will mint him tokens that he can use to buy names
   // (one token per name)
-  uint64 namesCountLeft = 3;
+  uint64 namesCountLeft = 4;
 
   // Number of gas operations: update name, add new data, etc
-  uint64 operationsCountLeft = 4;
+  uint64 operationsCountLeft = 5;
 }
 
 message AdminFundUserAccountRequest {

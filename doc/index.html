@@ -445,7 +445,7 @@
                   <td>signedData</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>&#34;data&#34; signed with Ethereum private key </p></td>
                 </tr>
               
                 <tr>
@@ -574,10 +574,19 @@ you can ask .owner() method to get &#39;ownerEthAddress&#39; </p></td>
                 </tr>
               
                 <tr>
+                  <td>ownerSmartContracWalletDeployed</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>The ownerSmartContracWalletAddress field is calculated automatically
+from ownerEthAddress even if SCW is not deployed yet
+SCW is deployed automatically after first operation </p></td>
+                </tr>
+              
+                <tr>
                   <td>namesCountLeft</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p>Number of names that user can buy. We will mint him tokens that he can use to buy names
+                  <td><p>Number of names that the user can buy. We will mint him tokens that he can use to buy names
 (one token per name) </p></td>
                 </tr>
               
@@ -614,18 +623,19 @@ you can ask .owner() method to get &#39;ownerEthAddress&#39; </p></td>
                 <td><a href="#AdminFundUserAccountRequestSigned">.AdminFundUserAccountRequestSigned</a></td>
                 <td><a href="#OperationResponse">.OperationResponse</a></td>
                 <td><p>ADMIN METHODS:
-Will send &#34;name tokens&#34; to the user&#39;s account (to his SmartContractWallet)
-  (user will be able to use these tokens to register his name later directly)
-blocking, will send TX to EVM chain
-if finished without erro -&gt; please use GetUserAccount to get updated</p></td>
+Will send &#34;access tokens&#34; to the user&#39;s account (to his SmartContractWallet).
+User will be able to use these &#34;access tokens&#34; to register his name later directly.
+
+Blocking, will send TX to EVM chain
+If finished without error -&gt; please use GetUserAccount to get updated info</p></td>
               </tr>
             
               <tr>
                 <td>AdminFundGasOperations</td>
                 <td><a href="#AdminFundGasOperationsRequestSigned">.AdminFundGasOperationsRequestSigned</a></td>
                 <td><a href="#OperationResponse">.OperationResponse</a></td>
-                <td><p>Each &#34;operations&#34; is a single TX like &#34;name update&#34;, etc 
-  (user will be able to send TXs to EVM chain without having any gas in his wallet)</p></td>
+                <td><p>Each operation is a single blockchain TX like &#34;name update&#34;.
+User will be able to send operations without having any gas in his wallet later</p></td>
               </tr>
             
               <tr>

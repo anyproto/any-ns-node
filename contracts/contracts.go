@@ -43,6 +43,7 @@ type ContractsService interface {
 	// generic method to call any contract
 	CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
 	GetBalanceOf(ctx context.Context, client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error)
+	IsContractDeployed(ctx context.Context, client *ethclient.Client, address common.Address) (bool, error)
 
 	// ENS methods
 	GetOwnerForNamehash(ctx context.Context, client *ethclient.Client, namehash [32]byte) (common.Address, error)
@@ -130,6 +131,21 @@ func (acontracts *anynsContracts) GetBalanceOf(ctx context.Context, client *ethc
 	balance := big.NewInt(0)
 	balance.SetBytes(res)
 	return balance, nil
+}
+
+func (acontracts *anynsContracts) IsContractDeployed(ctx context.Context, client *ethclient.Client, address common.Address) (bool, error) {
+	bs, err := client.CodeAt(ctx, address, nil)
+	if err != nil {
+		log.Error("failed to get code", zap.Error(err))
+		return false, err
+	}
+
+	// check if bs is not empty
+	if len(bs) == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, conn *ethclient.Client, nh [32]byte) (common.Address, error) {

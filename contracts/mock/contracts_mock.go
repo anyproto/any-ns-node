@@ -270,6 +270,21 @@ func (mr *MockContractsServiceMockRecorder) Init(a interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockContractsService)(nil).Init), a)
 }
 
+// IsContractDeployed mocks base method.
+func (m *MockContractsService) IsContractDeployed(ctx context.Context, client *ethclient.Client, address common.Address) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsContractDeployed", ctx, client, address)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsContractDeployed indicates an expected call of IsContractDeployed.
+func (mr *MockContractsServiceMockRecorder) IsContractDeployed(ctx, client, address interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsContractDeployed", reflect.TypeOf((*MockContractsService)(nil).IsContractDeployed), ctx, client, address)
+}
+
 // MakeCommitment mocks base method.
 func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) ([32]byte, error) {
 	m.ctrl.T.Helper()
