@@ -145,9 +145,8 @@ func newFixture(t *testing.T, nonceOverride uint64) *fixture {
 	}
 
 	fx.config.Mongo = config.Mongo{
-		Connect:    "mongodb://localhost:27017",
-		Database:   "any-ns",
-		Collection: "nonce",
+		Connect:  "mongodb://localhost:27017",
+		Database: "any-ns",
 	}
 
 	fx.config.Nonce = config.Nonce{

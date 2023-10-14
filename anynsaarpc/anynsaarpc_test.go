@@ -58,6 +58,11 @@ func newFixture(t *testing.T) *fixture {
 		GethUrl:   "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
 	}
 
+	fx.config.Mongo = config.Mongo{
+		Connect:  "mongodb://localhost:27017",
+		Database: "any-ns",
+	}
+
 	fx.aa = mock_accountabstraction.NewMockAccountAbstractionService(fx.ctrl)
 	fx.aa.EXPECT().Name().Return(accountabstraction.CName).AnyTimes()
 	fx.aa.EXPECT().Init(gomock.Any()).AnyTimes()

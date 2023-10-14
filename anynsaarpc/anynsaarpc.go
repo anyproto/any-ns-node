@@ -2,6 +2,7 @@ package anynsaarpc
 
 import (
 	"context"
+	"errors"
 	"math/big"
 
 	"github.com/anyproto/any-ns-node/anynsrpc"
@@ -11,6 +12,8 @@ import (
 	"github.com/anyproto/any-sync/net/rpc/server"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
@@ -27,17 +30,50 @@ func New() app.Component {
 }
 
 type anynsAARpc struct {
-	contractsConfig config.Contracts
-	contracts       contracts.ContractsService
-	aa              accountabstraction.AccountAbstractionService
+	confContracts config.Contracts
+	confMongo     config.Mongo
+
+	itemColl *mongo.Collection
+
+	contracts contracts.ContractsService
+	aa        accountabstraction.AccountAbstractionService
 }
 
 func (arpc *anynsAARpc) Init(a *app.App) (err error) {
-	arpc.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
+	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
+	arpc.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.aa = a.MustComponent(accountabstraction.CName).(accountabstraction.AccountAbstractionService)
 
+	// connect to mongo
+	uri := arpc.confMongo.Connect
+	dbName := arpc.confMongo.Database
+	collectionName := "aa"
+
+	// 1 - connect to DB
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+	if err != nil {
+		return err
+	}
+
+	arpc.itemColl = client.Database(dbName).Collection(collectionName)
+	if arpc.itemColl == nil {
+		return errors.New("failed to connect to MongoDB")
+	}
+
+	log.Info("mongo connected!")
+
 	return as.DRPCRegisterAnynsAccountAbstraction(a.MustComponent(server.CName).(server.DRPCServer), arpc)
+}
+
+// TODO: check if it is even called, this is not a app.ComponentRunnable instance
+// so maybe it won't be called
+func (arpc *anynsAARpc) Close(ctx context.Context) (err error) {
+	if arpc.itemColl != nil {
+		err = arpc.itemColl.Database().Client().Disconnect(ctx)
+		arpc.itemColl = nil
+	}
+	return
 }
 
 func (arpc *anynsAARpc) Name() (name string) {
@@ -130,7 +166,23 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 }
 
 func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.AdminFundGasOperationsRequestSigned) (*as.OperationResponse, error) {
-	// TODO: implement
+	// 1 - unmarshal the signed request
+	var afgor as.AdminFundGasOperationsRequest
+	err := proto.Unmarshal(in.Payload, &afgor)
+	if err != nil {
+		log.Error("can not unmarshal AdminFundGasOperationsRequest", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - check signature
+	err = arpc.aa.AdminVerifyIdentity(in.Payload, in.Signature)
+	if err != nil {
+		log.Error("not an Admin!!!", zap.Error(err))
+		return nil, err
+	}
+
+	// TODO: allow +N operations
+	log.Fatal("TODO: not implemented")
 
 	return nil, nil
 }

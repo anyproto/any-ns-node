@@ -33,7 +33,7 @@ type findItemByIndexQuery struct {
 	Index int64 `bson:"index"`
 }
 
-func New() app.Component {
+func New() app.ComponentRunnable {
 	return &anynsQueue{}
 }
 
@@ -61,14 +61,14 @@ type QueueService interface {
 }
 
 type anynsQueue struct {
-	q        *mb.MB[int64]
-	itemColl *mongo.Collection
-	done     chan bool
+	q    *mb.MB[int64]
+	done chan bool
 
 	confMongo     config.Mongo
 	confContracts config.Contracts
 	confQueue     config.Queue
 
+	itemColl     *mongo.Collection
 	contracts    contracts.ContractsService
 	nonceManager nonce_manager.NonceService
 }
@@ -94,7 +94,7 @@ func (aqueue *anynsQueue) Init(a *app.App) (err error) {
 func (aqueue *anynsQueue) Run(ctx context.Context) (err error) {
 	uri := aqueue.confMongo.Connect
 	dbName := aqueue.confMongo.Database
-	collectionName := aqueue.confMongo.Collection
+	collectionName := "queue"
 
 	// 1 - connect to DB
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))

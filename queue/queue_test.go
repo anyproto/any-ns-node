@@ -635,9 +635,8 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	fx.config.Mongo = config.Mongo{
-		Connect:    "mongodb://localhost:27017",
-		Database:   "any-ns",
-		Collection: "queue",
+		Connect:  "mongodb://localhost:27017",
+		Database: "any-ns",
 	}
 
 	fx.a.Register(fx.ts).
