@@ -381,10 +381,10 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	log.Info("eth_sendUserOperation got response", zap.Any("response", response))
 
 	// 7 - get op hash
-	// will handle error in response
+	// returns err if error is in the response
 	opHash, err := aa.alchemy.DecodeSendUserOperationResponse(response)
 	if err != nil {
-		log.Error("failed to decode response", zap.Error(err))
+		log.Error("failed to decode response or error", zap.Error(err))
 		return err
 	}
 	log.Info("decoded response", zap.String("opHash", opHash))

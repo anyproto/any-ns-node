@@ -6,5 +6,5 @@ type AA struct {
 	AccountFactory string `yaml:"accountFactory"`
 	EntryPoint     string `yaml:"entryPoint"`
 	GasPolicyId    string `yaml:"gasPolicyId"`
-	ChainID        int    `yaml:"chainId"`
+	ChainID        int    `yaml:"chainID"`
 }

@@ -101,6 +101,7 @@ func GetUserOperationHash(request UserOperation, chainID int64, entryPointAddres
 
 	// uoBytes to hex string
 	uoHex := hex.EncodeToString(uoBytes)
+
 	uoHexKeccak := "0x" + hex.EncodeToString(Keccak256(uoHex))
 
 	eap, err := encodeAbiParameters(
@@ -120,7 +121,8 @@ func GetUserOperationHash(request UserOperation, chainID int64, entryPointAddres
 		return nil, err
 	}
 
-	return Keccak256(hex.EncodeToString(eap)), nil
+	out := Keccak256(hex.EncodeToString(eap))
+	return out, nil
 }
 
 func PackUserOperation(request UserOperation) ([]byte, error) {
