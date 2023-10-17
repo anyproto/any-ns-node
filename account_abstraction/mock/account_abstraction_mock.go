@@ -141,6 +141,21 @@ func (mr *MockAccountAbstractionServiceMockRecorder) Init(a interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockAccountAbstractionService)(nil).Init), a)
 }
 
+// IsScwDeployed mocks base method.
+func (m *MockAccountAbstractionService) IsScwDeployed(ctx context.Context, scw common.Address) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsScwDeployed", ctx, scw)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsScwDeployed indicates an expected call of IsScwDeployed.
+func (mr *MockAccountAbstractionServiceMockRecorder) IsScwDeployed(ctx, scw interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsScwDeployed", reflect.TypeOf((*MockAccountAbstractionService)(nil).IsScwDeployed), ctx, scw)
+}
+
 // Name mocks base method.
 func (m *MockAccountAbstractionService) Name() string {
 	m.ctrl.T.Helper()

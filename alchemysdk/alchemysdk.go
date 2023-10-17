@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"strings"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 )
@@ -98,17 +100,21 @@ type alchemysdk struct {
 }
 
 type AlchemyAAService interface {
-	CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, nonce uint64, policyID string, entryPointAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error)
-	CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64, id int, myPK string, appendEntryPoint bool) ([]byte, error)
+	// if factoryAddr is non-null -> will set init code
+	CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, senderScw common.Address, nonce uint64, policyID string, entryPointAddr common.Address, factoryAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error)
+	CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, senderScw common.Address, nonce uint64, id int, myPK string, factoryAddr common.Address, appendEntryPoint bool) ([]byte, error)
 	CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error)
+
+	// if SCW is not deployed yet -> we should set an init code
+	GetAccountInitCode(eoa common.Address, factoryAddr common.Address) ([]byte, error)
 
 	SendRequest(apiKey string, jsonDATA []byte) ([]byte, error)
 	DecodeSendUserOperationResponse(response []byte) (opHash string, err error)
 
 	// creates a UserOperation and data to sign with user's private key
-	CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error)
+	CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error)
 	// adds signature to UserOperation and creates final JSONRPCRequest that can be sent with 'SendRequest'
-	CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddress common.Address) ([]byte, error)
+	CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddr common.Address) ([]byte, error)
 
 	app.Component
 }
@@ -127,7 +133,7 @@ func (aa *alchemysdk) Name() (name string) {
 }
 
 // should create a GasAndPaymentStruct
-func (aa *alchemysdk) CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, nonce uint64, policyID string, entryPointAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error) {
+func (aa *alchemysdk) CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, senderScw common.Address, nonce uint64, policyID string, entryPointAddr common.Address, factoryAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error) {
 	var req JSONRPCRequestGasAndPaymaster
 	req.ID = id
 	req.JSONRPC = "2.0"
@@ -137,8 +143,22 @@ func (aa *alchemysdk) CreateRequestGasAndPaymasterData(callData []byte, sender c
 	gaps.PolicyID = policyID
 	gaps.EntryPoint = entryPointAddr.String()
 	gaps.DummySignature = "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
-	gaps.UserOperation.Sender = sender.String()
-	gaps.UserOperation.InitCode = "0x"
+	gaps.UserOperation.Sender = senderScw.String()
+
+	// set InitCode
+	if (factoryAddr != common.Address{}) {
+		log.Debug("factoryAddr is not null. Initializing SCW")
+
+		code, err := aa.GetAccountInitCode(sender, factoryAddr)
+		if err != nil {
+			log.Error("failed to get init code", zap.Error(err))
+			return req, err
+		}
+
+		gaps.UserOperation.InitCode = "0x" + hex.EncodeToString(code)
+	} else {
+		gaps.UserOperation.InitCode = "0x"
+	}
 
 	nonceHexStr := fmt.Sprintf("0x%x", nonce)
 
@@ -158,20 +178,34 @@ func (aa *alchemysdk) CreateRequestGasAndPaymasterData(callData []byte, sender c
 }
 
 // creates a JSONRPCRequest with "eth_sendUserOperation" formatted data
-func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64, id int, myPK string, appendEntryPoint bool) ([]byte, error) {
+func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, senderScw common.Address, nonce uint64, id int, myPK string, factoryAddr common.Address, appendEntryPoint bool) ([]byte, error) {
 	var req JSONRPCRequest
 	req.ID = id
 	req.JSONRPC = "2.0"
 	req.Method = "eth_sendUserOperation"
 
 	var uo UserOperation
-	uo.Sender = sender.String()
+	uo.Sender = senderScw.String()
 	uo.CallData = "0x" + hex.EncodeToString(callData)
 
 	// convert nonce to hex string
 	nonceHexStr := fmt.Sprintf("0x%x", nonce)
 	uo.Nonce = nonceHexStr
-	uo.InitCode = "0x"
+
+	// set InitCode
+	if (factoryAddr != common.Address{}) {
+		log.Debug("factoryAddr is not null. Initializing SCW")
+
+		code, err := aa.GetAccountInitCode(sender, factoryAddr)
+		if err != nil {
+			log.Error("failed to get init code", zap.Error(err))
+			return nil, err
+		}
+
+		uo.InitCode = "0x" + hex.EncodeToString(code)
+	} else {
+		uo.InitCode = "0x"
+	}
 
 	uo.CallGasLimit = rgap.Result.CallGasLimit
 	uo.VerificationGasLimit = rgap.Result.VerificationGasLimit
@@ -180,7 +214,7 @@ func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponse
 	uo.MaxPriorityFeePerGas = rgap.Result.MaxPriorityFeePerGas
 	uo.PaymasterAndData = rgap.Result.PaymasterAndData
 
-	dataToSign, err := GetUserOperationHash(uo, chainID, entryPointAddress)
+	dataToSign, err := GetUserOperationHash(uo, chainID, entryPointAddr)
 	if err != nil {
 		log.Error("failed to pack UserOperation", zap.Error(err))
 		return nil, err
@@ -206,9 +240,9 @@ func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponse
 		return nil, err
 	}
 
-	// add entryPointAddress
+	// add entryPointAddr
 	if appendEntryPoint {
-		err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddress)
+		err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddr)
 
 		if err != nil {
 			log.Error("can not append entry point", zap.Error(err))
@@ -283,7 +317,7 @@ func (aa *alchemysdk) DecodeSendUserOperationResponse(response []byte) (opHash s
 }
 
 // creates data to sign with UserOperation
-func (aa *alchemysdk) CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error) {
+func (aa *alchemysdk) CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error) {
 	uo = UserOperation{}
 
 	uo.Sender = sender.String()
@@ -303,7 +337,7 @@ func (aa *alchemysdk) CreateRequestStep1(callData []byte, rgap JSONRPCResponseGa
 	// data should be signed and then set in CreateRequestStep2
 	// uo.Signature =
 
-	dataToSign, err = GetUserOperationHash(uo, chainID, entryPointAddress)
+	dataToSign, err = GetUserOperationHash(uo, chainID, entryPointAddr)
 	if err != nil {
 		log.Error("failed to pack UserOperation", zap.Error(err))
 		return nil, uo, err
@@ -314,7 +348,7 @@ func (aa *alchemysdk) CreateRequestStep1(callData []byte, rgap JSONRPCResponseGa
 	return dataToSign, uo, nil
 }
 
-func (aa *alchemysdk) CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddress common.Address) ([]byte, error) {
+func (aa *alchemysdk) CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo UserOperation, entryPointAddr common.Address) ([]byte, error) {
 	var req JSONRPCRequest
 	req.ID = alchemyRequestId
 	req.JSONRPC = "2.0"
@@ -332,12 +366,64 @@ func (aa *alchemysdk) CreateRequestStep2(alchemyRequestId int, signedByUserData 
 		return nil, err
 	}
 
-	// add entryPointAddress
-	err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddress)
+	// add entryPointAddr
+	err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddr)
 	if err != nil {
 		log.Error("can not append entry point", zap.Error(err))
 		return nil, err
 	}
 
 	return jsonDATA, nil
+}
+
+func (aa *alchemysdk) GetAccountInitCode(eoa common.Address, factoryAddr common.Address) ([]byte, error) {
+	const jsondata = `
+		[
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "salt",
+						"type": "uint256"
+					}
+				],
+				"name": "createAccount",
+				"outputs": [
+					{
+						"internalType": "contract SimpleAccount",
+						"name": "ret",
+						"type": "address"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		]
+	`
+
+	factoryABI, err := abi.JSON(strings.NewReader(jsondata))
+	if err != nil {
+		log.Error("error parsing ABI:", zap.Error(err))
+		return nil, err
+	}
+
+	// salt is 0
+	data, err := factoryABI.Pack("createAccount", eoa, big.NewInt(0))
+	if err != nil {
+		log.Error("error encoding function data", zap.Error(err))
+		return nil, nil
+	}
+
+	// log data
+	log.Debug("data: ", zap.String("data", hex.EncodeToString(data)))
+
+	// prepend factory address
+	data = append(factoryAddr.Bytes(), data...)
+
+	return data, nil
 }

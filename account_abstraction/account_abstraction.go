@@ -44,6 +44,7 @@ type AccountAbstractionService interface {
 	// each EOA has an associated smart wallet address
 	// even if it is not deployed yet - we can determine it
 	GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error)
+	IsScwDeployed(ctx context.Context, scw common.Address) (bool, error)
 	GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 	GetOperationsCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 
@@ -141,6 +142,16 @@ func (aa *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Address
 	}
 
 	return out, nil
+}
+
+func (aa *anynsAA) IsScwDeployed(ctx context.Context, scwa common.Address) (bool, error) {
+	client, err := aa.contracts.CreateEthConnection()
+	if err != nil {
+		log.Error("failed to create eth connection", zap.Error(err))
+		return false, err
+	}
+
+	return aa.contracts.IsContractDeployed(ctx, client, scwa)
 }
 
 func (aa *anynsAA) getNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error) {
@@ -260,7 +271,8 @@ func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err er
 // Admin sends transaction to mint tokens to the specified smart wallet
 func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress common.Address, namesCount *big.Int) (err error) {
 	// settings from config:
-	entryPointAddress := common.HexToAddress(aa.aaConfig.EntryPoint)
+	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
+
 	erc20tokenAddr := common.HexToAddress(aa.contractsConfig.AddrToken)
 	registrarController := common.HexToAddress(aa.contractsConfig.AddrRegistrar)
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
@@ -322,7 +334,18 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 
 	id := aa.getNextAlchemyRequestID()
 
-	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, adminScw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	// only specify factoryAddr if you need to instanitate a new SCW
+	factoryAddr := common.Address{}
+	deployed, err := aa.IsScwDeployed(ctx, adminScw)
+	if err != nil {
+		log.Error("failed to check if SCW is deployed", zap.Error(err))
+		return err
+	}
+	if !deployed {
+		factoryAddr = common.HexToAddress(aa.aaConfig.AccountFactory)
+	}
+
+	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, adminAddress, adminScw, uint64(nonce.Int64()), policyID, entryPointAddr, factoryAddr, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -351,6 +374,8 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 		return err
 	}
 	// TODO: handle "Error code": -32500  "AA25 invalid account nonce" error
+	// TODO: handle "Error code": -32500, "AA20 account not deployed"
+	// TODO: handle "Error code": -32500,	"AA10 sender already constructed"
 	if responseStruct.Error.Code != 0 {
 		log.Error("GasAndPaymaster call failed",
 			zap.Int("Error code", responseStruct.Error.Code),
@@ -363,7 +388,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 
 	// 6 - now create new transaction
 	appendEntryPoint := true
-	jsonDATA, err := aa.alchemy.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, appendEntryPoint)
+	jsonDATA, err := aa.alchemy.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddr, adminAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, factoryAddr, appendEntryPoint)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err
@@ -418,7 +443,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 
 func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
 	// settings from config:
-	entryPointAddress := common.HexToAddress(aa.aaConfig.EntryPoint)
+	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
 	policyID := aa.aaConfig.GasPolicyId
 
@@ -433,10 +458,23 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterR
 	}
 
 	// 1 - determine users's SCW
-	scw, err := aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
+	addr := common.HexToAddress(in.OwnerEthAddress)
+	scw, err := aa.GetSmartWalletAddress(ctx, addr)
 	if err != nil {
 		log.Error("failed to get smart wallet address for admin", zap.Error(err))
 		return nil, nil, err
+	}
+
+	// specify only if you need to instanitate a new SCW
+	factoryAddr := common.Address{}
+
+	deployed, err := aa.IsScwDeployed(ctx, scw)
+	if err != nil {
+		log.Error("failed to check if SCW is deployed", zap.Error(err))
+		return nil, nil, err
+	}
+	if !deployed {
+		factoryAddr = common.HexToAddress(aa.aaConfig.AccountFactory)
 	}
 
 	// 2 - get nonce
@@ -454,7 +492,7 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterR
 		return nil, nil, err
 	}
 
-	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, scw, uint64(nonce.Int64()), policyID, entryPointAddress, id)
+	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, addr, scw, uint64(nonce.Int64()), policyID, entryPointAddr, factoryAddr, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return nil, nil, err
@@ -482,6 +520,8 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterR
 		return nil, nil, err
 	}
 	// TODO: handle "Error code": -32500  "AA25 invalid account nonce" error
+	// TODO: handle "Error code": -32500, "AA20 account not deployed"
+	// TODO: handle "Error code": -32500,	"AA10 sender already constructed"
 	if responseStruct.Error.Code != 0 {
 		log.Error("GasAndPaymaster call failed",
 			zap.Int("Error code", responseStruct.Error.Code),
@@ -493,7 +533,7 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterR
 	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
 
 	// 6 - get data to sign
-	jsonData, uo, err := aa.alchemy.CreateRequestStep1(callData, responseStruct, chainID, entryPointAddress, scw, uint64(nonce.Int64()))
+	jsonData, uo, err := aa.alchemy.CreateRequestStep1(callData, responseStruct, chainID, entryPointAddr, scw, uint64(nonce.Int64()))
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return nil, nil, err
@@ -599,7 +639,7 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 // after data is signed - now you are ready to send it
 func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (err error) {
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
-	entryPointAddress := common.HexToAddress(aa.aaConfig.EntryPoint)
+	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	requestId := aa.getNextAlchemyRequestID()
 
 	// 1 - Unmarshal UserOperations from contextData
@@ -612,7 +652,7 @@ func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, si
 
 	// TODO: check that data is signed by user correctly with Eth private key?
 
-	data, err := aa.alchemy.CreateRequestStep2(requestId, signedByUserData, uo, entryPointAddress)
+	data, err := aa.alchemy.CreateRequestStep2(requestId, signedByUserData, uo, entryPointAddr)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
 		return err

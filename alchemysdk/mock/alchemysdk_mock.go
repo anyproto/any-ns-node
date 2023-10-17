@@ -60,33 +60,33 @@ func (m *MockAlchemyAAService) EXPECT() *MockAlchemyAAServiceMockRecorder {
 }
 
 // CreateRequestAndSign mocks base method.
-func (m *MockAlchemyAAService) CreateRequestAndSign(callData []byte, rgap alchemysdk.JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress, sender common.Address, nonce uint64, id int, myPK string, appendEntryPoint bool) ([]byte, error) {
+func (m *MockAlchemyAAService) CreateRequestAndSign(callData []byte, rgap alchemysdk.JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr, sender, senderScw common.Address, nonce uint64, id int, myPK string, factoryAddr common.Address, appendEntryPoint bool) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRequestAndSign", callData, rgap, chainID, entryPointAddress, sender, nonce, id, myPK, appendEntryPoint)
+	ret := m.ctrl.Call(m, "CreateRequestAndSign", callData, rgap, chainID, entryPointAddr, sender, senderScw, nonce, id, myPK, factoryAddr, appendEntryPoint)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateRequestAndSign indicates an expected call of CreateRequestAndSign.
-func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestAndSign(callData, rgap, chainID, entryPointAddress, sender, nonce, id, myPK, appendEntryPoint interface{}) *gomock.Call {
+func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestAndSign(callData, rgap, chainID, entryPointAddr, sender, senderScw, nonce, id, myPK, factoryAddr, appendEntryPoint interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestAndSign", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestAndSign), callData, rgap, chainID, entryPointAddress, sender, nonce, id, myPK, appendEntryPoint)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestAndSign", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestAndSign), callData, rgap, chainID, entryPointAddr, sender, senderScw, nonce, id, myPK, factoryAddr, appendEntryPoint)
 }
 
 // CreateRequestGasAndPaymasterData mocks base method.
-func (m *MockAlchemyAAService) CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, nonce uint64, policyID string, entryPointAddr common.Address, id int) (alchemysdk.JSONRPCRequestGasAndPaymaster, error) {
+func (m *MockAlchemyAAService) CreateRequestGasAndPaymasterData(callData []byte, sender, senderScw common.Address, nonce uint64, policyID string, entryPointAddr, factoryAddr common.Address, id int) (alchemysdk.JSONRPCRequestGasAndPaymaster, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRequestGasAndPaymasterData", callData, sender, nonce, policyID, entryPointAddr, id)
+	ret := m.ctrl.Call(m, "CreateRequestGasAndPaymasterData", callData, sender, senderScw, nonce, policyID, entryPointAddr, factoryAddr, id)
 	ret0, _ := ret[0].(alchemysdk.JSONRPCRequestGasAndPaymaster)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateRequestGasAndPaymasterData indicates an expected call of CreateRequestGasAndPaymasterData.
-func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestGasAndPaymasterData(callData, sender, nonce, policyID, entryPointAddr, id interface{}) *gomock.Call {
+func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestGasAndPaymasterData(callData, sender, senderScw, nonce, policyID, entryPointAddr, factoryAddr, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestGasAndPaymasterData", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestGasAndPaymasterData), callData, sender, nonce, policyID, entryPointAddr, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestGasAndPaymasterData", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestGasAndPaymasterData), callData, sender, senderScw, nonce, policyID, entryPointAddr, factoryAddr, id)
 }
 
 // CreateRequestGetUserOperation mocks base method.
@@ -105,9 +105,9 @@ func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestGetUserOperation(operat
 }
 
 // CreateRequestStep1 mocks base method.
-func (m *MockAlchemyAAService) CreateRequestStep1(callData []byte, rgap alchemysdk.JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddress, sender common.Address, nonce uint64) ([]byte, alchemysdk.UserOperation, error) {
+func (m *MockAlchemyAAService) CreateRequestStep1(callData []byte, rgap alchemysdk.JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr, sender common.Address, nonce uint64) ([]byte, alchemysdk.UserOperation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRequestStep1", callData, rgap, chainID, entryPointAddress, sender, nonce)
+	ret := m.ctrl.Call(m, "CreateRequestStep1", callData, rgap, chainID, entryPointAddr, sender, nonce)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(alchemysdk.UserOperation)
 	ret2, _ := ret[2].(error)
@@ -115,24 +115,24 @@ func (m *MockAlchemyAAService) CreateRequestStep1(callData []byte, rgap alchemys
 }
 
 // CreateRequestStep1 indicates an expected call of CreateRequestStep1.
-func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestStep1(callData, rgap, chainID, entryPointAddress, sender, nonce interface{}) *gomock.Call {
+func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestStep1(callData, rgap, chainID, entryPointAddr, sender, nonce interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestStep1", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestStep1), callData, rgap, chainID, entryPointAddress, sender, nonce)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestStep1", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestStep1), callData, rgap, chainID, entryPointAddr, sender, nonce)
 }
 
 // CreateRequestStep2 mocks base method.
-func (m *MockAlchemyAAService) CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo alchemysdk.UserOperation, entryPointAddress common.Address) ([]byte, error) {
+func (m *MockAlchemyAAService) CreateRequestStep2(alchemyRequestId int, signedByUserData []byte, uo alchemysdk.UserOperation, entryPointAddr common.Address) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRequestStep2", alchemyRequestId, signedByUserData, uo, entryPointAddress)
+	ret := m.ctrl.Call(m, "CreateRequestStep2", alchemyRequestId, signedByUserData, uo, entryPointAddr)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateRequestStep2 indicates an expected call of CreateRequestStep2.
-func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestStep2(alchemyRequestId, signedByUserData, uo, entryPointAddress interface{}) *gomock.Call {
+func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestStep2(alchemyRequestId, signedByUserData, uo, entryPointAddr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestStep2", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestStep2), alchemyRequestId, signedByUserData, uo, entryPointAddress)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestStep2", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestStep2), alchemyRequestId, signedByUserData, uo, entryPointAddr)
 }
 
 // DecodeSendUserOperationResponse mocks base method.
@@ -148,6 +148,21 @@ func (m *MockAlchemyAAService) DecodeSendUserOperationResponse(response []byte) 
 func (mr *MockAlchemyAAServiceMockRecorder) DecodeSendUserOperationResponse(response interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecodeSendUserOperationResponse", reflect.TypeOf((*MockAlchemyAAService)(nil).DecodeSendUserOperationResponse), response)
+}
+
+// GetAccountInitCode mocks base method.
+func (m *MockAlchemyAAService) GetAccountInitCode(eoa, factoryAddr common.Address) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccountInitCode", eoa, factoryAddr)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAccountInitCode indicates an expected call of GetAccountInitCode.
+func (mr *MockAlchemyAAServiceMockRecorder) GetAccountInitCode(eoa, factoryAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountInitCode", reflect.TypeOf((*MockAlchemyAAService)(nil).GetAccountInitCode), eoa, factoryAddr)
 }
 
 // Init mocks base method.
