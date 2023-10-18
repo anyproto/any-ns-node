@@ -87,6 +87,9 @@ message CreateUserOperationRequestSigned {
 }
 
 service AnynsAccountAbstraction {
+// COMMON METHODS:
+  rpc GetOperation(GetOperationStatusRequest) returns (OperationResponse) {}
+
 // ADMIN METHODS:
   // Will send "access tokens" to the user's account (to his SmartContractWallet).
   // User will be able to use these "access tokens" to register his name later directly.
@@ -112,6 +115,7 @@ service AnynsAccountAbstraction {
   // 4. check operation status using GetOperationStatus
   rpc GetDataNameRegister(NameRegisterRequest) returns (GetDataNameRegisterResponse) {}
   
+  // TODO
   //rpc GetDataNameUpdate(NameUpdateRequest) returns (GetDataNameRegisterResponse) {}
 
   rpc CreateUserOperation(CreateUserOperationRequestSigned) returns (OperationResponse) {}

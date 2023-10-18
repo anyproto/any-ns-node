@@ -40,7 +40,13 @@ type anynsAA struct {
 	alchemy         alchemysdk.AlchemyAAService
 }
 
+type OperationInfo struct {
+	OperationState as.OperationState
+}
+
 type AccountAbstractionService interface {
+	GetOperation(ctx context.Context, operationID string) (info *OperationInfo, err error)
+
 	// each EOA has an associated smart wallet address
 	// even if it is not deployed yet - we can determine it
 	GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error)
@@ -51,14 +57,14 @@ type AccountAbstractionService interface {
 	// will return error if signature is invalid
 	AdminVerifyIdentity(payload []byte, signature []byte) (err error)
 	// will mint + approve tokens to the specified smart wallet
-	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (err error)
+	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (operationID string, err error)
 
 	// get data to sign with your PK
 	GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
 
 	// after data is signed - now you are ready to send it
 	// contextData was received from functions like GetDataNameRegister and should be left intact
-	SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (err error)
+	SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (operationID string, err error)
 
 	app.Component
 }
@@ -269,7 +275,7 @@ func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err er
 }
 
 // Admin sends transaction to mint tokens to the specified smart wallet
-func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress common.Address, namesCount *big.Int) (err error) {
+func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress common.Address, namesCount *big.Int) (operationID string, err error) {
 	// settings from config:
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 
@@ -285,7 +291,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 
 	// 0 - check params
 	if namesCount.Cmp(big.NewInt(0)) == 0 {
-		return errors.New("names count is 0")
+		return "", errors.New("names count is 0")
 	}
 
 	// TODO: optimize, cache it or move to settings
@@ -293,14 +299,14 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	adminScw, err := aa.GetSmartWalletAddress(ctx, adminAddress)
 	if err != nil {
 		log.Error("failed to get smart wallet address for admin", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	// 2 - get nonce (from admin's SCW)
 	nonce, err := aa.getNonceForSmartWalletAddress(ctx, adminScw)
 	if err != nil {
 		log.Error("failed to get nonce", zap.Error(err))
-		return err
+		return "", err
 	}
 	log.Info("got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
 
@@ -309,14 +315,14 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	callDataOriginal, err := GetCallDataForMint(userScwAddress, 100)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
-		return err
+		return "", err
 	}
 	log.Debug("prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
 
 	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, 100)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
-		return err
+		return "", err
 	}
 	log.Debug("prepared original call data 2", zap.String("callDataOriginal2", hex.EncodeToString(callDataOriginal2)))
 
@@ -328,7 +334,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	callData, err := GetCallDataForBatchExecute(targets, callDataOriginals)
 	if err != nil {
 		log.Error("failed to get call data", zap.Error(err))
-		return err
+		return "", err
 	}
 	log.Info("prepared call data", zap.String("callData", hex.EncodeToString(callData)))
 
@@ -339,7 +345,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	deployed, err := aa.IsScwDeployed(ctx, adminScw)
 	if err != nil {
 		log.Error("failed to check if SCW is deployed", zap.Error(err))
-		return err
+		return "", err
 	}
 	if !deployed {
 		factoryAddr = common.HexToAddress(aa.aaConfig.AccountFactory)
@@ -348,13 +354,13 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, adminAddress, adminScw, uint64(nonce.Int64()), policyID, entryPointAddr, factoryAddr, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	jsonDATAPre, err := json.Marshal(rgapd)
 	if err != nil {
 		log.Error("can not marshal JSON", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
@@ -363,7 +369,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	response, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATAPre)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	// parse response
@@ -371,7 +377,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	err = json.Unmarshal(response, &responseStruct)
 	if err != nil {
 		log.Error("failed to unmarshal response", zap.Error(err))
-		return err
+		return "", err
 	}
 	// TODO: handle "Error code": -32500  "AA25 invalid account nonce" error
 	// TODO: handle "Error code": -32500, "AA20 account not deployed"
@@ -381,7 +387,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 			zap.Int("Error code", responseStruct.Error.Code),
 			zap.String("Error message", responseStruct.Error.Message),
 		)
-		return errors.New(responseStruct.Error.Message)
+		return "", errors.New(responseStruct.Error.Message)
 	}
 
 	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
@@ -391,7 +397,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	jsonDATA, err := aa.alchemy.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddr, adminAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, factoryAddr, appendEntryPoint)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	log.Info("created eth_sendUserOperation request", zap.String("jsonDATA", string(jsonDATA)))
@@ -400,45 +406,25 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	log.Info("eth_sendUserOperation got response", zap.Any("response", response))
 
 	// 7 - get op hash
 	// returns err if error is in the response
-	opHash, err := aa.alchemy.DecodeSendUserOperationResponse(response)
+	opHash, err := aa.alchemy.DecodeResponseSendRequest(response)
 	if err != nil {
 		log.Error("failed to decode response or error", zap.Error(err))
-		return err
+		return "", err
 	}
 	log.Info("decoded response", zap.String("opHash", opHash))
 
 	// TODO: loop
-	// 8 - wait for receipt
-	req, err := aa.alchemy.CreateRequestGetUserOperation(opHash, id+2)
-	if err != nil {
-		log.Error("failed to create request", zap.Error(err))
-		return err
-	}
+	// GetOperation()
 
-	jsonDATA, err = json.Marshal(req)
-	if err != nil {
-		log.Error("can not marshal JSON", zap.Error(err))
-		return err
-	}
-
-	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
-
-	// send it
-	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
-	if err != nil {
-		log.Error("failed to send request", zap.Error(err))
-		return err
-	}
-
-	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response))
-	return nil
+	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response), zap.String("opHash", opHash))
+	return opHash, nil
 }
 
 func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
@@ -637,8 +623,7 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 }
 
 // after data is signed - now you are ready to send it
-func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (err error) {
-	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (operationID string, err error) {
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	requestId := aa.getNextAlchemyRequestID()
 
@@ -647,7 +632,7 @@ func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, si
 	err = json.Unmarshal(contextData, &uo)
 	if err != nil {
 		log.Error("can not unmarshal JSON", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	// TODO: check that data is signed by user correctly with Eth private key?
@@ -655,48 +640,139 @@ func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, si
 	data, err := aa.alchemy.CreateRequestStep2(requestId, signedByUserData, uo, entryPointAddr)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	// 2 - send it
 	response, err := aa.alchemy.SendRequest(aa.aaConfig.AlchemyApiKey, data)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
-		return err
+		return "", err
 	}
 
 	// 3 - get op hash
 	// will handle error in response
-	opHash, err := aa.alchemy.DecodeSendUserOperationResponse(response)
+	opHash, err := aa.alchemy.DecodeResponseSendRequest(response)
 	if err != nil {
 		log.Error("failed to decode response", zap.Error(err))
-		return err
+		return "", err
 	}
 	log.Info("decoded response", zap.String("opHash", opHash))
 
 	// TODO: loop
-	// 4 - wait for receipt
-	req, err := aa.alchemy.CreateRequestGetUserOperation(opHash, requestId+1)
+	//_, _ = aa.GetOperation(ctx, opHash)
+
+	return opHash, nil
+}
+
+func (aa *anynsAA) GetOperation(ctx context.Context, operationID string) (*OperationInfo, error) {
+	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+
+	var out OperationInfo
+
+	// 1 - eth_getUserOperationReceipt
+	//returns null if operation is PENDING or NOT FOUND
+	//   right now there are no any means to check if operation is pending
+	// 	 or not found, so we always return PENDING
+	//returns success==true if COMPLETED
+	//returns success==false if FAILED
+
+	// ID is zero
+	id := 0
+	jsonDATA, err := aa.alchemy.CreateRequestGetUserOperationReceipt(operationID, id)
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
-		return err
+		return nil, err
+	}
+
+	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
+
+	// send it
+	res, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return nil, err
+	}
+
+	// if operation is pending or not found ->
+	// {"jsonrpc":"2.0","id":1,"result":null}
+	uoRes, err := aa.alchemy.DecodeResponseGetUserOperationReceipt(res)
+
+	if err != nil || (uoRes.Error.Code != 0) {
+		log.Info("can not decode operation response", zap.String("operation", operationID), zap.Error(err))
+
+		// additional check - does not work too :-(
+		//return aa.getUserOperationByHash(ctx, operationID)
+
+		out.OperationState = as.OperationState_Error
+		return &out, nil
+	}
+
+	if uoRes.Result.UserOpHash == "" {
+		log.Info("operation is not found", zap.String("operation", operationID), zap.Error(err))
+
+		// additional check - does not work too :-(
+		//return aa.getUserOperationByHash(ctx, operationID)
+
+		out.OperationState = as.OperationState_PendingOrNotFound
+		return &out, nil
+	}
+
+	// return results
+	if uoRes.Result.Success {
+		out.OperationState = as.OperationState_Completed
+	} else {
+		out.OperationState = as.OperationState_Error
+	}
+
+	return &out, nil
+}
+
+/*
+func (aa *anynsAA) getUserOperationByHash(ctx context.Context, operationID string) (*OperationInfo, error) {
+	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+
+	var out OperationInfo
+
+	id := 0
+	req, err := aa.alchemy.CreateRequestGetUserOperationByHash(operationID, id)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return nil, err
 	}
 
 	jsonDATA, err := json.Marshal(req)
 	if err != nil {
 		log.Error("can not marshal JSON", zap.Error(err))
-		return err
+		return nil, err
 	}
 
 	log.Info("created eth_getUserOperationReceipt request", zap.String("jsonDATA", string(jsonDATA)))
 
-	// 5 - send it
-	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
+	// send it
+	res, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
-		return err
+		return nil, err
 	}
 
-	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response))
-	return nil
+	// if operation is pending or not found ->
+	// {"jsonrpc":"2.0","id":1,"result":null}
+	uoRes, err := aa.alchemy.DecodeResponseGetUserOperationByHash(res)
+
+	if err != nil || (uoRes.Error.Code != 0) {
+		log.Info("can not decode user operation response.", zap.String("operation", operationID), zap.Error(err))
+		out.OperationState = as.OperationState_Error
+		return &out, nil
+	}
+
+	if uoRes.Result.UserOperation == "" {
+		log.Info("user operation is not found", zap.String("operation", operationID), zap.Error(err))
+		out.OperationState = as.OperationState_Error
+		return &out, nil
+	}
+
+	out.OperationState = as.OperationState_Success
+	return &out, nil
 }
+*/

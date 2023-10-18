@@ -89,19 +89,19 @@ func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestGasAndPaymasterData(cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestGasAndPaymasterData", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestGasAndPaymasterData), callData, sender, senderScw, nonce, policyID, entryPointAddr, factoryAddr, id)
 }
 
-// CreateRequestGetUserOperation mocks base method.
-func (m *MockAlchemyAAService) CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error) {
+// CreateRequestGetUserOperationReceipt mocks base method.
+func (m *MockAlchemyAAService) CreateRequestGetUserOperationReceipt(operationHash string, id int) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRequestGetUserOperation", operationHash, id)
+	ret := m.ctrl.Call(m, "CreateRequestGetUserOperationReceipt", operationHash, id)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateRequestGetUserOperation indicates an expected call of CreateRequestGetUserOperation.
-func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestGetUserOperation(operationHash, id interface{}) *gomock.Call {
+// CreateRequestGetUserOperationReceipt indicates an expected call of CreateRequestGetUserOperationReceipt.
+func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestGetUserOperationReceipt(operationHash, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestGetUserOperation", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestGetUserOperation), operationHash, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestGetUserOperationReceipt", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestGetUserOperationReceipt), operationHash, id)
 }
 
 // CreateRequestStep1 mocks base method.
@@ -135,19 +135,34 @@ func (mr *MockAlchemyAAServiceMockRecorder) CreateRequestStep2(alchemyRequestId,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRequestStep2", reflect.TypeOf((*MockAlchemyAAService)(nil).CreateRequestStep2), alchemyRequestId, signedByUserData, uo, entryPointAddr)
 }
 
-// DecodeSendUserOperationResponse mocks base method.
-func (m *MockAlchemyAAService) DecodeSendUserOperationResponse(response []byte) (string, error) {
+// DecodeResponseGetUserOperationReceipt mocks base method.
+func (m *MockAlchemyAAService) DecodeResponseGetUserOperationReceipt(response []byte) (*alchemysdk.JSONRPCResponseGetOp, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DecodeSendUserOperationResponse", response)
+	ret := m.ctrl.Call(m, "DecodeResponseGetUserOperationReceipt", response)
+	ret0, _ := ret[0].(*alchemysdk.JSONRPCResponseGetOp)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DecodeResponseGetUserOperationReceipt indicates an expected call of DecodeResponseGetUserOperationReceipt.
+func (mr *MockAlchemyAAServiceMockRecorder) DecodeResponseGetUserOperationReceipt(response interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecodeResponseGetUserOperationReceipt", reflect.TypeOf((*MockAlchemyAAService)(nil).DecodeResponseGetUserOperationReceipt), response)
+}
+
+// DecodeResponseSendRequest mocks base method.
+func (m *MockAlchemyAAService) DecodeResponseSendRequest(response []byte) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DecodeResponseSendRequest", response)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DecodeSendUserOperationResponse indicates an expected call of DecodeSendUserOperationResponse.
-func (mr *MockAlchemyAAServiceMockRecorder) DecodeSendUserOperationResponse(response interface{}) *gomock.Call {
+// DecodeResponseSendRequest indicates an expected call of DecodeResponseSendRequest.
+func (mr *MockAlchemyAAServiceMockRecorder) DecodeResponseSendRequest(response interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecodeSendUserOperationResponse", reflect.TypeOf((*MockAlchemyAAService)(nil).DecodeSendUserOperationResponse), response)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecodeResponseSendRequest", reflect.TypeOf((*MockAlchemyAAService)(nil).DecodeResponseSendRequest), response)
 }
 
 // GetAccountInitCode mocks base method.

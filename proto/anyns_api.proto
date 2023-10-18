@@ -77,17 +77,20 @@ message NameUpdateRequest {
 }
 
 message GetOperationStatusRequest {
-  int64 operationId = 1;
+  string operationId = 1;
 }
 
 enum OperationState {
-  Pending = 0;
-  Completed = 1;
-  Error = 2;
+  Unknown = 0;
+  
+  Pending = 1;
+  PendingOrNotFound = 2;
+  Completed = 3;
+  Error = 4;
 }
 
 message OperationResponse {
-  int64 operationId = 1;
+  string operationId = 1;
   OperationState operationState = 2;
 }
 

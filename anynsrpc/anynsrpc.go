@@ -3,6 +3,8 @@ package anynsrpc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
@@ -45,7 +47,14 @@ func (arpc *anynsRpc) Name() (name string) {
 }
 
 func (arpc *anynsRpc) GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (*as.OperationResponse, error) {
-	currentState, err := arpc.queue.GetRequestStatus(ctx, in.OperationId)
+	// 1 - convert in.OperationId from string to int64
+	operationID, err := strconv.ParseInt(in.OperationId, 10, 64)
+	if err != nil {
+		log.Error("can not convert OperationId to int64", zap.Error(err))
+		return nil, err
+	}
+
+	currentState, err := arpc.queue.GetRequestStatus(ctx, operationID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +140,7 @@ func (arpc *anynsRpc) NameRegister(ctx context.Context, in *as.NameRegisterReque
 
 	return &as.OperationResponse{
 		OperationState: as.OperationState_Pending,
-		OperationId:    operationId,
+		OperationId:    fmt.Sprint(operationId),
 	}, err
 }
 
@@ -164,7 +173,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 
 	// 4 - add to queue
 	operationId, err := arpc.queue.AddNewRequest(ctx, &nrr)
-	resp.OperationId = operationId
+	resp.OperationId = fmt.Sprint(operationId)
 	resp.OperationState = as.OperationState_Pending
 	return &resp, err
 }
@@ -185,7 +194,7 @@ func (arpc *anynsRpc) NameRenew(ctx context.Context, in *as.NameRenewRequest) (*
 
 	return &as.OperationResponse{
 		OperationState: as.OperationState_Pending,
-		OperationId:    operationId,
+		OperationId:    fmt.Sprint(operationId),
 	}, err
 }
 

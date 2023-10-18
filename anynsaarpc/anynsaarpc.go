@@ -3,6 +3,7 @@ package anynsaarpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/anyproto/any-ns-node/anynsrpc"
@@ -124,6 +125,21 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 	return &res, nil
 }
 
+func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (*as.OperationResponse, error) {
+	var out as.OperationResponse
+
+	status, err := arpc.aa.GetOperation(ctx, in.OperationId)
+	if err != nil {
+		log.Error("failed to get operation info", zap.Error(err))
+		return nil, err
+	}
+
+	out.OperationId = fmt.Sprint(in.OperationId)
+	out.OperationState = status.OperationState
+
+	return &out, nil
+}
+
 func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (*as.OperationResponse, error) {
 	// 1 - unmarshal the signed request
 	var afuar as.AdminFundUserAccountRequest
@@ -150,7 +166,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 	}
 
 	// 4 - mint tokens to that SCW
-	err = arpc.aa.AdminMintAccessTokens(ctx, common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
+	opID, err := arpc.aa.AdminMintAccessTokens(ctx, common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
 		return nil, err
@@ -159,7 +175,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 	// 3 - return
 	// TODO: add to queue
 	var out as.OperationResponse
-	out.OperationId = 0
+	out.OperationId = fmt.Sprint(opID)
 	out.OperationState = as.OperationState_Pending
 
 	return &out, err
@@ -241,7 +257,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 	// 3 - check if user has enough "GetOperationsCountLeft"
 
 	// 4 - now send it!
-	err = arpc.aa.SendUserOperation(ctx, cuor.Context, cuor.SignedData)
+	opID, err := arpc.aa.SendUserOperation(ctx, cuor.Context, cuor.SignedData)
 	if err != nil {
 		log.Error("failed to send user operation", zap.Error(err))
 		return nil, err
@@ -251,7 +267,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 
 	// 5 - return result
 	var out as.OperationResponse
-	out.OperationId = 0
+	out.OperationId = opID
 	out.OperationState = as.OperationState_Pending
 
 	return nil, nil

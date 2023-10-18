@@ -619,6 +619,13 @@ SCW is deployed automatically after first operation </p></td>
           <tbody>
             
               <tr>
+                <td>GetOperation</td>
+                <td><a href="#GetOperationStatusRequest">.GetOperationStatusRequest</a></td>
+                <td><a href="#OperationResponse">.OperationResponse</a></td>
+                <td><p>COMMON METHODS:</p></td>
+              </tr>
+            
+              <tr>
                 <td>AdminFundUserAccount</td>
                 <td><a href="#AdminFundUserAccountRequestSigned">.AdminFundUserAccountRequestSigned</a></td>
                 <td><a href="#OperationResponse">.OperationResponse</a></td>
@@ -714,7 +721,7 @@ Use it to:
               
                 <tr>
                   <td>operationId</td>
-                  <td><a href="#int64">int64</a></td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1018,7 +1025,7 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
               
                 <tr>
                   <td>operationId</td>
-                  <td><a href="#int64">int64</a></td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1048,20 +1055,32 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
           <tbody>
             
               <tr>
-                <td>Pending</td>
+                <td>Unknown</td>
                 <td>0</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>Completed</td>
+                <td>Pending</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>Error</td>
+                <td>PendingOrNotFound</td>
                 <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Completed</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Error</td>
+                <td>4</td>
                 <td><p></p></td>
               </tr>
             

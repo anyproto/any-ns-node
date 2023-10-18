@@ -154,9 +154,9 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 			return nil
 		})
 
-		fx.aa.EXPECT().AdminMintAccessTokens(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, scw common.Address, count *big.Int) (err error) {
+		fx.aa.EXPECT().AdminMintAccessTokens(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, scw common.Address, count *big.Int) (op string, err error) {
 			// no error
-			return nil
+			return "123", nil
 		})
 
 		// create payload
@@ -184,7 +184,33 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 
 		// should return "pending" operation
 		require.NoError(t, err)
-		require.Equal(t, resp.OperationId, int64(0))
+		require.Equal(t, resp.OperationId, "123")
+		require.Equal(t, resp.OperationState, as.OperationState_Pending)
+	})
+}
+
+func TestAnynsRpc_GetOperation(t *testing.T) {
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		gosr := as.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: as.OperationState_Pending,
+			}, nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.GetOperation(pctx, &gosr)
+
+		require.NoError(t, err)
+		require.Equal(t, resp.OperationId, "123")
+		// not found
 		require.Equal(t, resp.OperationState, as.OperationState_Pending)
 	})
 }

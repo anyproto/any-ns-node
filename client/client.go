@@ -35,6 +35,7 @@ type AnyNsClientService interface {
 	// AccountAbstractions interface
 	GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (out *as.UserAccount, err error)
 	AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (out *as.OperationResponse, err error)
+	GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error)
 
 	app.ComponentRunnable
 }
@@ -183,6 +184,16 @@ func (s *service) GetUserAccount(ctx context.Context, in *as.GetUserAccountReque
 func (s *service) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (out *as.OperationResponse, err error) {
 	err = s.doClientAA(ctx, func(cl as.DRPCAnynsAccountAbstractionClient) error {
 		if out, err = cl.AdminFundUserAccount(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+func (s *service) GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error) {
+	err = s.doClientAA(ctx, func(cl as.DRPCAnynsAccountAbstractionClient) error {
+		if out, err = cl.GetOperation(ctx, in); err != nil {
 			return rpcerr.Unwrap(err)
 		}
 		return nil

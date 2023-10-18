@@ -53,7 +53,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run as client")
-	command        = flag.String("cmd", "", "command to run: [name-register, name-renew, is-name-available, name-by-address]")
+	command        = flag.String("cmd", "", "command to run: [name-register, name-renew, is-name-available, name-by-address, get-operation]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -152,6 +152,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 		// it will pack and sign the request
 		// no need to do that manually
 		adminFundUserAccount(a, client, ctx)
+	case "get-operation":
+		clientGetOperation(client, ctx)
 	default:
 		log.Fatal("unknown command", zap.String("command", *command))
 	}
@@ -272,6 +274,23 @@ func adminFundUserAccount(a *app.App, client client.AnyNsClientService, ctx cont
 
 	// 3 - call
 	resp, err := client.AdminFundUserAccount(ctx, reqSigned)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientGetOperation(client client.AnyNsClientService, ctx context.Context) {
+	var req = &as.GetOperationStatusRequest{}
+
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.GetOperation(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}

@@ -89,6 +89,38 @@ type JSONRPCResponseUserOpHash struct {
 	Result string `json:"result"`
 }
 
+type JSONRPCResponseGetOp struct {
+	ID      int    `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
+
+	Error struct {
+		Code    int    `json:"code,omitempty"`
+		Message string `json:"message,omitempty"`
+	} `json:"error, omitempty"`
+
+	Result struct {
+		UserOpHash string `json:"userOpHash,omitempty"`
+		Success    bool   `json:"success,omitempty"`
+	} `json:"result"`
+}
+
+type JSONRPCResponseGetUserOpByHash struct {
+	ID      int    `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
+
+	Error struct {
+		Code    int    `json:"code,omitempty"`
+		Message string `json:"message,omitempty"`
+	} `json:"error, omitempty"`
+
+	Result struct {
+		UserOperation   string `json:"userOperation,omitempty"`
+		BlockNumber     string `json:"blockNumber,omitempty"`
+		BlockHash       string `json:"blockNumber,omitempty"`
+		TransactionHash string `json:"blockNumber,omitempty"`
+	} `json:"result"`
+}
+
 type JSONRPCRequestGetUserOperationReceipt struct {
 	ID      int      `json:"id"`
 	JSONRPC string   `json:"jsonrpc"`
@@ -100,16 +132,21 @@ type alchemysdk struct {
 }
 
 type AlchemyAAService interface {
-	// if factoryAddr is non-null -> will set init code
-	CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, senderScw common.Address, nonce uint64, policyID string, entryPointAddr common.Address, factoryAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error)
-	CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, senderScw common.Address, nonce uint64, id int, myPK string, factoryAddr common.Address, appendEntryPoint bool) ([]byte, error)
-	CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error)
-
 	// if SCW is not deployed yet -> we should set an init code
 	GetAccountInitCode(eoa common.Address, factoryAddr common.Address) ([]byte, error)
 
+	// if factoryAddr is non-null -> will set init code
+	CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, senderScw common.Address, nonce uint64, policyID string, entryPointAddr common.Address, factoryAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error)
+	CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, senderScw common.Address, nonce uint64, id int, myPK string, factoryAddr common.Address, appendEntryPoint bool) ([]byte, error)
+	// can be used to send any type of request to Alchemy
 	SendRequest(apiKey string, jsonDATA []byte) ([]byte, error)
-	DecodeSendUserOperationResponse(response []byte) (opHash string, err error)
+	DecodeResponseSendRequest(response []byte) (opHash string, err error)
+
+	CreateRequestGetUserOperationReceipt(operationHash string, id int) ([]byte, error)
+	DecodeResponseGetUserOperationReceipt(response []byte) (ret *JSONRPCResponseGetOp, err error)
+
+	//CreateRequestGetUserOperationByHash(operationHash string, id int) ([]byte, error)
+	//DecodeResponseGetUserOperationByHash(response []byte) (ret *JSONRPCResponseGetUserOpByHash, err error)
 
 	// creates a UserOperation and data to sign with user's private key
 	CreateRequestStep1(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, nonce uint64) (dataToSign []byte, uo UserOperation, err error)
@@ -254,7 +291,7 @@ func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponse
 }
 
 // creates a JSONRPCRequest with "eth_getUserOperationReceipt" formatted data
-func (aa *alchemysdk) CreateRequestGetUserOperation(operationHash string, id int) ([]byte, error) {
+func (aa *alchemysdk) CreateRequestGetUserOperationReceipt(operationHash string, id int) ([]byte, error) {
 	// {"jsonrpc":"2.0","id":11,"method":"eth_getUserOperationReceipt","params":["0x5fad93d239e4e7a7dd634822513b27f04e57ed8ea1be7b3e74df177eefd8beb8"]}
 	var req JSONRPCRequestGetUserOperationReceipt
 	req.ID = id
@@ -298,7 +335,7 @@ func (aa *alchemysdk) SendRequest(apiKey string, jsonDATA []byte) ([]byte, error
 	return body, nil
 }
 
-func (aa *alchemysdk) DecodeSendUserOperationResponse(response []byte) (opHash string, err error) {
+func (aa *alchemysdk) DecodeResponseSendRequest(response []byte) (opHash string, err error) {
 	// {"jsonrpc":"2.0","id":2,"result":"0x31b09cc37a91866b493ee9a31980e90b94b09195a85599f5e6d6a246c9e20186"}
 	// 1 - parse JSON
 	var responseStruct2 JSONRPCResponseUserOpHash
@@ -314,6 +351,24 @@ func (aa *alchemysdk) DecodeSendUserOperationResponse(response []byte) (opHash s
 	}
 
 	return responseStruct2.Result, nil
+}
+
+func (aa *alchemysdk) DecodeResponseGetUserOperationReceipt(response []byte) (ret *JSONRPCResponseGetOp, err error) {
+	// {"jsonrpc":"2.0","id":2,"result":{"success": true}}
+	// 1 - parse JSON
+	var responseStruct2 JSONRPCResponseGetOp
+	err = json.Unmarshal(response, &responseStruct2)
+	if err != nil {
+		log.Error("failed to unmarshal response", zap.Error(err))
+		return nil, err
+	}
+
+	if responseStruct2.Error.Code != 0 {
+		strErr := fmt.Sprintf("Error: %v - %v", responseStruct2.Error.Code, responseStruct2.Error.Message)
+		return nil, errors.New(strErr)
+	}
+
+	return &responseStruct2, nil
 }
 
 // creates data to sign with UserOperation
@@ -426,4 +481,44 @@ func (aa *alchemysdk) GetAccountInitCode(eoa common.Address, factoryAddr common.
 	data = append(factoryAddr.Bytes(), data...)
 
 	return data, nil
+}
+
+// TODO: unused
+// TODO: test
+func (aa *alchemysdk) CreateRequestGetUserOperationByHash(operationHash string, id int) ([]byte, error) {
+	// {"jsonrpc":"2.0","id":11,"method":"eth_getUserOperationByHash","params":["0x5fad93d239e4e7a7dd634822513b27f04e57ed8ea1be7b3e74df177eefd8beb8"]}
+	var req JSONRPCRequestGetUserOperationReceipt
+	req.ID = id
+	req.JSONRPC = "2.0"
+	req.Method = "eth_getUserOperationByHash"
+	req.Hashes = append(req.Hashes, operationHash)
+
+	// 2 - convert struct to json
+	jsonDATA, err := json.Marshal(req)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return nil, err
+	}
+
+	return jsonDATA, nil
+}
+
+// TODO: unused
+// TODO: test
+func (aa *alchemysdk) DecodeResponseGetUserOperationByHash(response []byte) (ret *JSONRPCResponseGetUserOpByHash, err error) {
+	// {"jsonrpc":"2.0","id":2,"result":{"success": true}}
+	// 1 - parse JSON
+	var responseStruct2 JSONRPCResponseGetUserOpByHash
+	err = json.Unmarshal(response, &responseStruct2)
+	if err != nil {
+		log.Error("failed to unmarshal response", zap.Error(err))
+		return nil, err
+	}
+
+	if responseStruct2.Error.Code != 0 {
+		strErr := fmt.Sprintf("Error: %v - %v", responseStruct2.Error.Code, responseStruct2.Error.Message)
+		return nil, errors.New(strErr)
+	}
+
+	return &responseStruct2, nil
 }

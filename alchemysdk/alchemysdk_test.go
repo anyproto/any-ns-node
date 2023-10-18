@@ -574,7 +574,7 @@ func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
 
 		// convert string to byte array
 		h := []byte("0x1")
-		_, err := fx.DecodeSendUserOperationResponse(h)
+		_, err := fx.DecodeResponseSendRequest(h)
 		assert.Error(t, err)
 	})
 
@@ -584,7 +584,7 @@ func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
 
 		respStr := `{"jsonrpc":"2.0","id":2,"result":"0xa417d6e564c27e7803097f7c712490896d093e27c6f9f44b0192252d82522792"}`
 
-		hash, err := fx.DecodeSendUserOperationResponse([]byte(respStr))
+		hash, err := fx.DecodeResponseSendRequest([]byte(respStr))
 		assert.NoError(t, err)
 		assert.Equal(t, hash, "0xa417d6e564c27e7803097f7c712490896d093e27c6f9f44b0192252d82522792")
 	})

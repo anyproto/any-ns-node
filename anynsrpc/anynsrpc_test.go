@@ -97,13 +97,13 @@ func TestAnynsRpc_GetOperationStatus(t *testing.T) {
 
 		pctx := context.Background()
 		resp, err := fx.GetOperationStatus(pctx, &as.GetOperationStatusRequest{
-			OperationId: 1,
+			OperationId: "1",
 		})
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
 		// this always returns completed even if operation was never created
-		assert.Equal(t, resp.OperationId, uint64(1))
+		assert.Equal(t, resp.OperationId, "1")
 		assert.Equal(t, resp.OperationState, as.OperationState_Completed)
 	})
 }

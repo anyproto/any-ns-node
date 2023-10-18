@@ -40,6 +40,7 @@ func (drpcEncoding_File_proto_anyns_aa_api_proto) JSONUnmarshal(buf []byte, msg 
 type DRPCAnynsAccountAbstractionClient interface {
 	DRPCConn() drpc.Conn
 
+	GetOperation(ctx context.Context, in *GetOperationStatusRequest) (*OperationResponse, error)
 	AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*OperationResponse, error)
 	AdminFundGasOperations(ctx context.Context, in *AdminFundGasOperationsRequestSigned) (*OperationResponse, error)
 	GetUserAccount(ctx context.Context, in *GetUserAccountRequest) (*UserAccount, error)
@@ -56,6 +57,15 @@ func NewDRPCAnynsAccountAbstractionClient(cc drpc.Conn) DRPCAnynsAccountAbstract
 }
 
 func (c *drpcAnynsAccountAbstractionClient) DRPCConn() drpc.Conn { return c.cc }
+
+func (c *drpcAnynsAccountAbstractionClient) GetOperation(ctx context.Context, in *GetOperationStatusRequest) (*OperationResponse, error) {
+	out := new(OperationResponse)
+	err := c.cc.Invoke(ctx, "/AnynsAccountAbstraction/GetOperation", drpcEncoding_File_proto_anyns_aa_api_proto{}, in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *drpcAnynsAccountAbstractionClient) AdminFundUserAccount(ctx context.Context, in *AdminFundUserAccountRequestSigned) (*OperationResponse, error) {
 	out := new(OperationResponse)
@@ -103,6 +113,7 @@ func (c *drpcAnynsAccountAbstractionClient) CreateUserOperation(ctx context.Cont
 }
 
 type DRPCAnynsAccountAbstractionServer interface {
+	GetOperation(context.Context, *GetOperationStatusRequest) (*OperationResponse, error)
 	AdminFundUserAccount(context.Context, *AdminFundUserAccountRequestSigned) (*OperationResponse, error)
 	AdminFundGasOperations(context.Context, *AdminFundGasOperationsRequestSigned) (*OperationResponse, error)
 	GetUserAccount(context.Context, *GetUserAccountRequest) (*UserAccount, error)
@@ -111,6 +122,10 @@ type DRPCAnynsAccountAbstractionServer interface {
 }
 
 type DRPCAnynsAccountAbstractionUnimplementedServer struct{}
+
+func (s *DRPCAnynsAccountAbstractionUnimplementedServer) GetOperation(context.Context, *GetOperationStatusRequest) (*OperationResponse, error) {
+	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
+}
 
 func (s *DRPCAnynsAccountAbstractionUnimplementedServer) AdminFundUserAccount(context.Context, *AdminFundUserAccountRequestSigned) (*OperationResponse, error) {
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
@@ -134,11 +149,20 @@ func (s *DRPCAnynsAccountAbstractionUnimplementedServer) CreateUserOperation(con
 
 type DRPCAnynsAccountAbstractionDescription struct{}
 
-func (DRPCAnynsAccountAbstractionDescription) NumMethods() int { return 5 }
+func (DRPCAnynsAccountAbstractionDescription) NumMethods() int { return 6 }
 
 func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver, interface{}, bool) {
 	switch n {
 	case 0:
+		return "/AnynsAccountAbstraction/GetOperation", drpcEncoding_File_proto_anyns_aa_api_proto{},
+			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
+				return srv.(DRPCAnynsAccountAbstractionServer).
+					GetOperation(
+						ctx,
+						in1.(*GetOperationStatusRequest),
+					)
+			}, DRPCAnynsAccountAbstractionServer.GetOperation, true
+	case 1:
 		return "/AnynsAccountAbstraction/AdminFundUserAccount", drpcEncoding_File_proto_anyns_aa_api_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsAccountAbstractionServer).
@@ -147,7 +171,7 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 						in1.(*AdminFundUserAccountRequestSigned),
 					)
 			}, DRPCAnynsAccountAbstractionServer.AdminFundUserAccount, true
-	case 1:
+	case 2:
 		return "/AnynsAccountAbstraction/AdminFundGasOperations", drpcEncoding_File_proto_anyns_aa_api_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsAccountAbstractionServer).
@@ -156,7 +180,7 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 						in1.(*AdminFundGasOperationsRequestSigned),
 					)
 			}, DRPCAnynsAccountAbstractionServer.AdminFundGasOperations, true
-	case 2:
+	case 3:
 		return "/AnynsAccountAbstraction/GetUserAccount", drpcEncoding_File_proto_anyns_aa_api_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsAccountAbstractionServer).
@@ -165,7 +189,7 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 						in1.(*GetUserAccountRequest),
 					)
 			}, DRPCAnynsAccountAbstractionServer.GetUserAccount, true
-	case 3:
+	case 4:
 		return "/AnynsAccountAbstraction/GetDataNameRegister", drpcEncoding_File_proto_anyns_aa_api_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsAccountAbstractionServer).
@@ -174,7 +198,7 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 						in1.(*NameRegisterRequest),
 					)
 			}, DRPCAnynsAccountAbstractionServer.GetDataNameRegister, true
-	case 4:
+	case 5:
 		return "/AnynsAccountAbstraction/CreateUserOperation", drpcEncoding_File_proto_anyns_aa_api_proto{},
 			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
 				return srv.(DRPCAnynsAccountAbstractionServer).
@@ -190,6 +214,22 @@ func (DRPCAnynsAccountAbstractionDescription) Method(n int) (string, drpc.Encodi
 
 func DRPCRegisterAnynsAccountAbstraction(mux drpc.Mux, impl DRPCAnynsAccountAbstractionServer) error {
 	return mux.Register(impl, DRPCAnynsAccountAbstractionDescription{})
+}
+
+type DRPCAnynsAccountAbstraction_GetOperationStream interface {
+	drpc.Stream
+	SendAndClose(*OperationResponse) error
+}
+
+type drpcAnynsAccountAbstraction_GetOperationStream struct {
+	drpc.Stream
+}
+
+func (x *drpcAnynsAccountAbstraction_GetOperationStream) SendAndClose(m *OperationResponse) error {
+	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_aa_api_proto{}); err != nil {
+		return err
+	}
+	return x.CloseSend()
 }
 
 type DRPCAnynsAccountAbstraction_AdminFundUserAccountStream interface {

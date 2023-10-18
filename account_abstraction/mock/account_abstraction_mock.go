@@ -9,6 +9,7 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	anyns_api "github.com/anyproto/any-ns-node/pb/anyns_api"
 	app "github.com/anyproto/any-sync/app"
 	common "github.com/ethereum/go-ethereum/common"
@@ -39,11 +40,12 @@ func (m *MockAccountAbstractionService) EXPECT() *MockAccountAbstractionServiceM
 }
 
 // AdminMintAccessTokens mocks base method.
-func (m *MockAccountAbstractionService) AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) error {
+func (m *MockAccountAbstractionService) AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AdminMintAccessTokens", ctx, scw, amount)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // AdminMintAccessTokens indicates an expected call of AdminMintAccessTokens.
@@ -95,6 +97,21 @@ func (m *MockAccountAbstractionService) GetNamesCountLeft(ctx context.Context, s
 func (mr *MockAccountAbstractionServiceMockRecorder) GetNamesCountLeft(ctx, scw interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamesCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetNamesCountLeft), ctx, scw)
+}
+
+// GetOperation mocks base method.
+func (m *MockAccountAbstractionService) GetOperation(ctx context.Context, operationID string) (*accountabstraction.OperationInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOperation", ctx, operationID)
+	ret0, _ := ret[0].(*accountabstraction.OperationInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOperation indicates an expected call of GetOperation.
+func (mr *MockAccountAbstractionServiceMockRecorder) GetOperation(ctx, operationID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOperation", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetOperation), ctx, operationID)
 }
 
 // GetOperationsCountLeft mocks base method.
@@ -171,11 +188,12 @@ func (mr *MockAccountAbstractionServiceMockRecorder) Name() *gomock.Call {
 }
 
 // SendUserOperation mocks base method.
-func (m *MockAccountAbstractionService) SendUserOperation(ctx context.Context, contextData, signedByUserData []byte) error {
+func (m *MockAccountAbstractionService) SendUserOperation(ctx context.Context, contextData, signedByUserData []byte) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendUserOperation", ctx, contextData, signedByUserData)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendUserOperation indicates an expected call of SendUserOperation.
