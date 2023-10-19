@@ -205,8 +205,9 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
-			// $20 USD per name (current testnet settings)
-			oneNamePriceWei := big.NewInt(20 * 1000000)
+			// 20 tokens per name (current testnet settings)
+			// 2 decimals
+			oneNamePriceWei := big.NewInt(20 * 100)
 
 			// divide oneNamePriceWei /2 to get less than 1 name
 			out := big.NewInt(0).Div(oneNamePriceWei, big.NewInt(2))
@@ -224,7 +225,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
-			oneNamePriceWei := big.NewInt(20 * 1000000)
+			oneNamePriceWei := big.NewInt(20 * 100)
 
 			// multiply by 12
 			out := big.NewInt(0).Mul(oneNamePriceWei, big.NewInt(12))
@@ -815,13 +816,12 @@ func TestAAS_GetCallDataForMint(t *testing.T) {
 		defer fx.finish(t)
 
 		smartAccountAddress := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
-		var usdToMint uint = 100
 
-		out, err := GetCallDataForMint(smartAccountAddress, usdToMint)
+		out, err := GetCallDataForMint(smartAccountAddress, big.NewInt(1))
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064")
+		assert.Equal(t, outStr, "0x9533a384000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064")
 	})
 }
 
@@ -832,13 +832,12 @@ func TestAAS_GetCallDataForAprove(t *testing.T) {
 	mt.Run("success", func(mt *mtest.T) {
 		from := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
 		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
-		var usdToMint uint = 100
 
-		out, err := GetCallDataForAprove(from, registrarController, usdToMint)
+		out, err := GetCallDataForAprove(from, registrarController, big.NewInt(1))
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000005f5e100")
+		assert.Equal(t, outStr, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000000000064")
 	})
 }
 

@@ -234,9 +234,9 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 	}
 
 	// TODO: remove hardcode and move to pricing methods
-	// $20 USD per name (current testnet settings)
-	// $1 USD = 10^6
-	oneNamePriceWei := big.NewInt(20 * 1000000)
+	// 20 tokens per name (current testnet settings)
+	// 1 token = 10^2 wei (2 decimals)
+	oneNamePriceWei := big.NewInt(20 * 100)
 
 	count = balance.Div(balance, oneNamePriceWei).Uint64()
 
@@ -311,15 +311,17 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	log.Info("got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
 
 	// 3 - create user operation
-	// TODO: change amount
-	callDataOriginal, err := GetCallDataForMint(userScwAddress, 100)
+	// 20 tokens per each name
+	tokensToMint := namesCount.Mul(namesCount, big.NewInt(20))
+
+	callDataOriginal, err := GetCallDataForMint(userScwAddress, tokensToMint)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err
 	}
 	log.Debug("prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
 
-	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, 100)
+	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, tokensToMint)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err

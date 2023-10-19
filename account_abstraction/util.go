@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func GetCallDataForMint(smartAccountAddress common.Address, usdToMint uint) ([]byte, error) {
+func GetCallDataForMint(smartAccountAddress common.Address, namesToMint *big.Int) ([]byte, error) {
 	const erc20ABI = `
 		[
 			{
@@ -24,7 +24,7 @@ func GetCallDataForMint(smartAccountAddress common.Address, usdToMint uint) ([]b
 						"type": "uint256"
 					}
 				],
-				"name": "mint",
+				"name": "mintToUser",
 				"outputs": [],
 				"payable": false,
 				"stateMutability": "nonpayable",
@@ -39,7 +39,10 @@ func GetCallDataForMint(smartAccountAddress common.Address, usdToMint uint) ([]b
 		return nil, err
 	}
 
-	inputData, err := parsedABI.Pack("mint", smartAccountAddress, big.NewInt(int64(usdToMint)))
+	// 2 decimals
+	namesToMint = namesToMint.Mul(namesToMint, big.NewInt(100))
+
+	inputData, err := parsedABI.Pack("mintToUser", smartAccountAddress, namesToMint)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +50,7 @@ func GetCallDataForMint(smartAccountAddress common.Address, usdToMint uint) ([]b
 	return inputData, nil
 }
 
-func GetCallDataForAprove(srcAddress common.Address, destAddress common.Address, usdToMint uint) ([]byte, error) {
+func GetCallDataForAprove(srcAddress common.Address, destAddress common.Address, namesToAllow *big.Int) ([]byte, error) {
 	const erc20ABI = `
 	[
 		{
@@ -112,12 +115,11 @@ func GetCallDataForAprove(srcAddress common.Address, destAddress common.Address,
 		return nil, err
 	}
 
-	approveAmount := big.NewInt(int64(usdToMint))
-	// multiply it by 1000000 (because approve is not in USD like mint above!)
-	approveAmount = approveAmount.Mul(approveAmount, big.NewInt(1000000))
+	// 2 decimals
+	namesToAllow = namesToAllow.Mul(namesToAllow, big.NewInt(100))
 
 	// as long as Admin is the owner of the contract, we can approve for any address
-	inputData, err := parsedABI.Pack("approveFor", srcAddress, destAddress, approveAmount)
+	inputData, err := parsedABI.Pack("approveFor", srcAddress, destAddress, namesToAllow)
 	if err != nil {
 		return nil, err
 	}
