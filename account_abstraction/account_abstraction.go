@@ -234,9 +234,9 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 	}
 
 	// TODO: remove hardcode and move to pricing methods
-	// 20 tokens per name (current testnet settings)
-	// 1 token = 10^2 wei (2 decimals)
-	oneNamePriceWei := big.NewInt(20 * 100)
+	// 10 tokens per name (current testnet settings)
+	// 1 token = 10^6 wei (6 decimals)
+	oneNamePriceWei := big.NewInt(10 * 1000000)
 
 	count = balance.Div(balance, oneNamePriceWei).Uint64()
 
@@ -311,9 +311,8 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	log.Info("got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
 
 	// 3 - create user operation
-	// 20 tokens per each name
-	tokensToMint := namesCount.Mul(namesCount, big.NewInt(20))
-
+	// 10 tokens per each name
+	tokensToMint := namesCount.Mul(namesCount, big.NewInt(10))
 	callDataOriginal, err := GetCallDataForMint(userScwAddress, tokensToMint)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))

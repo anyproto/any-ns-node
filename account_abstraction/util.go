@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func GetCallDataForMint(smartAccountAddress common.Address, namesToMint *big.Int) ([]byte, error) {
+func GetCallDataForMint(smartAccountAddress common.Address, fullTokensToMint *big.Int) ([]byte, error) {
 	const erc20ABI = `
 		[
 			{
@@ -24,7 +24,7 @@ func GetCallDataForMint(smartAccountAddress common.Address, namesToMint *big.Int
 						"type": "uint256"
 					}
 				],
-				"name": "mintToUser",
+				"name": "mint",
 				"outputs": [],
 				"payable": false,
 				"stateMutability": "nonpayable",
@@ -39,10 +39,10 @@ func GetCallDataForMint(smartAccountAddress common.Address, namesToMint *big.Int
 		return nil, err
 	}
 
-	// 2 decimals
-	namesToMint = namesToMint.Mul(namesToMint, big.NewInt(100))
+	// 6 decimals
+	fullTokensToMint.Mul(fullTokensToMint, big.NewInt(1000000))
 
-	inputData, err := parsedABI.Pack("mintToUser", smartAccountAddress, namesToMint)
+	inputData, err := parsedABI.Pack("mint", smartAccountAddress, fullTokensToMint)
 	if err != nil {
 		return nil, err
 	}
@@ -50,33 +50,9 @@ func GetCallDataForMint(smartAccountAddress common.Address, namesToMint *big.Int
 	return inputData, nil
 }
 
-func GetCallDataForAprove(srcAddress common.Address, destAddress common.Address, namesToAllow *big.Int) ([]byte, error) {
+func GetCallDataForAprove(userAddr common.Address, destAddress common.Address, fullTokensToAllow *big.Int) ([]byte, error) {
 	const erc20ABI = `
 	[
-		{
-			"constant": false,
-			"inputs": [
-				{
-					"name": "_spender",
-					"type": "address"
-				},
-				{
-					"name": "_value",
-					"type": "uint256"
-				}
-			],
-			"name": "approve",
-			"outputs": [
-				{
-					"name": "success",
-					"type": "bool"
-				}
-			],
-			"payable": false,
-			"stateMutability": "nonpayable",
-			"type": "function"
-		},
-
 		{
       "inputs": [
         {
@@ -115,11 +91,11 @@ func GetCallDataForAprove(srcAddress common.Address, destAddress common.Address,
 		return nil, err
 	}
 
-	// 2 decimals
-	namesToAllow = namesToAllow.Mul(namesToAllow, big.NewInt(100))
+	// 6 decimals
+	fullTokensToAllow.Mul(fullTokensToAllow, big.NewInt(1000000))
 
 	// as long as Admin is the owner of the contract, we can approve for any address
-	inputData, err := parsedABI.Pack("approveFor", srcAddress, destAddress, namesToAllow)
+	inputData, err := parsedABI.Pack("approveFor", userAddr, destAddress, fullTokensToAllow)
 	if err != nil {
 		return nil, err
 	}

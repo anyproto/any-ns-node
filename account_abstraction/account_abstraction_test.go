@@ -205,9 +205,9 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
-			// 20 tokens per name (current testnet settings)
-			// 2 decimals
-			oneNamePriceWei := big.NewInt(20 * 100)
+			// 10 tokens per name (current testnet settings)
+			// 6 decimals
+			oneNamePriceWei := big.NewInt(10 * 1000000)
 
 			// divide oneNamePriceWei /2 to get less than 1 name
 			out := big.NewInt(0).Div(oneNamePriceWei, big.NewInt(2))
@@ -225,7 +225,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
-			oneNamePriceWei := big.NewInt(20 * 100)
+			oneNamePriceWei := big.NewInt(10 * 1000000)
 
 			// multiply by 12
 			out := big.NewInt(0).Mul(oneNamePriceWei, big.NewInt(12))
@@ -821,7 +821,7 @@ func TestAAS_GetCallDataForMint(t *testing.T) {
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x9533a384000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e0000000000000000000000000000000000000000000000000000000000000064")
+		assert.Equal(t, outStr, "0x40c10f19000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e00000000000000000000000000000000000000000000000000000000000f4240")
 	})
 }
 
@@ -837,7 +837,7 @@ func TestAAS_GetCallDataForAprove(t *testing.T) {
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
-		assert.Equal(t, outStr, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca0000000000000000000000000000000000000000000000000000000000000064")
+		assert.Equal(t, outStr, "0x2b991746000000000000000000000000045f756f248799f4413a026100ae49e5e7f2031e000000000000000000000000b6bf17cbe45cbc7609e4f8fa56154c9def8590ca00000000000000000000000000000000000000000000000000000000000f4240")
 	})
 }
 
