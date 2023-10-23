@@ -2,6 +2,7 @@ package anynsaarpc
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"strings"
@@ -10,9 +11,12 @@ import (
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/commonspace/object/accountdata"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
+	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/mock/gomock"
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
@@ -60,8 +64,13 @@ func newFixture(t *testing.T) *fixture {
 
 	fx.config.Mongo = config.Mongo{
 		Connect:  "mongodb://localhost:27017",
-		Database: "any-ns",
+		Database: "any-ns-tst",
 	}
+
+	// drop everything
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(fx.config.Mongo.Connect))
+	err = client.Database(fx.config.Mongo.Database).Drop(ctx)
+	require.NoError(t, err)
 
 	fx.aa = mock_accountabstraction.NewMockAccountAbstractionService(fx.ctrl)
 	fx.aa.EXPECT().Name().Return(accountabstraction.CName).AnyTimes()
@@ -212,5 +221,451 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		require.Equal(t, resp.OperationId, "123")
 		// not found
 		require.Equal(t, resp.OperationState, as.OperationState_Pending)
+	})
+}
+
+func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
+	t.Run("fail if wrong operations count", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 0)
+		assert.Error(t, err)
+	})
+
+	t.Run("success if user never existed", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		assert.NoError(t, err)
+
+		// TODO: mock!
+		// read from Mongo and check
+		uri := fx.config.Mongo.Connect
+		dbName := fx.config.Mongo.Database
+		collectionName := "aa-users"
+
+		client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+		assert.NoError(t, err)
+
+		var itemColl *mongo.Collection = client.Database(dbName).Collection(collectionName)
+		item := &AAUser{}
+		err = itemColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
+		assert.NoError(t, err)
+
+		assert.Equal(t, item.Address, owner.Hex())
+		assert.Equal(t, item.OperationsCount, uint64(1))
+	})
+
+	t.Run("fail if user has existed before but Any ID is different", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		assert.NoError(t, err)
+
+		// again but with different Any ID
+		anyIDDifferent := "12D3KaaXB5EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		err = fx.MongoAddUserToTheWhitelist(pctx, owner, anyIDDifferent, 1)
+		assert.Error(t, err)
+	})
+
+	t.Run("success if user has existed before", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		assert.NoError(t, err)
+
+		// again!
+		err = fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		assert.NoError(t, err)
+
+		// TODO: mock!
+		// read from Mongo and check
+		uri := fx.config.Mongo.Connect
+		dbName := fx.config.Mongo.Database
+		collectionName := "aa-users"
+
+		client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+		assert.NoError(t, err)
+
+		var itemColl *mongo.Collection = client.Database(dbName).Collection(collectionName)
+		item := &AAUser{}
+		err = itemColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
+		assert.NoError(t, err)
+
+		assert.Equal(t, item.Address, owner.Hex())
+		assert.Equal(t, item.OperationsCount, uint64(2))
+	})
+}
+
+func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
+	t.Run("fail if nothing is found operations count", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "")
+		assert.Error(t, err)
+		assert.Equal(t, ops, uint64(0))
+	})
+
+	t.Run("fail if wrong Any ID", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
+		assert.NoError(t, err)
+
+		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "")
+		assert.Error(t, err)
+		assert.Equal(t, ops, uint64(0))
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
+		assert.NoError(t, err)
+
+		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+		assert.NoError(t, err)
+		assert.Equal(t, ops, uint64(1))
+	})
+}
+
+func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
+	t.Run("fail if user is not found", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		err := fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if user has no operations already", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		assert.NoError(t, err)
+
+		// 1st time - should work
+		err = fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		assert.NoError(t, err)
+
+		// 2nd time - should fail
+		err = fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		assert.NoError(t, err)
+
+		err = fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		assert.NoError(t, err)
+	})
+}
+
+func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
+	t.Run("fail if name is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegister(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if eth address is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegister(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if Any address is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "oWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegister(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if space ID is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "baxxxybeibs62gqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegister(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req as.NameRegisterRequest = as.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		fx.aa.EXPECT().GetDataNameRegister(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (dataOut []byte, contextData []byte, err error) {
+			return []byte("data"), []byte("context"), nil
+		})
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegister(pctx, &req)
+		assert.NoError(t, err)
+	})
+}
+
+func TestAnynsRpc_CreateUserOperation(t *testing.T) {
+	t.Run("fail if wrong signature", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		// 1 - enable user
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		assert.NoError(t, err)
+
+		var cuor as.CreateUserOperationRequest
+		// from string to []byte
+		cuor.Data, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+		cuor.SignedData, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+		cuor.Context, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+
+		cuor.OwnerEthAddress = owner.Hex()
+		cuor.OwnerAnyID = PeerId
+
+		marshalled, err := cuor.Marshal()
+		assert.NoError(t, err)
+
+		var cuor_signed as.CreateUserOperationRequestSigned
+		cuor_signed.Payload = marshalled
+
+		signingKey, err := crypto.DecodeKeyFromString(
+			PeerKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		assert.NoError(t, err)
+
+		_, err = signingKey.Sign(marshalled)
+		assert.NoError(t, err)
+
+		// HERE
+		//cuor_signed.Signature = sign
+
+		// let's go
+		_, err = fx.CreateUserOperation(pctx, &cuor_signed)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if SendUserOperation failed", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		// 1 - enable user
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+		SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		assert.NoError(t, err)
+
+		var cuor as.CreateUserOperationRequest
+		// from string to []byte
+		cuor.Data, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+		cuor.SignedData, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+		cuor.Context, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+
+		cuor.OwnerEthAddress = owner.Hex()
+
+		// OwnerAnyID
+		decodedSigningKey, err := crypto.DecodeKeyFromString(
+			SignKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		assert.NoError(t, err)
+
+		identity, err := decodedSigningKey.GetPublic().Marshall()
+		assert.NoError(t, err)
+		// bytes to hex string
+		cuor.OwnerAnyID = string(identity)
+
+		marshalled, err := cuor.Marshal()
+		assert.NoError(t, err)
+
+		var cuor_signed as.CreateUserOperationRequestSigned
+		cuor_signed.Payload = marshalled
+
+		signingKey, err := crypto.DecodeKeyFromString(
+			PeerKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		assert.NoError(t, err)
+
+		sign, err := signingKey.Sign(marshalled)
+		assert.NoError(t, err)
+
+		cuor_signed.Signature = sign
+
+		// let's go
+		_, err = fx.CreateUserOperation(pctx, &cuor_signed)
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		// 1 - enable user
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+		SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		assert.NoError(t, err)
+
+		var cuor as.CreateUserOperationRequest
+		// from string to []byte
+		cuor.Data, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+		cuor.SignedData, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+		cuor.Context, err = hex.DecodeString("1234")
+		assert.NoError(t, err)
+
+		cuor.OwnerEthAddress = owner.Hex()
+
+		// OwnerAnyID
+		decodedSigningKey, err := crypto.DecodeKeyFromString(
+			SignKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		assert.NoError(t, err)
+
+		identity, err := decodedSigningKey.GetPublic().Marshall()
+		assert.NoError(t, err)
+		// bytes to hex string
+		cuor.OwnerAnyID = string(identity)
+
+		marshalled, err := cuor.Marshal()
+		assert.NoError(t, err)
+
+		var cuor_signed as.CreateUserOperationRequestSigned
+		cuor_signed.Payload = marshalled
+
+		signingKey, err := crypto.DecodeKeyFromString(
+			PeerKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		assert.NoError(t, err)
+
+		sign, err := signingKey.Sign(marshalled)
+		assert.NoError(t, err)
+
+		cuor_signed.Signature = sign
+
+		fx.aa.EXPECT().SendUserOperation(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, x interface{}, y interface{}) (operationID string, err error) {
+			return "123", nil
+		})
+
+		// let's go
+		_, err = fx.CreateUserOperation(pctx, &cuor_signed)
+		assert.NoError(t, err)
 	})
 }

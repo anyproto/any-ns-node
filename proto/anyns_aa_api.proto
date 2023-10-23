@@ -45,8 +45,10 @@ message AdminFundGasOperationsRequest {
   // An Ethereum address that owns that name
   string ownerEthAddress = 1;
 
+  string ownerAnyID = 2;
+
   // Number of gas operations: update name, add new data, etc
-  uint64 operationsCount = 2;
+  uint64 operationsCount = 3;
 }
 
 message AdminFundGasOperationsRequestSigned {
@@ -76,6 +78,10 @@ message CreateUserOperationRequest {
   bytes signedData = 2;
 
   bytes context = 3;
+
+  string ownerEthAddress = 4;
+
+  string ownerAnyID = 5;
 }
 
 message CreateUserOperationRequestSigned {
