@@ -267,6 +267,29 @@ func (arpc *anynsAARpc) GetDataNameUpdate(ctx context.Context, in *as.NameUpdate
 	return nil, nil
 }
 
+func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, signature []byte) (err error) {
+	// to read in the PeerID format
+	ownerAnyIdentity, err := crypto.DecodePeerId(ownerIdStr)
+
+	// to read ID in the marshaled format
+	//arr := []byte(ownerIdStr)
+	//ownerAnyIdentity, err := crypto.UnmarshalEd25519PublicKeyProto(arr)
+
+	if err != nil {
+		log.Error("failed to unmarshal public key", zap.Error(err))
+		return err
+	}
+
+	// 2 - verify signature
+	res, err := ownerAnyIdentity.Verify(payload, signature)
+	if err != nil || !res {
+		return errors.New("signature is different")
+	}
+
+	// success
+	return nil
+}
+
 // once user got data by using method like GetDataNameRegister, and signed it, now he can create a new operation
 func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUserOperationRequestSigned) (*as.OperationResponse, error) {
 	// 1 - unmarshal the signed request
@@ -278,14 +301,10 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 	}
 
 	// 2 - check users's signature
-	arr := []byte(cuor.OwnerAnyID)
-	ownerAnyIdentity, err := crypto.UnmarshalEd25519PublicKeyProto(arr)
+	err = arpc.VerifyAnyIdentity(cuor.OwnerAnyID, in.Payload, in.Signature)
 	if err != nil {
+		log.Error("wrong Anytype signature", zap.Error(err))
 		return nil, err
-	}
-	res, err := ownerAnyIdentity.Verify(in.Payload, in.Signature)
-	if err != nil || !res {
-		return nil, errors.New("signature is invalid")
 	}
 
 	// 3 - check if user has enough "GetOperationsCountLeft"
@@ -358,8 +377,8 @@ func (arpc *anynsAARpc) MongoAddUserToTheWhitelist(ctx context.Context, owner co
 	// 3.2 - update item in mongo
 	// but first check if Any ID is the same as was passed above
 	if ownerAnyID != item.AnyID {
-		log.Error("wrong AnyID", zap.String("any_id", ownerAnyID), zap.String("item.AnyID", item.AnyID))
-		return errors.New("wrong AnyID")
+		log.Error("AnyID does not match", zap.String("any_id", ownerAnyID), zap.String("item.AnyID", item.AnyID))
+		return errors.New("AnyID does not match")
 	}
 
 	log.Debug("increasing operations count in the whitelist", zap.String("owner", owner.Hex()))
@@ -390,8 +409,8 @@ func (arpc *anynsAARpc) MongoGetUserOperationsCount(ctx context.Context, owner c
 
 	// check if AnyID is correct
 	if item.AnyID != ownerAnyID {
-		log.Error("wrong AnyID", zap.String("any_id", ownerAnyID))
-		return 0, errors.New("wrong AnyID")
+		log.Error("AnyID does not match", zap.String("any_id", ownerAnyID))
+		return 0, errors.New("AnyID does not match")
 	}
 
 	return item.OperationsCount, nil
