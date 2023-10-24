@@ -123,20 +123,24 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 			return uint64(10), nil
 		})
 
-		fx.aa.EXPECT().GetOperationsCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
-			return uint64(20), nil
-		})
-
 		pctx := context.Background()
+
+		err := fx.MongoAddUserToTheWhitelist(pctx,
+			common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
+			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			21,
+		)
+
 		resp, err := fx.GetUserAccount(pctx, &as.GetUserAccountRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
+		assert.NoError(t, err)
 
 		require.NoError(t, err)
 		assert.Equal(t, common.HexToAddress(resp.OwnerEthAddress), common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
 		assert.Equal(t, common.HexToAddress(resp.OwnerSmartContracWalletAddress), common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"))
 		assert.Equal(t, resp.NamesCountLeft, uint64(10))
-		assert.Equal(t, resp.OperationsCountLeft, uint64(20))
+		assert.Equal(t, resp.OperationsCountLeft, uint64(21))
 	})
 }
 
@@ -148,14 +152,6 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 
 		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
 			return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
-		})
-
-		fx.aa.EXPECT().GetNamesCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
-			return uint64(10), nil
-		})
-
-		fx.aa.EXPECT().GetOperationsCountLeft(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, param interface{}) (count uint64, err error) {
-			return uint64(20), nil
 		})
 
 		fx.aa.EXPECT().AdminVerifyIdentity(gomock.Any(), gomock.Any()).DoAndReturn(func(payload []byte, signature []byte) (err error) {
@@ -174,9 +170,15 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		accountKeys, err := accountdata.NewRandom()
 		require.NoError(t, err)
 
+		/*
+			fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
+				return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
+			})*/
+
 		// pack
 		nrr := as.AdminFundUserAccountRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
+
 			// add 0 name calls
 			NamesCount: 0,
 		}
@@ -340,9 +342,24 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
 		assert.NoError(t, err)
 
-		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "")
+		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "1111KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
 		assert.Error(t, err)
 		assert.Equal(t, ops, uint64(0))
+	})
+
+	t.Run("success if AnyID is empty (do not compare it!)", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+
+		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
+		assert.NoError(t, err)
+
+		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "")
+		assert.NoError(t, err)
+		assert.Equal(t, ops, uint64(1))
 	})
 
 	t.Run("success", func(t *testing.T) {

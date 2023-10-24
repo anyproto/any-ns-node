@@ -52,7 +52,6 @@ type AccountAbstractionService interface {
 	GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error)
 	IsScwDeployed(ctx context.Context, scw common.Address) (bool, error)
 	GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
-	GetOperationsCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 
 	// will return error if signature is invalid
 	AdminVerifyIdentity(payload []byte, signature []byte) (err error)
@@ -246,12 +245,6 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 	)
 
 	return count, nil
-}
-
-func (aa *anynsAA) GetOperationsCountLeft(ctx context.Context, scw common.Address) (count uint64, err error) {
-	// TODO: implement
-
-	return 0, nil
 }
 
 func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err error) {

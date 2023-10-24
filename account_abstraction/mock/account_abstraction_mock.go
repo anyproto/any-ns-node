@@ -114,21 +114,6 @@ func (mr *MockAccountAbstractionServiceMockRecorder) GetOperation(ctx, operation
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOperation", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetOperation), ctx, operationID)
 }
 
-// GetOperationsCountLeft mocks base method.
-func (m *MockAccountAbstractionService) GetOperationsCountLeft(ctx context.Context, scw common.Address) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOperationsCountLeft", ctx, scw)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetOperationsCountLeft indicates an expected call of GetOperationsCountLeft.
-func (mr *MockAccountAbstractionServiceMockRecorder) GetOperationsCountLeft(ctx, scw interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOperationsCountLeft", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetOperationsCountLeft), ctx, scw)
-}
-
 // GetSmartWalletAddress mocks base method.
 func (m *MockAccountAbstractionService) GetSmartWalletAddress(ctx context.Context, eoa common.Address) (common.Address, error) {
 	m.ctrl.T.Helper()

@@ -127,7 +127,13 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 		return nil, err
 	}
 
-	res.OperationsCountLeft, err = arpc.aa.GetOperationsCountLeft(ctx, scwa)
+	res.OperationsCountLeft, err = arpc.MongoGetUserOperationsCount(
+		ctx,
+		common.HexToAddress(in.OwnerEthAddress),
+		// becuase AnyID is empty -> it will not check it
+		"",
+	)
+
 	if err != nil {
 		log.Error("failed to get operations count left", zap.Error(err))
 		return nil, err
@@ -172,16 +178,14 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 	}
 
 	// 3 - determine SCW of user wallet
-	ua, err := arpc.GetUserAccount(ctx, &as.GetUserAccountRequest{
-		OwnerEthAddress: afuar.OwnerEthAddress,
-	})
+	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(afuar.OwnerEthAddress))
 	if err != nil {
-		log.Error("failed to get user account", zap.Error(err))
+		log.Error("failed to get smart wallet address", zap.Error(err))
 		return nil, err
 	}
 
 	// 4 - mint tokens to that SCW
-	opID, err := arpc.aa.AdminMintAccessTokens(ctx, common.HexToAddress(ua.OwnerSmartContracWalletAddress), big.NewInt(int64(afuar.NamesCount)))
+	opID, err := arpc.aa.AdminMintAccessTokens(ctx, scwa, big.NewInt(int64(afuar.NamesCount)))
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
 		return nil, err
@@ -307,7 +311,8 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 		return nil, err
 	}
 
-	// 3 - check if user has enough "GetOperationsCountLeft"
+	// 3 - check if user has enough operations left
+	// will fail if AnyID was different
 	ops, err := arpc.MongoGetUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress), cuor.OwnerAnyID)
 	if err != nil {
 		log.Error("failed to get operations count", zap.Error(err))
@@ -398,6 +403,7 @@ func (arpc *anynsAARpc) MongoAddUserToTheWhitelist(ctx context.Context, owner co
 }
 
 // will check if ownerAnyID matches AnyID in the DB (was set by Admin before)
+// if ownerAnyID is empty -> do not check it
 func (arpc *anynsAARpc) MongoGetUserOperationsCount(ctx context.Context, owner common.Address, ownerAnyID string) (operations uint64, err error) {
 	item := &AAUser{}
 	err = arpc.itemColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
@@ -408,7 +414,8 @@ func (arpc *anynsAARpc) MongoGetUserOperationsCount(ctx context.Context, owner c
 	}
 
 	// check if AnyID is correct
-	if item.AnyID != ownerAnyID {
+	// this should be in the format of PeerID - 12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS
+	if (ownerAnyID != "") && (item.AnyID != ownerAnyID) {
 		log.Error("AnyID does not match", zap.String("any_id", ownerAnyID))
 		return 0, errors.New("AnyID does not match")
 	}

@@ -241,22 +241,6 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(12), count)
 	})
 }
-
-func TestAAS_GetOperationsCountLeft(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		count, err := fx.GetOperationsCountLeft(ctx, common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"))
-
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(0), count)
-	})
-}
-
 func TestAAS_VerifyAdminIdentity(t *testing.T) {
 	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	defer mt.Close()
