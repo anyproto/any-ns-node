@@ -35,17 +35,19 @@ contracts:
   name_wrapper: 0xC68FC50baebA616916C390d035Cf485d8F039d21
   admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
   token: 0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6
+  token_decimals: 6
   admin_pk: XXX
-  wait_mining_retry_count: 5
+  wait_mining_retry_count: 15
 queue:
   skip_processing: false
   skip_background_processing: false
   nonce_retry_count: 10
   high_nonce_retry_count: 2
 accountAbstraction:
-  alchemyRpcUrl: https://eth-sepolia.g.alchemy.com/v2/YYY
-  accountFactory: 0x123
-  entryPoint: 0x234
-  gasPolicyId: 123
-  alchemyApiKey: xYZ_aBC
-  chainID: 11155111
+  alchemy_rpc_url: https://eth-sepolia.g.alchemy.com/v2/YYY
+  account_factory: 0x123
+  entry_point: 0x234
+  gas_policy_id: 123
+  alchemy_api_key: xYZ_aBC
+  chain_id: 11155111
+  name_tokens_per_name: 10

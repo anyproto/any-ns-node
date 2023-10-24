@@ -50,12 +50,15 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	fx.config.Contracts = config.Contracts{
-		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-		GethUrl:   "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
+		AddrAdmin:     "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+		GethUrl:       "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
+		TokenDecimals: 6,
 	}
 	fx.config.Account.PeerId = "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 	fx.config.Account.PeerKey = "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 	fx.config.Account.SigningKey = "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+
+	fx.config.Aa.NameTokensPerName = 10
 
 	fx.contracts = mock_contracts.NewMockContractsService(fx.ctrl)
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
@@ -817,7 +820,7 @@ func TestAAS_GetCallDataForMint(t *testing.T) {
 
 		smartAccountAddress := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
 
-		out, err := GetCallDataForMint(smartAccountAddress, big.NewInt(1))
+		out, err := GetCallDataForMint(smartAccountAddress, big.NewInt(1), 6)
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
@@ -833,7 +836,7 @@ func TestAAS_GetCallDataForAprove(t *testing.T) {
 		from := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
 		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
 
-		out, err := GetCallDataForAprove(from, registrarController, big.NewInt(1))
+		out, err := GetCallDataForAprove(from, registrarController, big.NewInt(1), 6)
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)

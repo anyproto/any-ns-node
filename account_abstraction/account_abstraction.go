@@ -233,10 +233,9 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 		return 0, err
 	}
 
-	// TODO: remove hardcode and move to pricing methods
-	// 10 tokens per name (current testnet settings)
-	// 1 token = 10^6 wei (6 decimals)
-	oneNamePriceWei := big.NewInt(10 * 1000000)
+	// N tokens per name (current testnet settings)
+	weiPerToken := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(int64(aa.contractsConfig.TokenDecimals)), nil)
+	oneNamePriceWei := weiPerToken.Mul(big.NewInt(int64(aa.aaConfig.NameTokensPerName)), weiPerToken)
 
 	count = balance.Div(balance, oneNamePriceWei).Uint64()
 
@@ -311,16 +310,18 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	log.Info("got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
 
 	// 3 - create user operation
-	// 10 tokens per each name
-	tokensToMint := namesCount.Mul(namesCount, big.NewInt(10))
-	callDataOriginal, err := GetCallDataForMint(userScwAddress, tokensToMint)
+	// N tokens per each name (was 10 during our tests)
+	tokensToMint := namesCount.Mul(namesCount, big.NewInt(int64(aa.aaConfig.NameTokensPerName)))
+	tokenDecimals := aa.contractsConfig.TokenDecimals
+
+	callDataOriginal, err := GetCallDataForMint(userScwAddress, tokensToMint, tokenDecimals)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err
 	}
 	log.Debug("prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
 
-	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, tokensToMint)
+	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, tokensToMint, tokenDecimals)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err

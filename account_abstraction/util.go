@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func GetCallDataForMint(smartAccountAddress common.Address, fullTokensToMint *big.Int) ([]byte, error) {
+func GetCallDataForMint(smartAccountAddress common.Address, fullTokensToMint *big.Int, tokenDecimals uint8) ([]byte, error) {
 	const erc20ABI = `
 		[
 			{
@@ -40,7 +40,8 @@ func GetCallDataForMint(smartAccountAddress common.Address, fullTokensToMint *bi
 	}
 
 	// 6 decimals
-	fullTokensToMint.Mul(fullTokensToMint, big.NewInt(1000000))
+	weiPerToken := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(int64(tokenDecimals)), nil)
+	fullTokensToMint = weiPerToken.Mul(fullTokensToMint, weiPerToken)
 
 	inputData, err := parsedABI.Pack("mint", smartAccountAddress, fullTokensToMint)
 	if err != nil {
@@ -50,7 +51,7 @@ func GetCallDataForMint(smartAccountAddress common.Address, fullTokensToMint *bi
 	return inputData, nil
 }
 
-func GetCallDataForAprove(userAddr common.Address, destAddress common.Address, fullTokensToAllow *big.Int) ([]byte, error) {
+func GetCallDataForAprove(userAddr common.Address, destAddress common.Address, fullTokensToAllow *big.Int, tokenDecimals uint8) ([]byte, error) {
 	const erc20ABI = `
 	[
 		{
@@ -92,7 +93,8 @@ func GetCallDataForAprove(userAddr common.Address, destAddress common.Address, f
 	}
 
 	// 6 decimals
-	fullTokensToAllow.Mul(fullTokensToAllow, big.NewInt(1000000))
+	weiPerToken := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(int64(tokenDecimals)), nil)
+	fullTokensToAllow = weiPerToken.Mul(fullTokensToAllow, weiPerToken)
 
 	// as long as Admin is the owner of the contract, we can approve for any address
 	inputData, err := parsedABI.Pack("approveFor", userAddr, destAddress, fullTokensToAllow)

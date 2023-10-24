@@ -6,6 +6,7 @@ type Contracts struct {
 	AddrResolver          string `yaml:"resolver"`
 	AddrRegistrar         string `yaml:"registrar"`
 	AddrToken             string `yaml:"token"`
+	TokenDecimals         uint8  `yaml:"token_decimals"`
 	AddrPrivateController string `yaml:"private_controller"`
 	AddrNameWrapper       string `yaml:"name_wrapper"`
 
