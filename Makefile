@@ -35,10 +35,12 @@ check-style:
 
 .PHONY: deps
 deps:
+	go install go.uber.org/mock/mockgen@latest
 	go mod download
 	go build -o deps/protoc-gen-go-drpc storj.io/drpc/cmd/protoc-gen-go-drpc
 	go build -o deps/protoc-gen-gogofaster github.com/gogo/protobuf/protoc-gen-gogofaster
 	go build -o deps github.com/ahmetb/govvv
+
 
 .PHONY: prereqs-for-mac
 prereqs-for-mac:
