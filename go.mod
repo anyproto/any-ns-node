@@ -12,11 +12,10 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/stretchr/testify v1.8.4
 	github.com/zeebo/assert v1.3.0
-	go.mongodb.org/mongo-driver v1.12.0
+	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.11.0
-	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/yaml.v3 v3.0.1
 	storj.io/drpc v0.0.33
 )
