@@ -4,9 +4,10 @@ Please see [Any Naming System repository](https://github.com/anyproto/any-ns) fo
 This global singleton node provides access to AnyNS smart contracts. You can call smart contracts either directly or by using _this_ dRPC service. 
 
 ## Building and Running
-1. To build: `make build`
-2. To run: `go run ./cmd --c=NODE_CONFIG`
-3. To run as a client: `go run ./cmd --c=CLIENT_CONFIG --cl --cmd=COMMAND --params=PARAMS_JSON`
+1. Prereq: `go install go.uber.org/mock/mockgen@latest`
+2. To build: `make build`
+3. To run: `go run ./cmd --c=NODE_CONFIG`
+4. To run as a client: `go run ./cmd --c=CLIENT_CONFIG --cl --cmd=COMMAND --params=PARAMS_JSON`
 
 ## Available client commands
 
