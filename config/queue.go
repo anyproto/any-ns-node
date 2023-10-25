@@ -7,11 +7,11 @@ type Queue struct {
 
 	// do not process items means that we will just update their status in the DB
 	// as if they were successfully processed (for testing purposes only!)
-	SkipProcessing bool `yaml:"skip_processing"`
+	SkipProcessing bool `yaml:"isSkipProcessing"`
 
-	SkipBackroundProcessing bool `yaml:"skip_background_processing"`
+	SkipBackroundProcessing bool `yaml:"isSkipProcessingBackground"`
 
-	LowNonceRetryCount uint `yaml:"nonce_retry_count"`
+	LowNonceRetryCount uint `yaml:"retryCountNonce"`
 
-	HighNonceRetryCount uint `yaml:"high_nonce_retry_count"`
+	HighNonceRetryCount uint `yaml:"retryCountHighNonce"`
 }

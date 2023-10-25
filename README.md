@@ -27,7 +27,7 @@ Please see example in the 'etc' subfolder.
 ```
 contracts:
   // use your own geth node or Infura/Alchemy/Moralis/etc API
-  geth_url: https://sepolia.infura.io/v3/XXX
+  gethUrl: https://sepolia.infura.io/v3/XXX
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/ENSRegistry.json
   registry: 0xc0D3c96aE923Da6b45E6d4c21a0424730a20BCA9
@@ -39,16 +39,16 @@ contracts:
   registrar: 0x6BA138bb7B1Bdea2B127D55D7C8F0DC9467b424E
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeRegistrarControllerPrivate.json
-  private_controller: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732
+  privateController: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeNameWrapper.json
-  name_wrapper: 0xFe69BF9B3fD69d09977b37b5953C8B43687f3B23
+  nameWrapper: 0xFe69BF9B3fD69d09977b37b5953C8B43687f3B23
 
   // Admin address
   admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
   
   // Admin key
-  admin_pk: XXX
+  adminPk: XXX
 ```
 
 ## Contribution
