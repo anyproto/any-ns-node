@@ -11,7 +11,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/stretchr/testify v1.8.4
-	github.com/zeebo/assert v1.3.0
+	github.com/zeebo/assert v1.3.1
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.3.0
 	go.uber.org/zap v1.26.0
