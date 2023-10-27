@@ -13,6 +13,11 @@ yamux:
         - 127.0.0.1:4830
     writeTimeoutSec: 10
     dialTimeoutSec: 10
+quic:
+    listenAddrs:
+        - 127.0.0.1:5530
+    writeTimeoutSec: 10
+    dialTimeoutSec: 10
 network:
     id: 64ba63209976be4a733bbb91
     networkId: N4Gvo3v5wL31RrYgX3PrhAGMYvdWe5rAgtVB8cZySYWrkhb6

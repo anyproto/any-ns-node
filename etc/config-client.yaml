@@ -8,6 +8,9 @@ drpc:
 yamux:
     writeTimeoutSec: 10
     dialTimeoutSec: 10
+quic:
+    writeTimeoutSec: 10
+    dialTimeoutSec: 10
 network:
     id: 64ba63209976be4a733bbb91
     networkId: N4Gvo3v5wL31RrYgX3PrhAGMYvdWe5rAgtVB8cZySYWrkhb6

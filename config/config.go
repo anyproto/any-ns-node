@@ -5,6 +5,7 @@ import (
 
 	commonaccount "github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/net/rpc"
+	"github.com/anyproto/any-sync/net/transport/quic"
 	"github.com/anyproto/any-sync/net/transport/yamux"
 
 	"github.com/anyproto/any-sync/app"
@@ -34,6 +35,7 @@ type Config struct {
 	Account          commonaccount.Config   `yaml:"account"`
 	Network          nodeconf.Configuration `yaml:"network"`
 	NetworkStorePath string                 `yaml:"networkStorePath"`
+	Quic             quic.Config            `yaml:"quic"`
 	Yamux            yamux.Config           `yaml:"yamux"`
 	Mongo            Mongo                  `yaml:"mongo"`
 	Contracts        Contracts              `yaml:"contracts"`
@@ -80,4 +82,8 @@ func (c *Config) GetQueue() Queue {
 
 func (c *Config) GetAA() AA {
 	return c.Aa
+}
+
+func (c *Config) GetQuic() quic.Config {
+	return c.Quic
 }

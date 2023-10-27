@@ -32,7 +32,9 @@ import (
 	"github.com/anyproto/any-sync/net/pool"
 	"github.com/anyproto/any-sync/net/rpc/server"
 	"github.com/anyproto/any-sync/net/secureservice"
+	"github.com/anyproto/any-sync/net/transport/quic"
 	"github.com/anyproto/any-sync/net/transport/yamux"
+
 	"go.uber.org/zap"
 
 	// import this to keep govvv in go.mod on mod tidy
@@ -307,6 +309,7 @@ func BootstrapClient(a *app.App) {
 		Register(pool.New()).
 		Register(peerservice.New()).
 		Register(yamux.New()).
+		Register(quic.New()).
 		Register(secureservice.New()).
 		Register(server.New()).
 		Register(client.New())
@@ -325,6 +328,7 @@ func BootstrapServer(a *app.App) {
 		Register(pool.New()).
 		Register(peerservice.New()).
 		Register(yamux.New()).
+		Register(quic.New()).
 		Register(secureservice.New()).
 		Register(server.New()).
 		Register(accountabstraction.New()).
