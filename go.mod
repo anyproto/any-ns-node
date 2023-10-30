@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/ahmetb/govvv v0.3.0
-	github.com/anyproto/any-sync v0.3.4
+	github.com/anyproto/any-sync v0.3.6
 	github.com/cheggaaa/mb/v3 v3.0.1
 	github.com/cockroachdb/errors v1.11.1
 	github.com/ethereum/go-ethereum v1.13.4
