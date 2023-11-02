@@ -38,8 +38,11 @@ account_abstraction/mock/account_abstraction_mock.go: account_abstraction/accoun
 alchemysdk/mock/alchemysdk_mock.go: alchemysdk/alchemysdk.go
 	mockgen -source=alchemysdk/alchemysdk.go > alchemysdk/mock/alchemysdk_mock.go
 
+client/mock/anyns_client_mock.go: client/client.go
+	mockgen -source=client/client.go > client/mock/anyns_client_mock.go
+
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go
+mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go client/mock/anyns_client_mock.go
 
 .PHONY: test
 test: mocks
