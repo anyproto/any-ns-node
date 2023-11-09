@@ -10,8 +10,6 @@ github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/ahmetb/govvv v0.3.0 h1:YGLGwEyiUwHFy5eh/RUhdupbuaCGBYn5T5GWXp+WJB0=
 github.com/ahmetb/govvv v0.3.0/go.mod h1:4WRFpdWtc/YtKgPFwa1dr5+9hiRY5uKAL08bOlxOR6s=
-github.com/anyproto/any-sync v0.3.7-0.20231101124203-fe8cba622542 h1:lD8TqUbwVOwnbeWdr6aRXLvGeX58labb8P6R9aC4xr0=
-github.com/anyproto/any-sync v0.3.7-0.20231101124203-fe8cba622542/go.mod h1:EUxILCmnj9r+g08otHHwF0NgZVeisI+t6tPXVdWaPdE=
 github.com/anyproto/any-sync v0.3.7 h1:FR2Cx+3h6wxwB8NtPKtdtpG83eQk2zgjysaaJWlAyHk=
 github.com/anyproto/any-sync v0.3.7/go.mod h1:EUxILCmnj9r+g08otHHwF0NgZVeisI+t6tPXVdWaPdE=
 github.com/anyproto/go-chash v0.1.0 h1:I9meTPjXFRfXZHRJzjOHC/XF7Q5vzysKkiT/grsogXY=
