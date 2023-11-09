@@ -6,13 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"strings"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 )
@@ -57,8 +55,8 @@ type JSONRPCResponseGasAndPaymaster struct {
 
 	Error struct {
 		Code    int    `json:"code,omitempty"`
-		Message string `json:"message, omitempty"`
-	} `json:"error, omitempty"`
+		Message string `json:"message,omitempty"`
+	} `json:"error,omitempty"`
 
 	Result struct {
 		PreVerificationGas   string `json:"preVerificationGas,omitempty"`
@@ -84,7 +82,7 @@ type JSONRPCResponseUserOpHash struct {
 	Error struct {
 		Code    int    `json:"code,omitempty"`
 		Message string `json:"message,omitempty"`
-	} `json:"error, omitempty"`
+	} `json:"error,omitempty"`
 
 	Result string `json:"result"`
 }
@@ -96,7 +94,7 @@ type JSONRPCResponseGetOp struct {
 	Error struct {
 		Code    int    `json:"code,omitempty"`
 		Message string `json:"message,omitempty"`
-	} `json:"error, omitempty"`
+	} `json:"error,omitempty"`
 
 	Result struct {
 		UserOpHash string `json:"userOpHash,omitempty"`
@@ -111,7 +109,7 @@ type JSONRPCResponseGetUserOpByHash struct {
 	Error struct {
 		Code    int    `json:"code,omitempty"`
 		Message string `json:"message,omitempty"`
-	} `json:"error, omitempty"`
+	} `json:"error,omitempty"`
 
 	Result struct {
 		UserOperation   string `json:"userOperation,omitempty"`
@@ -132,9 +130,6 @@ type alchemysdk struct {
 }
 
 type AlchemyAAService interface {
-	// if SCW is not deployed yet -> we should set an init code
-	GetAccountInitCode(eoa common.Address, factoryAddr common.Address) ([]byte, error)
-
 	// if factoryAddr is non-null -> will set init code
 	CreateRequestGasAndPaymasterData(callData []byte, sender common.Address, senderScw common.Address, nonce uint64, policyID string, entryPointAddr common.Address, factoryAddr common.Address, id int) (JSONRPCRequestGasAndPaymaster, error)
 	CreateRequestAndSign(callData []byte, rgap JSONRPCResponseGasAndPaymaster, chainID int64, entryPointAddr common.Address, sender common.Address, senderScw common.Address, nonce uint64, id int, myPK string, factoryAddr common.Address, appendEntryPoint bool) ([]byte, error)
@@ -186,7 +181,7 @@ func (aa *alchemysdk) CreateRequestGasAndPaymasterData(callData []byte, sender c
 	if (factoryAddr != common.Address{}) {
 		log.Debug("factoryAddr is not null. Initializing SCW")
 
-		code, err := aa.GetAccountInitCode(sender, factoryAddr)
+		code, err := getAccountInitCode(sender, factoryAddr)
 		if err != nil {
 			log.Error("failed to get init code", zap.Error(err))
 			return req, err
@@ -233,7 +228,7 @@ func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponse
 	if (factoryAddr != common.Address{}) {
 		log.Debug("factoryAddr is not null. Initializing SCW")
 
-		code, err := aa.GetAccountInitCode(sender, factoryAddr)
+		code, err := getAccountInitCode(sender, factoryAddr)
 		if err != nil {
 			log.Error("failed to get init code", zap.Error(err))
 			return nil, err
@@ -251,14 +246,14 @@ func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponse
 	uo.MaxPriorityFeePerGas = rgap.Result.MaxPriorityFeePerGas
 	uo.PaymasterAndData = rgap.Result.PaymasterAndData
 
-	dataToSign, err := GetUserOperationHash(uo, chainID, entryPointAddr)
+	dataToSign, err := getUserOperationHash(uo, chainID, entryPointAddr)
 	if err != nil {
 		log.Error("failed to pack UserOperation", zap.Error(err))
 		return nil, err
 	}
 	log.Debug("dataToSign: ", zap.String("hash", hex.EncodeToString(dataToSign)))
 
-	sig, err := SignDataWithEthereumPrivateKey(dataToSign, myPK)
+	sig, err := signDataWithEthereumPrivateKey(dataToSign, myPK)
 	if err != nil {
 		log.Error("failed to sign", zap.Error(err))
 		return nil, err
@@ -279,7 +274,7 @@ func (aa *alchemysdk) CreateRequestAndSign(callData []byte, rgap JSONRPCResponse
 
 	// add entryPointAddr
 	if appendEntryPoint {
-		err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddr)
+		jsonDATA, err = appendEntryPointAddress(jsonDATA, entryPointAddr)
 
 		if err != nil {
 			log.Error("can not append entry point", zap.Error(err))
@@ -392,7 +387,7 @@ func (aa *alchemysdk) CreateRequestStep1(callData []byte, rgap JSONRPCResponseGa
 	// data should be signed and then set in CreateRequestStep2
 	// uo.Signature =
 
-	dataToSign, err = GetUserOperationHash(uo, chainID, entryPointAddr)
+	dataToSign, err = getUserOperationHash(uo, chainID, entryPointAddr)
 	if err != nil {
 		log.Error("failed to pack UserOperation", zap.Error(err))
 		return nil, uo, err
@@ -422,65 +417,13 @@ func (aa *alchemysdk) CreateRequestStep2(alchemyRequestId int, signedByUserData 
 	}
 
 	// add entryPointAddr
-	err, jsonDATA = AppendEntryPointAddress(jsonDATA, entryPointAddr)
+	jsonDATA, err = appendEntryPointAddress(jsonDATA, entryPointAddr)
 	if err != nil {
 		log.Error("can not append entry point", zap.Error(err))
 		return nil, err
 	}
 
 	return jsonDATA, nil
-}
-
-func (aa *alchemysdk) GetAccountInitCode(eoa common.Address, factoryAddr common.Address) ([]byte, error) {
-	const jsondata = `
-		[
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "owner",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "salt",
-						"type": "uint256"
-					}
-				],
-				"name": "createAccount",
-				"outputs": [
-					{
-						"internalType": "contract SimpleAccount",
-						"name": "ret",
-						"type": "address"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			}
-		]
-	`
-
-	factoryABI, err := abi.JSON(strings.NewReader(jsondata))
-	if err != nil {
-		log.Error("error parsing ABI:", zap.Error(err))
-		return nil, err
-	}
-
-	// salt is 0
-	data, err := factoryABI.Pack("createAccount", eoa, big.NewInt(0))
-	if err != nil {
-		log.Error("error encoding function data", zap.Error(err))
-		return nil, nil
-	}
-
-	// log data
-	log.Debug("data: ", zap.String("data", hex.EncodeToString(data)))
-
-	// prepend factory address
-	data = append(factoryAddr.Bytes(), data...)
-
-	return data, nil
 }
 
 // TODO: unused

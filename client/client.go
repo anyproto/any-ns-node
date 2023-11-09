@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/anyproto/any-sync/app"
-	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/pool"
 	"github.com/anyproto/any-sync/net/rpc/rpcerr"
 	"github.com/anyproto/any-sync/nodeconf"
@@ -14,7 +13,7 @@ import (
 
 const CName = "any-ns.anynsclient"
 
-var log = logger.NewNamed(CName)
+//var log = logger.NewNamed(CName)
 
 /*
  * This client component can be used to access the Any Naming System (any-ns)
@@ -75,9 +74,9 @@ func (s *service) Close(_ context.Context) error {
 }
 
 func (s *service) doClient(ctx context.Context, fn func(cl as.DRPCAnynsClient) error) error {
-	// TODO: https://github.com/orgs/anyproto/projects/3?pane=issue&itemId=34657351
-	// introduce different node type for NS node
-	peer, err := s.pool.Get(ctx, s.nodeconf.CoordinatorPeers()[0])
+	// it will try to connect to the Naming Node
+	// please enable "namingNode" type of node in the config (in the network.nodes array)
+	peer, err := s.pool.Get(ctx, s.nodeconf.NamingNodePeers()[0])
 
 	if err != nil {
 		return err
@@ -93,9 +92,9 @@ func (s *service) doClient(ctx context.Context, fn func(cl as.DRPCAnynsClient) e
 }
 
 func (s *service) doClientAA(ctx context.Context, fn func(cl as.DRPCAnynsAccountAbstractionClient) error) error {
-	// TODO: https://github.com/orgs/anyproto/projects/3?pane=issue&itemId=34657351
-	// introduce different node type for NS node
-	peer, err := s.pool.Get(ctx, s.nodeconf.CoordinatorPeers()[0])
+	// it will try to connect to the Naming Node
+	// please enable "namingNode" type of node in the config (in the network.nodes array)
+	peer, err := s.pool.Get(ctx, s.nodeconf.NamingNodePeers()[0])
 
 	if err != nil {
 		return err

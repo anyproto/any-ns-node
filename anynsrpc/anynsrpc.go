@@ -157,7 +157,7 @@ func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegiste
 	}
 
 	// 2 - check signature
-	err = VerifyIdentity(in, nrr.OwnerAnyAddress)
+	err = verifyIdentity(in, nrr.OwnerAnyAddress)
 	if err != nil {
 		resp.OperationState = as.OperationState_Error
 		log.Error("identity is different", zap.Error(err))
