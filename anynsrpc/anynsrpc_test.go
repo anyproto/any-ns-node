@@ -49,7 +49,7 @@ func TestVerifyIdentity_IdentityIsOK(t *testing.T) {
 	require.NoError(t, err)
 
 	// run
-	err = VerifyIdentity(&in, nrr.OwnerAnyAddress)
+	err = verifyIdentity(&in, nrr.OwnerAnyAddress)
 	require.NoError(t, err)
 }
 
@@ -82,7 +82,7 @@ func TestVerifyIdentity_IdentityIsBad(t *testing.T) {
 	require.NoError(t, err)
 
 	// run
-	err = VerifyIdentity(&in, nrr.OwnerAnyAddress)
+	err = verifyIdentity(&in, nrr.OwnerAnyAddress)
 	require.Error(t, err)
 }
 

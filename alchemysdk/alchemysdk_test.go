@@ -45,10 +45,10 @@ func TestAAS_Keccak256(t *testing.T) {
 	defer mt.Close()
 
 	mt.Run("success", func(mt *mtest.T) {
-		hexString := hex.EncodeToString(Keccak256("0x"))
+		hexString := hex.EncodeToString(keccak256("0x"))
 		assert.Equal(t, hexString, "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 
-		hexString = hex.EncodeToString(Keccak256(""))
+		hexString = hex.EncodeToString(keccak256(""))
 		assert.Equal(t, hexString, "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 	})
 }
@@ -72,7 +72,7 @@ func TestAAS_PackUserOperation(t *testing.T) {
 		request.PaymasterAndData = "0x"
 		request.Signature = "0x"
 
-		out, err := PackUserOperation(request)
+		out, err := packUserOperation(request)
 		// byte array to string
 		outStr := "0x" + hex.EncodeToString(out)
 
@@ -96,7 +96,7 @@ func TestAAS_GetCallDataForExecute(t *testing.T) {
 		data1Bytes, err := hex.DecodeString(data1[2:])
 		assert.NoError(t, err)
 
-		out, err := GetCallDataForExecute(erc20tokenAddr, data1Bytes)
+		out, err := getCallDataForExecute(erc20tokenAddr, data1Bytes)
 		outStr := "0x" + hex.EncodeToString(out)
 
 		assert.NoError(t, err)
@@ -125,7 +125,7 @@ func TestAAS_GetUserOperationHash(t *testing.T) {
 
 		entryPointAddress := common.HexToAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
 
-		out, err := GetUserOperationHash(request, 11155111, entryPointAddress)
+		out, err := getUserOperationHash(request, 11155111, entryPointAddress)
 		// byte array to string
 		outStr := "0x" + hex.EncodeToString(out)
 
@@ -150,7 +150,7 @@ func TestAAS_GetUserOperationHash(t *testing.T) {
 
 		entryPointAddress := common.HexToAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
 
-		out, err := GetUserOperationHash(request, 80001, entryPointAddress)
+		out, err := getUserOperationHash(request, 80001, entryPointAddress)
 		// byte array to string
 		outStr := "0x" + hex.EncodeToString(out)
 
@@ -173,7 +173,7 @@ func TestAAS_SignDataHashWithEthereumPrivateKey(t *testing.T) {
 		dataBytes, err := hex.DecodeString(data[2:])
 		assert.NoError(t, err)
 
-		out, err := SignDataHashWithEthereumPrivateKey(dataBytes, privateKeyECDSA)
+		out, err := signDataHashWithEthereumPrivateKey(dataBytes, privateKeyECDSA)
 		assert.NoError(t, err)
 		assert.Equal(t, "0x"+hex.EncodeToString(out), "0x210af945f4be3a6a179e10240fd8ed5cd3d9317734d36a7b9bb969a9139bb3fc69c0f095cc52b616b1120887ceb71fd811a849ef59dc847ad3ef8c56004c5be61b")
 	})
@@ -188,7 +188,7 @@ func TestAAS_SignDataHashWithEthereumPrivateKey(t *testing.T) {
 		dataBytes, err := hex.DecodeString(data[2:])
 		assert.NoError(t, err)
 
-		out, err := SignDataHashWithEthereumPrivateKey(dataBytes, privateKeyECDSA)
+		out, err := signDataHashWithEthereumPrivateKey(dataBytes, privateKeyECDSA)
 		assert.NoError(t, err)
 		assert.Equal(t, "0x"+hex.EncodeToString(out), "0xb9258a347f35b42e3862cd9c66371c110b9429617fc371eef6b147798af397d8343ac9fcf7152fd97b476463b4c9d32db964333deb7e01feca9787dae71770981b")
 	})
@@ -335,10 +335,10 @@ func TestAAS_SignDataWithEthereumPrivateKey(t *testing.T) {
 		entryPointAddress := common.HexToAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
 
 		// sign it
-		dataToSign, err := GetUserOperationHash(request, chainID, entryPointAddress)
+		dataToSign, err := getUserOperationHash(request, chainID, entryPointAddress)
 		assert.NoError(t, err)
 
-		out, err := SignDataWithEthereumPrivateKey(dataToSign, myPK)
+		out, err := signDataWithEthereumPrivateKey(dataToSign, myPK)
 		assert.NoError(t, err)
 		assert.Equal(t, "0x"+hex.EncodeToString(out), "0x5327e90dcb6136769a302eb6ef846b01382a97dc4b1a1422bc1911436c9a0f291ec24a0ce2f3d082a03c31d0c4b966d75dafacd1e5fd926e55ecc251cd3fc47f1c")
 	})
@@ -501,7 +501,7 @@ func TestAA_CreateRequest(t *testing.T) {
 		// Sepolia
 		var chainID int64 = 11155111
 
-		// 1 - TEST GetUserOperationHash
+		// 1 - TEST getUserOperationHash
 		// prepare data
 		var request UserOperation
 
@@ -519,7 +519,7 @@ func TestAA_CreateRequest(t *testing.T) {
 		request.Signature = "0x"
 
 		entryPointAddress := common.HexToAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
-		dataToSign, err := GetUserOperationHash(request, chainID, entryPointAddress)
+		dataToSign, err := getUserOperationHash(request, chainID, entryPointAddress)
 		assert.NoError(t, err)
 		// covert dataToSign to hex string
 		dataToSignHexStr := "0x" + hex.EncodeToString(dataToSign)
@@ -528,7 +528,7 @@ func TestAA_CreateRequest(t *testing.T) {
 		// sign
 		myPK := "ac4bab11ad6b7ec2c84e5e293710828234ab63b62d377a23681228be588fab57"
 
-		out, err := SignDataWithEthereumPrivateKey(dataToSign, myPK)
+		out, err := signDataWithEthereumPrivateKey(dataToSign, myPK)
 		assert.NoError(t, err)
 		assert.Equal(t, "0x"+hex.EncodeToString(out), "0x48e0411bf17e1beb381b65b9d460e174589cc7d6ff96b307cad5a7c37bd14ac53846077023f38b07b7811d7dd62b374ca14d204f6f59a71753f452d0dd2048db1b")
 
@@ -601,7 +601,7 @@ func TestAA_GetAccountInitCode(t *testing.T) {
 		addr := common.HexToAddress("0xB5CA7eBFc4BA773683810a59954820CfC42f4AcD")
 		factoryAddr := common.HexToAddress("0x9406Cc6185a346906296840746125a0E44976454")
 
-		code, err := fx.GetAccountInitCode(addr, factoryAddr)
+		code, err := getAccountInitCode(addr, factoryAddr)
 		assert.NoError(t, err)
 		assert.Equal(t, "0x"+hex.EncodeToString(code), "0x9406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000b5ca7ebfc4ba773683810a59954820cfc42f4acd0000000000000000000000000000000000000000000000000000000000000000")
 	})

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/anyproto/any-sync/app"
-	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/pool"
 	"github.com/anyproto/any-sync/net/rpc/rpcerr"
 	"github.com/anyproto/any-sync/nodeconf"
@@ -14,7 +13,7 @@ import (
 
 const CName = "any-ns.anynsclient"
 
-var log = logger.NewNamed(CName)
+//var log = logger.NewNamed(CName)
 
 /*
  * This client component can be used to access the Any Naming System (any-ns)

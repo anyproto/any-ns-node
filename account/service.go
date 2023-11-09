@@ -9,7 +9,7 @@ import (
 
 type service struct {
 	accountData *accountdata.AccountKeys
-	peerId      string
+	//peerId      string
 }
 
 func (s *service) Account() *accountdata.AccountKeys {

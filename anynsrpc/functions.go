@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func VerifyIdentity(in *as.NameRegisterSignedRequest, ownerAnyAddress string) error {
+func verifyIdentity(in *as.NameRegisterSignedRequest, ownerAnyAddress string) error {
 	// convert ownerAnyAddress to array of bytes
 	arr := []byte(ownerAnyAddress)
 
@@ -83,7 +83,7 @@ func СheckRegisterParams(in *as.NameRegisterRequest) error {
 	}
 
 	// 3 - check Any address
-	if !СheckAnyAddress(in.OwnerAnyAddress) {
+	if !checkAnyAddress(in.OwnerAnyAddress) {
 		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
 		return errors.New("invalid Any address")
 	}
@@ -102,7 +102,7 @@ func СheckRegisterParams(in *as.NameRegisterRequest) error {
 	return nil
 }
 
-func СheckAnyAddress(addr string) bool {
+func checkAnyAddress(addr string) bool {
 	// in.OwnerAnyAddress should be a ed25519 public key hash
 	return isValidAnyAddress(addr)
 }

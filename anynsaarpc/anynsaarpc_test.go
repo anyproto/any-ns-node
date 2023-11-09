@@ -69,6 +69,8 @@ func newFixture(t *testing.T) *fixture {
 
 	// drop everything
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(fx.config.Mongo.Connect))
+	require.NoError(t, err)
+
 	err = client.Database(fx.config.Mongo.Database).Drop(ctx)
 	require.NoError(t, err)
 
@@ -125,11 +127,12 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 
 		pctx := context.Background()
 
-		err := fx.MongoAddUserToTheWhitelist(pctx,
+		err := fx.mongoAddUserToTheWhitelist(pctx,
 			common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 			21,
 		)
+		require.NoError(t, err)
 
 		resp, err := fx.GetUserAccount(pctx, &as.GetUserAccountRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
@@ -235,7 +238,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 0)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 0)
 		assert.Error(t, err)
 	})
 
@@ -247,7 +250,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
 
 		// TODO: mock!
@@ -276,12 +279,12 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
 
 		// again but with different Any ID
 		anyIDDifferent := "12D3KaaXB5EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
-		err = fx.MongoAddUserToTheWhitelist(pctx, owner, anyIDDifferent, 1)
+		err = fx.mongoAddUserToTheWhitelist(pctx, owner, anyIDDifferent, 1)
 		assert.Error(t, err)
 	})
 
@@ -293,11 +296,11 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
 
 		// again!
-		err = fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		err = fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
 
 		// TODO: mock!
@@ -327,7 +330,7 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "")
+		ops, err := fx.mongoGetUserOperationsCount(pctx, owner, "")
 		assert.Error(t, err)
 		assert.Equal(t, ops, uint64(0))
 	})
@@ -339,10 +342,10 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
 		assert.NoError(t, err)
 
-		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "1111KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+		ops, err := fx.mongoGetUserOperationsCount(pctx, owner, "1111KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
 		assert.Error(t, err)
 		assert.Equal(t, ops, uint64(0))
 	})
@@ -354,10 +357,10 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
 		assert.NoError(t, err)
 
-		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "")
+		ops, err := fx.mongoGetUserOperationsCount(pctx, owner, "")
 		assert.NoError(t, err)
 		assert.Equal(t, ops, uint64(1))
 	})
@@ -369,10 +372,10 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", 1)
 		assert.NoError(t, err)
 
-		ops, err := fx.MongoGetUserOperationsCount(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+		ops, err := fx.mongoGetUserOperationsCount(pctx, owner, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
 		assert.NoError(t, err)
 		assert.Equal(t, ops, uint64(1))
 	})
@@ -386,7 +389,7 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		err := fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		err := fx.mongoDecreaseUserOperationsCount(pctx, owner)
 		assert.Error(t, err)
 	})
 
@@ -398,15 +401,15 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
 
 		// 1st time - should work
-		err = fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		err = fx.mongoDecreaseUserOperationsCount(pctx, owner)
 		assert.NoError(t, err)
 
 		// 2nd time - should fail
-		err = fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		err = fx.mongoDecreaseUserOperationsCount(pctx, owner)
 		assert.Error(t, err)
 	})
 
@@ -418,10 +421,10 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
 
-		err = fx.MongoDecreaseUserOperationsCount(pctx, owner)
+		err = fx.mongoDecreaseUserOperationsCount(pctx, owner)
 		assert.NoError(t, err)
 	})
 }
@@ -574,7 +577,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		//PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
 		assert.NoError(t, err)
 
 		var cuor as.CreateUserOperationRequest
@@ -625,7 +628,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 		//SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
 		assert.NoError(t, err)
 
 		var cuor as.CreateUserOperationRequest
@@ -685,7 +688,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 		//SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
-		err := fx.MongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
 		assert.NoError(t, err)
 
 		var cuor as.CreateUserOperationRequest

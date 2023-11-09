@@ -49,7 +49,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx.itemColl = nil
 
 		pctx := context.Background()
-		err, newState := fx.NameRegisterMoveStateNext(pctx,
+		newState, err := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
 				ItemType:        ItemType_NameRegister,
@@ -74,7 +74,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		}).AnyTimes()
 
 		pctx := context.Background()
-		err, newState := fx.NameRegisterMoveStateNext(pctx,
+		newState, err := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
 				ItemType:        ItemType_NameRegister,
@@ -101,7 +101,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 
 		pctx := context.Background()
 
-		err, newState := fx.NameRegisterMoveStateNext(pctx,
+		newState, err := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
 				ItemType:        ItemType_NameRegister,
@@ -128,7 +128,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx.itemColl = nil
 
 		pctx := context.Background()
-		err, newState := fx.NameRegisterMoveStateNext(pctx,
+		newState, err := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
 				ItemType:        ItemType_NameRegister,
@@ -156,7 +156,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx.itemColl = nil
 
 		pctx := context.Background()
-		err, newState := fx.NameRegisterMoveStateNext(pctx,
+		newState, err := fx.NameRegisterMoveStateNext(pctx,
 			&QueueItem{
 				FullName:        "hello.any",
 				ItemType:        ItemType_NameRegister,

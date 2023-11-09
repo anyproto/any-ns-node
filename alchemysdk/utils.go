@@ -57,7 +57,7 @@ func encodeAbiParameters(types []string, values []interface{}) ([]byte, error) {
 	return encodedData, nil
 }
 
-func Keccak256(data string) []byte {
+func keccak256(data string) []byte {
 	// remove 0x prefix if exists
 	data = strings.TrimPrefix(data, "0x")
 
@@ -93,8 +93,8 @@ func hexToBigInt(hex string) *big.Int {
 	return value
 }
 
-func GetUserOperationHash(request UserOperation, chainID int64, entryPointAddress common.Address) ([]byte, error) {
-	uoBytes, err := PackUserOperation(request)
+func getUserOperationHash(request UserOperation, chainID int64, entryPointAddress common.Address) ([]byte, error) {
+	uoBytes, err := packUserOperation(request)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func GetUserOperationHash(request UserOperation, chainID int64, entryPointAddres
 	// uoBytes to hex string
 	uoHex := hex.EncodeToString(uoBytes)
 
-	uoHexKeccak := "0x" + hex.EncodeToString(Keccak256(uoHex))
+	uoHexKeccak := "0x" + hex.EncodeToString(keccak256(uoHex))
 
 	eap, err := encodeAbiParameters(
 		[]string{
@@ -121,15 +121,15 @@ func GetUserOperationHash(request UserOperation, chainID int64, entryPointAddres
 		return nil, err
 	}
 
-	out := Keccak256(hex.EncodeToString(eap))
+	out := keccak256(hex.EncodeToString(eap))
 	return out, nil
 }
 
-func PackUserOperation(request UserOperation) ([]byte, error) {
+func packUserOperation(request UserOperation) ([]byte, error) {
 	// byte arrays
-	hashedInitCode := "0x" + hex.EncodeToString(Keccak256(request.InitCode))
-	hashedCallData := "0x" + hex.EncodeToString(Keccak256(request.CallData))
-	hashedPaymasterAndData := "0x" + hex.EncodeToString(Keccak256(request.PaymasterAndData))
+	hashedInitCode := "0x" + hex.EncodeToString(keccak256(request.InitCode))
+	hashedCallData := "0x" + hex.EncodeToString(keccak256(request.CallData))
+	hashedPaymasterAndData := "0x" + hex.EncodeToString(keccak256(request.PaymasterAndData))
 
 	return encodeAbiParameters(
 		[]string{
@@ -159,7 +159,7 @@ func PackUserOperation(request UserOperation) ([]byte, error) {
 	)
 }
 
-func GetCallDataForExecute(dest common.Address, originalCallData []byte) ([]byte, error) {
+func getCallDataForExecute(dest common.Address, originalCallData []byte) ([]byte, error) {
 	const executeABI = `
 	[
     {
@@ -202,17 +202,17 @@ func GetCallDataForExecute(dest common.Address, originalCallData []byte) ([]byte
 	return inputData, nil
 }
 
-func SignDataWithEthereumPrivateKey(data []byte, privateKeyHex string) ([]byte, error) {
+func signDataWithEthereumPrivateKey(data []byte, privateKeyHex string) ([]byte, error) {
 	// Generate a new ECDSA private key.
 	privateKeyECDSA, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
 		return nil, err
 	}
 
-	return SignDataHashWithEthereumPrivateKey(data, privateKeyECDSA)
+	return signDataHashWithEthereumPrivateKey(data, privateKeyECDSA)
 }
 
-func SignDataHashWithEthereumPrivateKey(dataToSign []byte, privateKeyECDSA *ecdsa.PrivateKey) ([]byte, error) {
+func signDataHashWithEthereumPrivateKey(dataToSign []byte, privateKeyECDSA *ecdsa.PrivateKey) ([]byte, error) {
 	if len(dataToSign) != 32 {
 		return nil, errors.New("dataToSign must be 32 bytes long")
 	}
@@ -235,21 +235,21 @@ func SignDataHashWithEthereumPrivateKey(dataToSign []byte, privateKeyECDSA *ecds
 	return out, nil
 }
 
-func AppendEntryPointAddress(jsonData []byte, entryPointAddress common.Address) (error, []byte) {
+func appendEntryPointAddress(jsonData []byte, entryPointAddress common.Address) ([]byte, error) {
 	// Define a struct to represent the JSON data
 	var data map[string]interface{}
 
 	// Parse the JSON data into the struct
 	if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
 		log.Error("failed to unmarshal JSON", zap.Error(err))
-		return err, nil
+		return nil, err
 	}
 
 	// Add the custom value to the 'params' array
 	paramsArray, ok := data["params"].([]interface{})
 	if !ok {
 		log.Error("'params' field is not an array")
-		return errors.New("'params' field is not an array"), nil
+		return nil, errors.New("'params' field is not an array")
 	}
 	paramsArray = append(paramsArray, entryPointAddress.String())
 	data["params"] = paramsArray
@@ -258,8 +258,60 @@ func AppendEntryPointAddress(jsonData []byte, entryPointAddress common.Address) 
 	outputJSON, err := json.Marshal(data)
 	if err != nil {
 		log.Error("error encoding JSON:", zap.Error(err))
-		return err, nil
+		return nil, err
 	}
 
-	return nil, outputJSON
+	return outputJSON, nil
+}
+
+func getAccountInitCode(eoa common.Address, factoryAddr common.Address) ([]byte, error) {
+	const jsondata = `
+		[
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "salt",
+						"type": "uint256"
+					}
+				],
+				"name": "createAccount",
+				"outputs": [
+					{
+						"internalType": "contract SimpleAccount",
+						"name": "ret",
+						"type": "address"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		]
+	`
+
+	factoryABI, err := abi.JSON(strings.NewReader(jsondata))
+	if err != nil {
+		log.Error("error parsing ABI:", zap.Error(err))
+		return nil, err
+	}
+
+	// salt is 0
+	data, err := factoryABI.Pack("createAccount", eoa, big.NewInt(0))
+	if err != nil {
+		log.Error("error encoding function data", zap.Error(err))
+		return nil, nil
+	}
+
+	// log data
+	log.Debug("data: ", zap.String("data", hex.EncodeToString(data)))
+
+	// prepend factory address
+	data = append(factoryAddr.Bytes(), data...)
+
+	return data, nil
 }

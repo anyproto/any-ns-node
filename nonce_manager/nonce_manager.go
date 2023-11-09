@@ -170,7 +170,3 @@ func (anonce *anynsNonceService) SaveNonce(addr ethcommon.Address, newValue uint
 
 	return newValue, nil
 }
-
-func (anonce *anynsNonceService) getAdminAddr() string {
-	return anonce.confContracts.AddrAdmin
-}
