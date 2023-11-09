@@ -1,13 +1,23 @@
+SHELL=/bin/bash
 export GOPRIVATE=github.com/anyproto
 export PATH:=deps:$(PATH)
+export CGO_ENABLED:=1
+BUILD_GOOS:=$(shell go env GOOS)
+BUILD_GOARCH:=$(shell go env GOARCH)
+
+ifeq ($(CGO_ENABLED), 0)
+	TAGS:=-tags nographviz
+else
+	TAGS:=
+endif
 
 .PHONY: build
 build:
 	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/any-ns-node/app))
-	go build -v -o bin/any-ns-node -ldflags "$(FLAGS) -X github.com/anyproto/any-ns-node/app.AppName=any-ns-node" github.com/anyproto/any-ns-node/cmd
+	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build $(TAGS) -v -o bin/any-ns-node -ldflags "$(FLAGS) -X github.com/anyproto/any-ns-node/app.AppName=any-ns-node" github.com/anyproto/any-ns-node/cmd
 
 contracts/mock/contracts_mock.go: contracts/contracts.go
-	# go install go.uber.org/mock/mockgen@latest 
+	# go install go.uber.org/mock/mockgen@latest
 	mockgen -source=contracts/contracts.go > contracts/mock/contracts_mock.go
 
 queue/mock/queue_mock.go: queue/queue.go
@@ -27,11 +37,11 @@ mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/m
 
 .PHONY: test
 test: mocks
-	go test ./... --cover
+	go test ./... --cover $(TAGS)
 
 .PHONY: check-style
 check-style:
-	golangci-lint run -E errcheck -E gofmt -E revive 
+	golangci-lint run -E errcheck -E gofmt -E revive
 
 .PHONY: deps
 deps:
