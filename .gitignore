@@ -36,3 +36,4 @@ vendor
 # vendor/
 
 ./config*.yaml
+./config*.yml

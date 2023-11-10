@@ -115,7 +115,7 @@ all: deps pb anytype_crypto build
 # Run a dRPC server
 .PHONY: run
 run:
-	go run ./cmd --c=config.yaml
+	go run ./cmd --c=config.yml
 
 # Run a test client that connects to server
 .PHONY: is-name-avail

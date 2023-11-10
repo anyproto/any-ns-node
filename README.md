@@ -13,7 +13,7 @@ This global singleton node provides access to AnyNS smart contracts. You can cal
 ### 1. is-name-available
 Check if name is available. If not - it will return information
 Parameters: `'{ "FullName": "xxx.any"}'`.
-Example: `go run ./cmd --c=config-client.yaml --cl --cmd=is-name-available --params='{ "FullName": "xxx.any"}'`
+Example: `go run ./cmd --c=config-client.yml --cl --cmd=is-name-available --params='{ "FullName": "xxx.any"}'`
 
 ### 2. name-register
 Create an operation to register a new name.

@@ -139,29 +139,29 @@ func runAsClient(a *app.App, ctx context.Context) {
 	// check commands
 	switch *command {
 	case "name-register":
-		clientNameRegister(client, ctx)
+		clientNameRegister(ctx, client)
 	case "is-name-available":
-		clientIsNameAvailable(client, ctx)
+		clientIsNameAvailable(ctx, client)
 	case "name-renew":
-		clientNameRenew(client, ctx)
+		clientNameRenew(ctx, client)
 	case "name-by-address":
-		clientNameByAddress(client, ctx)
+		clientNameByAddress(ctx, client)
 
 	// AccountAbstraction methods:
 	case "get-user-account":
-		clientGetUserAccount(client, ctx)
+		clientGetUserAccount(ctx, client)
 	case "admin-fund-user":
 		// it will pack and sign the request
 		// no need to do that manually
-		adminFundUserAccount(a, client, ctx)
+		adminFundUserAccount(ctx, a, client)
 	case "get-operation":
-		clientGetOperation(client, ctx)
+		clientGetOperation(ctx, client)
 	default:
 		log.Fatal("unknown command", zap.String("command", *command))
 	}
 }
 
-func clientIsNameAvailable(client client.AnyNsClientService, ctx context.Context) {
+func clientIsNameAvailable(ctx context.Context, client client.AnyNsClientService) {
 	var req = &as.NameAvailableRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
@@ -177,7 +177,7 @@ func clientIsNameAvailable(client client.AnyNsClientService, ctx context.Context
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientNameRegister(client client.AnyNsClientService, ctx context.Context) {
+func clientNameRegister(ctx context.Context, client client.AnyNsClientService) {
 	var req = &as.NameRegisterRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
@@ -193,7 +193,7 @@ func clientNameRegister(client client.AnyNsClientService, ctx context.Context) {
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientNameRenew(client client.AnyNsClientService, ctx context.Context) {
+func clientNameRenew(ctx context.Context, client client.AnyNsClientService) {
 	var req = &as.NameRenewRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
@@ -209,7 +209,7 @@ func clientNameRenew(client client.AnyNsClientService, ctx context.Context) {
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientNameByAddress(client client.AnyNsClientService, ctx context.Context) {
+func clientNameByAddress(ctx context.Context, client client.AnyNsClientService) {
 	var req = &as.NameByAddressRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
@@ -225,7 +225,7 @@ func clientNameByAddress(client client.AnyNsClientService, ctx context.Context) 
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientGetUserAccount(client client.AnyNsClientService, ctx context.Context) {
+func clientGetUserAccount(ctx context.Context, client client.AnyNsClientService) {
 	var req = &as.GetUserAccountRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
@@ -241,7 +241,7 @@ func clientGetUserAccount(client client.AnyNsClientService, ctx context.Context)
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func adminFundUserAccount(a *app.App, client client.AnyNsClientService, ctx context.Context) {
+func adminFundUserAccount(ctx context.Context, a *app.App, client client.AnyNsClientService) {
 	// 1 - pack request
 	var req = &as.AdminFundUserAccountRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
@@ -283,7 +283,7 @@ func adminFundUserAccount(a *app.App, client client.AnyNsClientService, ctx cont
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientGetOperation(client client.AnyNsClientService, ctx context.Context) {
+func clientGetOperation(ctx context.Context, client client.AnyNsClientService) {
 	var req = &as.GetOperationStatusRequest{}
 
 	err := json.Unmarshal([]byte(*params), &req)
