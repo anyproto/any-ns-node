@@ -4,6 +4,7 @@ import (
 	"os"
 
 	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/metric"
 	"github.com/anyproto/any-sync/net/rpc"
 	"github.com/anyproto/any-sync/net/transport/quic"
 	"github.com/anyproto/any-sync/net/transport/yamux"
@@ -42,6 +43,7 @@ type Config struct {
 	Queue            Queue                  `yaml:"queue"`
 	Nonce            Nonce                  `yaml:"nonce"`
 	Aa               AA                     `yaml:"accountAbstraction"`
+	Metric           metric.Config          `yaml:"metric"`
 }
 
 func (c *Config) Init(a *app.App) (err error) {
@@ -86,4 +88,8 @@ func (c *Config) GetAA() AA {
 
 func (c *Config) GetQuic() quic.Config {
 	return c.Quic
+}
+
+func (c *Config) GetMetric() metric.Config {
+	return c.Metric
 }

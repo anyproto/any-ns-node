@@ -8,6 +8,8 @@ drpc:
 mongo:
     connect: mongodb://localhost:27017
     database: anynsnode
+metric:
+    addr: 0.0.0.0:8000
 yamux:
     listenAddrs:
         - 127.0.0.1:4830

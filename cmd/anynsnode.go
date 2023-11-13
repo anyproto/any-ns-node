@@ -18,6 +18,7 @@ import (
 	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
 	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/metric"
 	"github.com/anyproto/any-sync/util/crypto"
 
 	"github.com/anyproto/any-sync/app"
@@ -318,6 +319,7 @@ func BootstrapClient(a *app.App) {
 func BootstrapServer(a *app.App) {
 	a.Register(account.New()).
 		Register(contracts.New()).
+		Register(metric.New()).
 		Register(nonce_manager.New()).
 		Register(nodeconf.New()).
 		Register(nodeconfstore.New()).
