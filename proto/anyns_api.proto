@@ -39,83 +39,8 @@ message NameByAddressResponse {
   string name = 2;
 }
 
-message NameRegisterRequest {
-  string fullName = 1;
-
-  // A content hash attached to this name
-  string ownerAnyAddress = 2;
-  
-  // An Ethereum address that owns that name
-  string ownerEthAddress = 3;
-
-  // A SpaceID attached to this name
-  string spaceId = 4;
-}
-
-message NameRenewRequest {
-  string fullName = 1;
-
-  uint64 durationSeconds = 2;
-}
-
-message NameRegisterSignedRequest {
-  // NameRegisterRequest struct
-  bytes payload = 1;
-
-  // payload signed by payload.ownerEthAddress 
-  bytes signature = 2; 
-}
-
-message NameUpdateRequest {
-  string fullName = 1;
-
-  // A content hash attached to this name
-  string ownerAnyAddress = 2;
-
-  // A SpaceID attached to this name
-  string spaceId = 3;
-}
-
-message GetOperationStatusRequest {
-  string operationId = 1;
-}
-
-enum OperationState {
-  Unknown = 0;
-  
-  Pending = 1;
-  PendingOrNotFound = 2;
-  Completed = 3;
-  Error = 4;
-}
-
-message OperationResponse {
-  string operationId = 1;
-  OperationState operationState = 2;
-}
-
-message GetNameRegisterMsgResponse {
-  bytes msg = 1;
-}
-
-
 service Anyns {
   // Check if name is free or get the attached information if not
   rpc IsNameAvailable(NameAvailableRequest) returns (NameAvailableResponse) {}
   rpc GetNameByAddress(NameByAddressRequest) returns (NameByAddressResponse) {}
-
-  // TODO: remove this method (it is insecure) and use NameRegisterRequestSigned
-  rpc NameRegister(NameRegisterRequest) returns (OperationResponse) {}
-  rpc NameRegisterSigned(NameRegisterSignedRequest) returns (OperationResponse) {}
-
-  // Get the async operation with id==X statue
-  rpc GetOperationStatus(GetOperationStatusRequest) returns (OperationResponse) {}
-
-  // Renew name without changing the owner
-  rpc NameRenew(NameRenewRequest) returns (OperationResponse) {}
-
-// TODO:
-  // Add to queue a name update operation
-  // rpc NameUpdate(NameUpdateRequest) returns (OperationResponse) {}
-  
 }

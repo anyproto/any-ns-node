@@ -42,10 +42,6 @@ type DRPCAnynsClient interface {
 
 	IsNameAvailable(ctx context.Context, in *NameAvailableRequest) (*NameAvailableResponse, error)
 	GetNameByAddress(ctx context.Context, in *NameByAddressRequest) (*NameByAddressResponse, error)
-	NameRegister(ctx context.Context, in *NameRegisterRequest) (*OperationResponse, error)
-	NameRegisterSigned(ctx context.Context, in *NameRegisterSignedRequest) (*OperationResponse, error)
-	GetOperationStatus(ctx context.Context, in *GetOperationStatusRequest) (*OperationResponse, error)
-	NameRenew(ctx context.Context, in *NameRenewRequest) (*OperationResponse, error)
 }
 
 type drpcAnynsClient struct {
@@ -76,49 +72,9 @@ func (c *drpcAnynsClient) GetNameByAddress(ctx context.Context, in *NameByAddres
 	return out, nil
 }
 
-func (c *drpcAnynsClient) NameRegister(ctx context.Context, in *NameRegisterRequest) (*OperationResponse, error) {
-	out := new(OperationResponse)
-	err := c.cc.Invoke(ctx, "/Anyns/NameRegister", drpcEncoding_File_proto_anyns_api_proto{}, in, out)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *drpcAnynsClient) NameRegisterSigned(ctx context.Context, in *NameRegisterSignedRequest) (*OperationResponse, error) {
-	out := new(OperationResponse)
-	err := c.cc.Invoke(ctx, "/Anyns/NameRegisterSigned", drpcEncoding_File_proto_anyns_api_proto{}, in, out)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *drpcAnynsClient) GetOperationStatus(ctx context.Context, in *GetOperationStatusRequest) (*OperationResponse, error) {
-	out := new(OperationResponse)
-	err := c.cc.Invoke(ctx, "/Anyns/GetOperationStatus", drpcEncoding_File_proto_anyns_api_proto{}, in, out)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *drpcAnynsClient) NameRenew(ctx context.Context, in *NameRenewRequest) (*OperationResponse, error) {
-	out := new(OperationResponse)
-	err := c.cc.Invoke(ctx, "/Anyns/NameRenew", drpcEncoding_File_proto_anyns_api_proto{}, in, out)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 type DRPCAnynsServer interface {
 	IsNameAvailable(context.Context, *NameAvailableRequest) (*NameAvailableResponse, error)
 	GetNameByAddress(context.Context, *NameByAddressRequest) (*NameByAddressResponse, error)
-	NameRegister(context.Context, *NameRegisterRequest) (*OperationResponse, error)
-	NameRegisterSigned(context.Context, *NameRegisterSignedRequest) (*OperationResponse, error)
-	GetOperationStatus(context.Context, *GetOperationStatusRequest) (*OperationResponse, error)
-	NameRenew(context.Context, *NameRenewRequest) (*OperationResponse, error)
 }
 
 type DRPCAnynsUnimplementedServer struct{}
@@ -131,25 +87,9 @@ func (s *DRPCAnynsUnimplementedServer) GetNameByAddress(context.Context, *NameBy
 	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
 }
 
-func (s *DRPCAnynsUnimplementedServer) NameRegister(context.Context, *NameRegisterRequest) (*OperationResponse, error) {
-	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
-}
-
-func (s *DRPCAnynsUnimplementedServer) NameRegisterSigned(context.Context, *NameRegisterSignedRequest) (*OperationResponse, error) {
-	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
-}
-
-func (s *DRPCAnynsUnimplementedServer) GetOperationStatus(context.Context, *GetOperationStatusRequest) (*OperationResponse, error) {
-	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
-}
-
-func (s *DRPCAnynsUnimplementedServer) NameRenew(context.Context, *NameRenewRequest) (*OperationResponse, error) {
-	return nil, drpcerr.WithCode(errors.New("Unimplemented"), drpcerr.Unimplemented)
-}
-
 type DRPCAnynsDescription struct{}
 
-func (DRPCAnynsDescription) NumMethods() int { return 6 }
+func (DRPCAnynsDescription) NumMethods() int { return 2 }
 
 func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver, interface{}, bool) {
 	switch n {
@@ -171,42 +111,6 @@ func (DRPCAnynsDescription) Method(n int) (string, drpc.Encoding, drpc.Receiver,
 						in1.(*NameByAddressRequest),
 					)
 			}, DRPCAnynsServer.GetNameByAddress, true
-	case 2:
-		return "/Anyns/NameRegister", drpcEncoding_File_proto_anyns_api_proto{},
-			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
-				return srv.(DRPCAnynsServer).
-					NameRegister(
-						ctx,
-						in1.(*NameRegisterRequest),
-					)
-			}, DRPCAnynsServer.NameRegister, true
-	case 3:
-		return "/Anyns/NameRegisterSigned", drpcEncoding_File_proto_anyns_api_proto{},
-			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
-				return srv.(DRPCAnynsServer).
-					NameRegisterSigned(
-						ctx,
-						in1.(*NameRegisterSignedRequest),
-					)
-			}, DRPCAnynsServer.NameRegisterSigned, true
-	case 4:
-		return "/Anyns/GetOperationStatus", drpcEncoding_File_proto_anyns_api_proto{},
-			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
-				return srv.(DRPCAnynsServer).
-					GetOperationStatus(
-						ctx,
-						in1.(*GetOperationStatusRequest),
-					)
-			}, DRPCAnynsServer.GetOperationStatus, true
-	case 5:
-		return "/Anyns/NameRenew", drpcEncoding_File_proto_anyns_api_proto{},
-			func(srv interface{}, ctx context.Context, in1, in2 interface{}) (drpc.Message, error) {
-				return srv.(DRPCAnynsServer).
-					NameRenew(
-						ctx,
-						in1.(*NameRenewRequest),
-					)
-			}, DRPCAnynsServer.NameRenew, true
 	default:
 		return "", nil, nil, nil, false
 	}
@@ -242,70 +146,6 @@ type drpcAnyns_GetNameByAddressStream struct {
 }
 
 func (x *drpcAnyns_GetNameByAddressStream) SendAndClose(m *NameByAddressResponse) error {
-	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_proto{}); err != nil {
-		return err
-	}
-	return x.CloseSend()
-}
-
-type DRPCAnyns_NameRegisterStream interface {
-	drpc.Stream
-	SendAndClose(*OperationResponse) error
-}
-
-type drpcAnyns_NameRegisterStream struct {
-	drpc.Stream
-}
-
-func (x *drpcAnyns_NameRegisterStream) SendAndClose(m *OperationResponse) error {
-	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_proto{}); err != nil {
-		return err
-	}
-	return x.CloseSend()
-}
-
-type DRPCAnyns_NameRegisterSignedStream interface {
-	drpc.Stream
-	SendAndClose(*OperationResponse) error
-}
-
-type drpcAnyns_NameRegisterSignedStream struct {
-	drpc.Stream
-}
-
-func (x *drpcAnyns_NameRegisterSignedStream) SendAndClose(m *OperationResponse) error {
-	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_proto{}); err != nil {
-		return err
-	}
-	return x.CloseSend()
-}
-
-type DRPCAnyns_GetOperationStatusStream interface {
-	drpc.Stream
-	SendAndClose(*OperationResponse) error
-}
-
-type drpcAnyns_GetOperationStatusStream struct {
-	drpc.Stream
-}
-
-func (x *drpcAnyns_GetOperationStatusStream) SendAndClose(m *OperationResponse) error {
-	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_proto{}); err != nil {
-		return err
-	}
-	return x.CloseSend()
-}
-
-type DRPCAnyns_NameRenewStream interface {
-	drpc.Stream
-	SendAndClose(*OperationResponse) error
-}
-
-type drpcAnyns_NameRenewStream struct {
-	drpc.Stream
-}
-
-func (x *drpcAnyns_NameRenewStream) SendAndClose(m *OperationResponse) error {
 	if err := x.MsgSend(m, drpcEncoding_File_proto_anyns_api_proto{}); err != nil {
 		return err
 	}

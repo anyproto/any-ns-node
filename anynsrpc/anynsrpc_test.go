@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/anyproto/any-sync/app"
-	"github.com/anyproto/any-sync/commonspace/object/accountdata"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -23,90 +22,6 @@ import (
 )
 
 var ctx = context.Background()
-
-func TestVerifyIdentity_IdentityIsOK(t *testing.T) {
-	var in as.NameRegisterSignedRequest
-
-	accountKeys, err := accountdata.NewRandom()
-	require.NoError(t, err)
-
-	identity, err := accountKeys.SignKey.GetPublic().Marshall()
-	require.NoError(t, err)
-
-	// pack
-	nrr := as.NameRegisterRequest{
-		OwnerAnyAddress: string(identity),
-		OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-		FullName:        "hello.any",
-		SpaceId:         "",
-	}
-
-	marshalled, err := nrr.Marshal()
-	require.NoError(t, err)
-
-	in.Payload = marshalled
-	in.Signature, err = accountKeys.SignKey.Sign(in.Payload)
-	require.NoError(t, err)
-
-	// run
-	err = verifyIdentity(&in, nrr.OwnerAnyAddress)
-	require.NoError(t, err)
-}
-
-func TestVerifyIdentity_IdentityIsBad(t *testing.T) {
-	var in as.NameRegisterSignedRequest
-
-	accountKeys, err := accountdata.NewRandom()
-	require.NoError(t, err)
-
-	accountKeys2, err := accountdata.NewRandom()
-	require.NoError(t, err)
-
-	identity2, err := accountKeys2.SignKey.GetPublic().Marshall()
-	require.NoError(t, err)
-
-	// pack
-	nrr := as.NameRegisterRequest{
-		// DIFFERENT!
-		OwnerAnyAddress: string(identity2),
-		OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-		FullName:        "hello.any",
-		SpaceId:         "",
-	}
-
-	marshalled, err := nrr.Marshal()
-	require.NoError(t, err)
-
-	in.Payload = marshalled
-	in.Signature, err = accountKeys.SignKey.Sign(in.Payload)
-	require.NoError(t, err)
-
-	// run
-	err = verifyIdentity(&in, nrr.OwnerAnyAddress)
-	require.Error(t, err)
-}
-
-func TestAnynsRpc_GetOperationStatus(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.queue.EXPECT().GetRequestStatus(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, operationId interface{}) (as.OperationState, error) {
-			return as.OperationState_Completed, nil
-		})
-
-		pctx := context.Background()
-		resp, err := fx.GetOperationStatus(pctx, &as.GetOperationStatusRequest{
-			OperationId: "1",
-		})
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-
-		// this always returns completed even if operation was never created
-		assert.Equal(t, resp.OperationId, "1")
-		assert.Equal(t, resp.OperationState, as.OperationState_Completed)
-	})
-}
 
 func TestIsValidAnyAddress(t *testing.T) {
 
@@ -189,110 +104,6 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 		assert.Equal(t, resp.OwnerEthAddress, "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		assert.Equal(t, resp.OwnerAnyAddress, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
 		assert.Equal(t, resp.SpaceId, "")
-	})
-}
-
-func TestAnynsRpc_RegisterName(t *testing.T) {
-
-	t.Run("bad names", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.queue.EXPECT().AddNewRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, req interface{}) (int64, error) {
-			return 1, nil
-		}).AnyTimes()
-
-		// 1 - bad names
-		var arrayOfBadNames = []string{
-			"hello",          // no extension
-			"somename/hello", // multi-level is not allowed
-			"xx.any",         // too short
-			"somename.hello", // bad TLD
-		}
-
-		// for-each this array
-		for _, badName := range arrayOfBadNames {
-			pctx := context.Background()
-			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-				FullName:        badName,
-				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-			})
-
-			require.Error(t, err)
-		}
-	})
-
-	t.Run("bad eth address", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		var arrayOfBadEthAddresses = []string{
-			"", // no address
-			"0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a5",   // too short
-			"0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a511", // too long
-			"0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a5g",  // bad symbol
-		}
-
-		for _, badEthAddress := range arrayOfBadEthAddresses {
-			pctx := context.Background()
-			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-				FullName:        "coolName.any",
-				OwnerEthAddress: badEthAddress,
-				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-			})
-
-			require.Error(t, err)
-		}
-	})
-
-	t.Run("bad any address", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		// 3 - bad Any address
-		var arrayOfBadAnyAddresses = []string{
-			"", // no address
-			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSu",   // too short
-			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuSS", // too long
-			"12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuSg", // bad symbol
-		}
-
-		// for-each this array
-		for _, badAnyAddress := range arrayOfBadAnyAddresses {
-			pctx := context.Background()
-			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-				FullName:        "coolName.any",
-				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-				OwnerAnyAddress: badAnyAddress,
-			})
-
-			require.Error(t, err)
-		}
-	})
-
-	t.Run("bad space ID", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		var arrayOfBadSpaces = []string{
-			"bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjz",   // too short
-			"bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjzee", // too long
-			"АВФbafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhc",  // bad symbols
-		}
-
-		// for-each this array
-		for _, badSpace := range arrayOfBadSpaces {
-			pctx := context.Background()
-			_, err := fx.NameRegister(pctx, &as.NameRegisterRequest{
-				FullName:        "coolName.any",
-				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
-				SpaceId:         badSpace,
-			})
-
-			require.Error(t, err)
-		}
 	})
 }
 

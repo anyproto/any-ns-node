@@ -92,20 +92,6 @@ func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) 
 	}
 }
 
-func queueItemFromNameRenewRequest(req *as.NameRenewRequest, count int64) QueueItem {
-	currTime := time.Now().Unix()
-
-	return QueueItem{
-		Index:                count,
-		ItemType:             ItemType_NameRenew,
-		FullName:             req.FullName,
-		NameRenewDurationSec: req.DurationSeconds,
-		Status:               OperationStatus_Initial,
-		DateCreated:          currTime,
-		DateModified:         currTime,
-	}
-}
-
 // TODO: remove this
 func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
 	req := as.NameRegisterRequest{

@@ -21,24 +21,23 @@ var log = logger.NewNamed(CName)
  * This client component can be used to access the Any Naming System (any-ns)
  * from other components.
  */
-type AnyNsClientService interface {
+type AnyNsClientServiceBase interface {
 	IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (out *as.NameAvailableResponse, err error)
-	GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error)
-	// TODO: remove and use only NameRegisterSigned
-	NameRegister(ctx context.Context, in *as.NameRegisterRequest) (out *as.OperationResponse, err error)
-	NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error)
-
-	NameRenew(ctx context.Context, in *as.NameRenewRequest) (out *as.OperationResponse, err error)
-
 	// reverse resolve
 	GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (out *as.NameByAddressResponse, err error)
 
-	// AccountAbstractions interface
+	app.ComponentRunnable
+}
+
+type AnyNsClientService interface {
+	// AccountAbstractions methods:
 	GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (out *as.UserAccount, err error)
 	AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (out *as.OperationResponse, err error)
-	GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error)
 
-	app.ComponentRunnable
+	GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error)
+	CreateOperation(ctx context.Context, in *as.CreateUserOperationRequestSigned) (out *as.OperationResponse, err error)
+
+	AnyNsClientServiceBase
 }
 
 type service struct {
@@ -123,46 +122,6 @@ func (s *service) IsNameAvailable(ctx context.Context, in *as.NameAvailableReque
 	return
 }
 
-func (s *service) GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error) {
-	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
-		if out, err = cl.GetOperationStatus(ctx, in); err != nil {
-			return rpcerr.Unwrap(err)
-		}
-		return nil
-	})
-	return
-}
-
-func (s *service) NameRegister(ctx context.Context, in *as.NameRegisterRequest) (out *as.OperationResponse, err error) {
-	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
-		if out, err = cl.NameRegister(ctx, in); err != nil {
-			return rpcerr.Unwrap(err)
-		}
-		return nil
-	})
-	return
-}
-
-func (s *service) NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (out *as.OperationResponse, err error) {
-	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
-		if out, err = cl.NameRegisterSigned(ctx, in); err != nil {
-			return rpcerr.Unwrap(err)
-		}
-		return nil
-	})
-	return
-}
-
-func (s *service) NameRenew(ctx context.Context, in *as.NameRenewRequest) (out *as.OperationResponse, err error) {
-	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
-		if out, err = cl.NameRenew(ctx, in); err != nil {
-			return rpcerr.Unwrap(err)
-		}
-		return nil
-	})
-	return
-}
-
 func (s *service) GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (out *as.NameByAddressResponse, err error) {
 	err = s.doClient(ctx, func(cl as.DRPCAnynsClient) error {
 		if out, err = cl.GetNameByAddress(ctx, in); err != nil {
@@ -197,6 +156,16 @@ func (s *service) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUser
 func (s *service) GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (out *as.OperationResponse, err error) {
 	err = s.doClientAA(ctx, func(cl as.DRPCAnynsAccountAbstractionClient) error {
 		if out, err = cl.GetOperation(ctx, in); err != nil {
+			return rpcerr.Unwrap(err)
+		}
+		return nil
+	})
+	return
+}
+
+func (s *service) CreateOperation(ctx context.Context, in *as.CreateUserOperationRequestSigned) (out *as.OperationResponse, err error) {
+	err = s.doClientAA(ctx, func(cl as.DRPCAnynsAccountAbstractionClient) error {
+		if out, err = cl.CreateUserOperation(ctx, in); err != nil {
 			return rpcerr.Unwrap(err)
 		}
 		return nil

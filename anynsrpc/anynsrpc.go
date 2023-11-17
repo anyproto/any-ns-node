@@ -3,11 +3,8 @@ package anynsrpc
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/gogo/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/anyproto/any-ns-node/config"
@@ -44,25 +41,6 @@ func (arpc *anynsRpc) Init(a *app.App) (err error) {
 
 func (arpc *anynsRpc) Name() (name string) {
 	return CName
-}
-
-func (arpc *anynsRpc) GetOperationStatus(ctx context.Context, in *as.GetOperationStatusRequest) (*as.OperationResponse, error) {
-	// 1 - convert in.OperationId from string to int64
-	operationID, err := strconv.ParseInt(in.OperationId, 10, 64)
-	if err != nil {
-		log.Error("can not convert OperationId to int64", zap.Error(err))
-		return nil, err
-	}
-
-	currentState, err := arpc.queue.GetRequestStatus(ctx, operationID)
-	if err != nil {
-		return nil, err
-	}
-
-	var res as.OperationResponse
-	res.OperationId = in.OperationId
-	res.OperationState = currentState
-	return &res, nil
 }
 
 func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (*as.NameAvailableResponse, error) {
@@ -121,81 +99,6 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	res.NameExpires = exp.Int64()
 
 	return &res, nil
-}
-
-func (arpc *anynsRpc) NameRegister(ctx context.Context, in *as.NameRegisterRequest) (*as.OperationResponse, error) {
-	// 1 - check all parameters
-	err := СheckRegisterParams(in)
-	if err != nil {
-		log.Error("invalid parameters", zap.Error(err))
-		return nil, err
-	}
-
-	// 2 - create new operation
-	operationId, err := arpc.queue.AddNewRequest(ctx, in)
-	if err != nil {
-		log.Error("can not create new operation", zap.Error(err))
-		return nil, err
-	}
-
-	return &as.OperationResponse{
-		OperationState: as.OperationState_Pending,
-		OperationId:    fmt.Sprint(operationId),
-	}, err
-}
-
-func (arpc *anynsRpc) NameRegisterSigned(ctx context.Context, in *as.NameRegisterSignedRequest) (*as.OperationResponse, error) {
-	var resp as.OperationResponse
-
-	// 1 - unmarshal the signed request
-	var nrr as.NameRegisterRequest
-	err := proto.Unmarshal(in.Payload, &nrr)
-	if err != nil {
-		resp.OperationState = as.OperationState_Error
-		log.Error("can not unmarshal NameRegisterRequest", zap.Error(err))
-		return &resp, err
-	}
-
-	// 2 - check signature
-	err = verifyIdentity(in, nrr.OwnerAnyAddress)
-	if err != nil {
-		resp.OperationState = as.OperationState_Error
-		log.Error("identity is different", zap.Error(err))
-		return &resp, err
-	}
-
-	// 3 - check all parameters
-	err = СheckRegisterParams(&nrr)
-	if err != nil {
-		log.Error("invalid parameters", zap.Error(err))
-		return nil, err
-	}
-
-	// 4 - add to queue
-	operationId, err := arpc.queue.AddNewRequest(ctx, &nrr)
-	resp.OperationId = fmt.Sprint(operationId)
-	resp.OperationState = as.OperationState_Pending
-	return &resp, err
-}
-
-func (arpc *anynsRpc) NameRenew(ctx context.Context, in *as.NameRenewRequest) (*as.OperationResponse, error) {
-	// 1 - check all parameters
-	if !checkName(in.FullName) {
-		log.Error("invalid name", zap.String("name", in.FullName))
-		return nil, errors.New("invalid name")
-	}
-
-	// 2 - create new operation
-	operationId, err := arpc.queue.AddRenewRequest(ctx, in)
-	if err != nil {
-		log.Error("can not create new operation", zap.Error(err))
-		return nil, err
-	}
-
-	return &as.OperationResponse{
-		OperationState: as.OperationState_Pending,
-		OperationId:    fmt.Sprint(operationId),
-	}, err
 }
 
 func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (*as.NameByAddressResponse, error) {

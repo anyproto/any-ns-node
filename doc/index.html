@@ -207,13 +207,29 @@
                 </li>
               
                 <li>
+                  <a href="#.GetOperationStatusRequest"><span class="badge">M</span>GetOperationStatusRequest</a>
+                </li>
+              
+                <li>
                   <a href="#.GetUserAccountRequest"><span class="badge">M</span>GetUserAccountRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.NameRegisterRequest"><span class="badge">M</span>NameRegisterRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#.OperationResponse"><span class="badge">M</span>OperationResponse</a>
                 </li>
               
                 <li>
                   <a href="#.UserAccount"><span class="badge">M</span>UserAccount</a>
                 </li>
               
+              
+                <li>
+                  <a href="#.OperationState"><span class="badge">E</span>OperationState</a>
+                </li>
               
               
               
@@ -228,14 +244,6 @@
           <li>
             <a href="#proto%2fanyns_api.proto">proto/anyns_api.proto</a>
             <ul>
-              
-                <li>
-                  <a href="#.GetNameRegisterMsgResponse"><span class="badge">M</span>GetNameRegisterMsgResponse</a>
-                </li>
-              
-                <li>
-                  <a href="#.GetOperationStatusRequest"><span class="badge">M</span>GetOperationStatusRequest</a>
-                </li>
               
                 <li>
                   <a href="#.NameAvailableRequest"><span class="badge">M</span>NameAvailableRequest</a>
@@ -253,30 +261,6 @@
                   <a href="#.NameByAddressResponse"><span class="badge">M</span>NameByAddressResponse</a>
                 </li>
               
-                <li>
-                  <a href="#.NameRegisterRequest"><span class="badge">M</span>NameRegisterRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#.NameRegisterSignedRequest"><span class="badge">M</span>NameRegisterSignedRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#.NameRenewRequest"><span class="badge">M</span>NameRenewRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#.NameUpdateRequest"><span class="badge">M</span>NameUpdateRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#.OperationResponse"><span class="badge">M</span>OperationResponse</a>
-                </li>
-              
-              
-                <li>
-                  <a href="#.OperationState"><span class="badge">E</span>OperationState</a>
-                </li>
               
               
               
@@ -545,6 +529,30 @@
 
         
       
+        <h3 id=".GetOperationStatusRequest">GetOperationStatusRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>operationId</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id=".GetUserAccountRequest">GetUserAccountRequest</h3>
         <p>no signature required here</p>
 
@@ -560,6 +568,82 @@
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>An Ethereum address that owns that account </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".NameRegisterRequest">NameRegisterRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>fullName</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ownerAnyAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A content hash attached to this name </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ownerEthAddress</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>An Ethereum address that owns that name </p></td>
+                </tr>
+              
+                <tr>
+                  <td>spaceId</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A SpaceID attached to this name </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id=".OperationResponse">OperationResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>operationId</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operationState</td>
+                  <td><a href="#OperationState">OperationState</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -627,6 +711,47 @@ SCW is deployed automatically after first operation </p></td>
       
 
       
+        <h3 id=".OperationState">OperationState</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>Unknown</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Pending</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PendingOrNotFound</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Completed</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Error</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
 
       
 
@@ -684,7 +809,7 @@ Use it to:
 1. get data &#43; context
 2. sign it with your Ethereum private key
 3. send it using CreateUserOperation
-4. check operation status using GetOperationStatus</p></td>
+4. check operation status using GetOperation</p></td>
               </tr>
             
               <tr>
@@ -705,54 +830,6 @@ Use it to:
       </div>
       <p></p>
 
-      
-        <h3 id=".GetNameRegisterMsgResponse">GetNameRegisterMsgResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>msg</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id=".GetOperationStatusRequest">GetOperationStatusRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>operationId</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
       
         <h3 id=".NameAvailableRequest">NameAvailableRequest</h3>
         <p></p>
@@ -889,224 +966,7 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
 
         
       
-        <h3 id=".NameRegisterRequest">NameRegisterRequest</h3>
-        <p></p>
 
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>fullName</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>ownerAnyAddress</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>A content hash attached to this name </p></td>
-                </tr>
-              
-                <tr>
-                  <td>ownerEthAddress</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>An Ethereum address that owns that name </p></td>
-                </tr>
-              
-                <tr>
-                  <td>spaceId</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>A SpaceID attached to this name </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id=".NameRegisterSignedRequest">NameRegisterSignedRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>payload</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>NameRegisterRequest struct </p></td>
-                </tr>
-              
-                <tr>
-                  <td>signature</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>payload signed by payload.ownerEthAddress </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id=".NameRenewRequest">NameRenewRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>fullName</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>durationSeconds</td>
-                  <td><a href="#uint64">uint64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id=".NameUpdateRequest">NameUpdateRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>fullName</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>ownerAnyAddress</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>A content hash attached to this name </p></td>
-                </tr>
-              
-                <tr>
-                  <td>spaceId</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>A SpaceID attached to this name </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id=".OperationResponse">OperationResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>operationId</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>operationState</td>
-                  <td><a href="#OperationState">OperationState</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-
-      
-        <h3 id=".OperationState">OperationState</h3>
-        <p></p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>Unknown</td>
-                <td>0</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>Pending</td>
-                <td>1</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>PendingOrNotFound</td>
-                <td>2</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>Completed</td>
-                <td>3</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>Error</td>
-                <td>4</td>
-                <td><p></p></td>
-              </tr>
-            
-          </tbody>
-        </table>
       
 
       
@@ -1132,34 +992,6 @@ google.protobuf.Timestamp nameExpires = 5 [(gogoproto.stdtime) = true]; </p></td
                 <td><a href="#NameByAddressRequest">.NameByAddressRequest</a></td>
                 <td><a href="#NameByAddressResponse">.NameByAddressResponse</a></td>
                 <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>NameRegister</td>
-                <td><a href="#NameRegisterRequest">.NameRegisterRequest</a></td>
-                <td><a href="#OperationResponse">.OperationResponse</a></td>
-                <td><p>TODO: remove this method (it is insecure) and use NameRegisterRequestSigned</p></td>
-              </tr>
-            
-              <tr>
-                <td>NameRegisterSigned</td>
-                <td><a href="#NameRegisterSignedRequest">.NameRegisterSignedRequest</a></td>
-                <td><a href="#OperationResponse">.OperationResponse</a></td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>GetOperationStatus</td>
-                <td><a href="#GetOperationStatusRequest">.GetOperationStatusRequest</a></td>
-                <td><a href="#OperationResponse">.OperationResponse</a></td>
-                <td><p>Get the async operation with id==X statue</p></td>
-              </tr>
-            
-              <tr>
-                <td>NameRenew</td>
-                <td><a href="#NameRenewRequest">.NameRenewRequest</a></td>
-                <td><a href="#OperationResponse">.OperationResponse</a></td>
-                <td><p>Renew name without changing the owner</p></td>
               </tr>
             
           </tbody>
