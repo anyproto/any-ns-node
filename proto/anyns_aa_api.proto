@@ -1,8 +1,6 @@
 syntax = "proto3";
 option go_package = "pb/anyns_api";
 
-import "proto/anyns_api.proto";
-
 message UserAccount {
   // An Ethereum address that owns that account
   string ownerEthAddress = 1;
@@ -92,6 +90,38 @@ message CreateUserOperationRequestSigned {
   bytes signature = 2;
 }
 
+message NameRegisterRequest {
+  string fullName = 1;
+
+  // A content hash attached to this name
+  string ownerAnyAddress = 2;
+  
+  // An Ethereum address that owns that name
+  string ownerEthAddress = 3;
+
+  // A SpaceID attached to this name
+  string spaceId = 4;
+}
+
+message GetOperationStatusRequest {
+  string operationId = 1;
+}
+
+enum OperationState {
+  Unknown = 0;
+  
+  Pending = 1;
+  PendingOrNotFound = 2;
+  Completed = 3;
+  Error = 4;
+}
+
+message OperationResponse {
+  string operationId = 1;
+
+  OperationState operationState = 2;
+}
+
 service AnynsAccountAbstraction {
 // COMMON METHODS:
   rpc GetOperation(GetOperationStatusRequest) returns (OperationResponse) {}
@@ -118,7 +148,7 @@ service AnynsAccountAbstraction {
   // 1. get data + context
   // 2. sign it with your Ethereum private key
   // 3. send it using CreateUserOperation
-  // 4. check operation status using GetOperationStatus
+  // 4. check operation status using GetOperation
   rpc GetDataNameRegister(NameRegisterRequest) returns (GetDataNameRegisterResponse) {}
   
   // TODO

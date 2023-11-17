@@ -265,12 +265,6 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *as.NameRegi
 	return &out, nil
 }
 
-func (arpc *anynsAARpc) GetDataNameUpdate(ctx context.Context, in *as.NameUpdateRequest) (*as.GetDataNameRegisterResponse, error) {
-	// TODO: implement
-
-	return nil, nil
-}
-
 func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, signature []byte) (err error) {
 	// to read in the PeerID format
 	ownerAnyIdentity, err := crypto.DecodePeerId(ownerIdStr)

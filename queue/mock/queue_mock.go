@@ -57,21 +57,6 @@ func (mr *MockQueueServiceMockRecorder) AddNewRequest(ctx, req any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNewRequest", reflect.TypeOf((*MockQueueService)(nil).AddNewRequest), ctx, req)
 }
 
-// AddRenewRequest mocks base method.
-func (m *MockQueueService) AddRenewRequest(ctx context.Context, req *anyns_api.NameRenewRequest) (int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRenewRequest", ctx, req)
-	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// AddRenewRequest indicates an expected call of AddRenewRequest.
-func (mr *MockQueueServiceMockRecorder) AddRenewRequest(ctx, req any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRenewRequest", reflect.TypeOf((*MockQueueService)(nil).AddRenewRequest), ctx, req)
-}
-
 // Close mocks base method.
 func (m *MockQueueService) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()

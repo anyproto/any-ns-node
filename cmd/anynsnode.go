@@ -56,7 +56,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run as client")
-	command        = flag.String("cmd", "", "command to run: [name-register, name-renew, is-name-available, name-by-address, get-operation]")
+	command        = flag.String("cmd", "", "command to run: [name-register, is-name-available, name-by-address, get-operation]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -139,12 +139,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 
 	// check commands
 	switch *command {
-	case "name-register":
-		clientNameRegister(ctx, client)
 	case "is-name-available":
 		clientIsNameAvailable(ctx, client)
-	case "name-renew":
-		clientNameRenew(ctx, client)
 	case "name-by-address":
 		clientNameByAddress(ctx, client)
 
@@ -172,38 +168,6 @@ func clientIsNameAvailable(ctx context.Context, client client.AnyNsClientService
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.IsNameAvailable(ctx, req)
-	if err != nil {
-		log.Fatal("can't get response", zap.Error(err))
-	}
-	log.Info("got response", zap.Any("response", resp))
-}
-
-func clientNameRegister(ctx context.Context, client client.AnyNsClientService) {
-	var req = &as.NameRegisterRequest{}
-	err := json.Unmarshal([]byte(*params), &req)
-	if err != nil {
-		log.Fatal("wrong command parameters", zap.Error(err))
-	}
-
-	log.Info("sending request", zap.Any("request", req))
-
-	resp, err := client.NameRegister(ctx, req)
-	if err != nil {
-		log.Fatal("can't get response", zap.Error(err))
-	}
-	log.Info("got response", zap.Any("response", resp))
-}
-
-func clientNameRenew(ctx context.Context, client client.AnyNsClientService) {
-	var req = &as.NameRenewRequest{}
-	err := json.Unmarshal([]byte(*params), &req)
-	if err != nil {
-		log.Fatal("wrong command parameters", zap.Error(err))
-	}
-
-	log.Info("sending request", zap.Any("request", req))
-
-	resp, err := client.NameRenew(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}

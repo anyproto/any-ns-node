@@ -4,7 +4,6 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/anyproto/any-sync/app"
@@ -41,8 +40,6 @@ type QueueService interface {
 	// 1 - new name registration request
 	AddNewRequest(ctx context.Context, req *as.NameRegisterRequest) (operationId int64, err error)
 	GetRequestStatus(ctx context.Context, operationId int64) (status as.OperationState, err error)
-	// 2 - name renew request
-	AddRenewRequest(ctx context.Context, req *as.NameRenewRequest) (operationId int64, err error)
 
 	// Internal methods (public for tests):
 	// read all "pending" items from DB and try to process em during startup
@@ -296,8 +293,8 @@ func (aqueue *anynsQueue) ProcessItem(ctx context.Context, queueItem *QueueItem)
 		switch queueItem.ItemType {
 		case ItemType_NameRegister:
 			newState, err = aqueue.NameRegisterMoveStateNext(ctx, queueItem, conn)
-		case ItemType_NameRenew:
-			newState, err = aqueue.nameRenewMoveStateNext(ctx, queueItem, conn)
+		default:
+			log.Fatal("unknown item type", zap.Any("item type", queueItem.ItemType))
 		}
 
 		// 3 - handle nonce errors
@@ -812,112 +809,4 @@ func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queu
 
 	log.Info("operation succeeded!")
 	return nil
-}
-
-func (aqueue *anynsQueue) AddRenewRequest(ctx context.Context, req *as.NameRenewRequest) (operationId int64, err error) {
-	// count all documents in the collection (filter can not be nil)
-	type countAllItemsQuery struct {
-	}
-
-	// find current item count in the queue
-	count, err := aqueue.itemColl.CountDocuments(ctx, countAllItemsQuery{})
-	if err != nil {
-		return 0, err
-	}
-
-	// 1 - insert into Mongo
-	item := queueItemFromNameRenewRequest(req, count)
-
-	_, err = aqueue.itemColl.InsertOne(ctx, item)
-	if err != nil {
-		return 0, err
-	}
-	log.Info("inserted pending renew operation into DB", zap.Int64("Item Index", item.Index))
-
-	// 2 - insert into in-memory queue
-	err = aqueue.q.Add(ctx, item.Index)
-	if err != nil {
-		// TODO: the record in DB will be never processed
-		return 0, err
-	}
-
-	operationId = item.Index
-	return operationId, nil
-}
-
-func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (newState QueueItemStatus, err error) {
-	controller, err := aqueue.contracts.ConnectToController(conn)
-	if err != nil {
-		log.Error("failed to connect to contract", zap.Error(err))
-		return OperationStatus_Error, err
-	}
-
-	// 1 - get proper nonce (from DB, config file or network)
-	nonce, err := aqueue.nonceManager.GetCurrentNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin))
-	if err != nil {
-		log.Error("can not get nonce", zap.Error(err))
-		return OperationStatus_Error, err
-	}
-
-	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin(conn)
-	if err != nil {
-		log.Error("can not get auth params for admin", zap.Error(err))
-		return OperationStatus_Error, err
-	}
-	if authOpts != nil {
-		authOpts.Nonce = big.NewInt(int64(nonce))
-	}
-	log.Info("Nonce is", zap.Any("Nonce", nonce))
-
-	//
-	parts := strings.Split(queueItem.FullName, ".")
-	if len(parts) != 2 {
-		return OperationStatus_Error, errors.New("invalid name")
-	}
-	firstPart := parts[0]
-
-	// 2 - send tx to the network
-	tx, err := aqueue.contracts.RenewName(
-		ctx,
-		conn,
-		authOpts,
-		firstPart,
-		queueItem.NameRenewDurationSec,
-		controller)
-
-	// can return ErrNonceTooLow error
-	// can return ErrNonceTooHigh error
-	if err != nil {
-		log.Error("can not Renew tx", zap.Error(err))
-		return OperationStatus_Error, err
-	}
-
-	// update nonce in DB
-	_, err = aqueue.nonceManager.SaveNonce(common.HexToAddress(aqueue.confContracts.AddrAdmin), nonce+1)
-	if err != nil {
-		log.Error("can not update nonce in DB!", zap.Error(err))
-		return OperationStatus_Error, err
-	}
-
-	// wait for tx to be mined
-	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
-	if err != nil {
-		log.Error("can not wait for register tx", zap.Error(err))
-		return OperationStatus_Error, err
-	}
-	if !txRes {
-		log.Warn("tx finished with ERROR result", zap.String("tx hash", tx.Hash().String()))
-		return OperationStatus_Error, err
-	}
-
-	// update item in DB
-	queueItem.Status = OperationStatus_Completed
-	err = aqueue.SaveItemToDb(ctx, queueItem)
-	if err != nil {
-		log.Error("can not save last update", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
-		return OperationStatus_Error, err
-	}
-
-	log.Info("renew operation succeeded!")
-	return OperationStatus_Completed, nil
 }

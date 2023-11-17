@@ -5,29 +5,10 @@ import (
 	"strings"
 
 	as "github.com/anyproto/any-ns-node/pb/anyns_api"
-	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
 )
-
-func verifyIdentity(in *as.NameRegisterSignedRequest, ownerAnyAddress string) error {
-	// convert ownerAnyAddress to array of bytes
-	arr := []byte(ownerAnyAddress)
-
-	ownerAnyIdentity, err := crypto.UnmarshalEd25519PublicKeyProto(arr)
-	if err != nil {
-		return err
-	}
-
-	res, err := ownerAnyIdentity.Verify(in.Payload, in.Signature)
-	if err != nil || !res {
-		return errors.New("signature is different")
-	}
-
-	// identity is OK
-	return nil
-}
 
 func checkName(name string) bool {
 	// get name parts
