@@ -24,7 +24,7 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
 var ctx = context.Background()
@@ -105,7 +105,7 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 		})
 
 		pctx := context.Background()
-		resp, err := fx.GetUserAccount(pctx, &as.GetUserAccountRequest{
+		resp, err := fx.GetUserAccount(pctx, &nsp.GetUserAccountRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
 
@@ -134,7 +134,7 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		resp, err := fx.GetUserAccount(pctx, &as.GetUserAccountRequest{
+		resp, err := fx.GetUserAccount(pctx, &nsp.GetUserAccountRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
 		assert.NoError(t, err)
@@ -168,7 +168,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		})
 
 		// create payload
-		var in as.AdminFundUserAccountRequestSigned
+		var in nsp.AdminFundUserAccountRequestSigned
 
 		accountKeys, err := accountdata.NewRandom()
 		require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 			})*/
 
 		// pack
-		nrr := as.AdminFundUserAccountRequest{
+		nrr := nsp.AdminFundUserAccountRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 
 			// add 0 name calls
@@ -199,7 +199,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		// should return "pending" operation
 		require.NoError(t, err)
 		require.Equal(t, resp.OperationId, "123")
-		require.Equal(t, resp.OperationState, as.OperationState_Pending)
+		require.Equal(t, resp.OperationState, nsp.OperationState_Pending)
 	})
 }
 
@@ -209,13 +209,13 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		gosr := as.GetOperationStatusRequest{
+		gosr := nsp.GetOperationStatusRequest{
 			OperationId: "123",
 		}
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
 			return &accountabstraction.OperationInfo{
-				OperationState: as.OperationState_Pending,
+				OperationState: nsp.OperationState_Pending,
 			}, nil
 		})
 
@@ -225,7 +225,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, resp.OperationId, "123")
 		// not found
-		require.Equal(t, resp.OperationState, as.OperationState_Pending)
+		require.Equal(t, resp.OperationState, nsp.OperationState_Pending)
 	})
 }
 
@@ -434,7 +434,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -450,7 +450,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -466,7 +466,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "oWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -482,7 +482,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -498,7 +498,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -580,7 +580,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
 		assert.NoError(t, err)
 
-		var cuor as.CreateUserOperationRequest
+		var cuor nsp.CreateUserOperationRequest
 		// from string to []byte
 		cuor.Data, err = hex.DecodeString("1234")
 		assert.NoError(t, err)
@@ -597,7 +597,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		marshalled, err := cuor.Marshal()
 		assert.NoError(t, err)
 
-		var cuor_signed as.CreateUserOperationRequestSigned
+		var cuor_signed nsp.CreateUserOperationRequestSigned
 		cuor_signed.Payload = marshalled
 
 		// sign with WRONG key here
@@ -631,7 +631,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
 		assert.NoError(t, err)
 
-		var cuor as.CreateUserOperationRequest
+		var cuor nsp.CreateUserOperationRequest
 		// from string to []byte
 		cuor.Data, err = hex.DecodeString("1234")
 		assert.NoError(t, err)
@@ -661,7 +661,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		marshalled, err := cuor.Marshal()
 		assert.NoError(t, err)
 
-		var cuor_signed as.CreateUserOperationRequestSigned
+		var cuor_signed nsp.CreateUserOperationRequestSigned
 		cuor_signed.Payload = marshalled
 
 		cuor_signed.Signature, err = decodedPeerKey.Sign(cuor_signed.Payload)
@@ -691,7 +691,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
 		assert.NoError(t, err)
 
-		var cuor as.CreateUserOperationRequest
+		var cuor nsp.CreateUserOperationRequest
 		// from string to []byte
 		cuor.Data, err = hex.DecodeString("1234")
 		assert.NoError(t, err)
@@ -721,7 +721,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		marshalled, err := cuor.Marshal()
 		assert.NoError(t, err)
 
-		var cuor_signed as.CreateUserOperationRequestSigned
+		var cuor_signed nsp.CreateUserOperationRequestSigned
 		cuor_signed.Payload = marshalled
 
 		cuor_signed.Signature, err = decodedPeerKey.Sign(cuor_signed.Payload)

@@ -16,7 +16,7 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	"github.com/anyproto/any-ns-node/nonce_manager"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -38,8 +38,8 @@ func New() app.ComponentRunnable {
 
 type QueueService interface {
 	// 1 - new name registration request
-	AddNewRequest(ctx context.Context, req *as.NameRegisterRequest) (operationId int64, err error)
-	GetRequestStatus(ctx context.Context, operationId int64) (status as.OperationState, err error)
+	AddNewRequest(ctx context.Context, req *nsp.NameRegisterRequest) (operationId int64, err error)
+	GetRequestStatus(ctx context.Context, operationId int64) (status nsp.OperationState, err error)
 
 	// Internal methods (public for tests):
 	// read all "pending" items from DB and try to process em during startup
@@ -126,7 +126,7 @@ func (aqueue *anynsQueue) Close(ctx context.Context) (err error) {
 	return
 }
 
-func (aqueue *anynsQueue) AddNewRequest(ctx context.Context, req *as.NameRegisterRequest) (operationId int64, err error) {
+func (aqueue *anynsQueue) AddNewRequest(ctx context.Context, req *nsp.NameRegisterRequest) (operationId int64, err error) {
 	// count all documents in the collection (filter can not be nil)
 	type countAllItemsQuery struct {
 	}
@@ -166,7 +166,7 @@ func (aqueue *anynsQueue) AddNewRequest(ctx context.Context, req *as.NameRegiste
 	return operationId, nil
 }
 
-func (aqueue *anynsQueue) GetRequestStatus(ctx context.Context, operationId int64) (status as.OperationState, err error) {
+func (aqueue *anynsQueue) GetRequestStatus(ctx context.Context, operationId int64) (status nsp.OperationState, err error) {
 	// get status from the queue
 	var item QueueItem
 	result := aqueue.itemColl.FindOne(ctx, findItemByIndexQuery{Index: operationId}).Decode(&item)
@@ -255,7 +255,7 @@ func (aqueue *anynsQueue) ProcessItem(ctx context.Context, queueItem *QueueItem)
 	log.Info("Found item in state", zap.Any("Item", queueItem), zap.Any("Status", queueItem.Status))
 
 	if aqueue.confQueue.SkipProcessing {
-		log.Info("skipping processing item in DB. mark item as completed", zap.Any("Item Index", queueItem.Index))
+		log.Info("skipping processing item in DB. mark item nsp completed", zap.Any("Item Index", queueItem.Index))
 		queueItem.Status = OperationStatus_Completed
 		return aqueue.SaveItemToDb(ctx, queueItem)
 	}
@@ -484,9 +484,9 @@ func (aqueue *anynsQueue) isStopProcessing(err error, prevState QueueItemStatus,
 
 	state := StatusToState(newState)
 	switch state {
-	case as.OperationState_Pending:
+	case nsp.OperationState_Pending:
 		return false
-	case as.OperationState_Completed, as.OperationState_Error:
+	case nsp.OperationState_Completed, nsp.OperationState_Error:
 		return true
 	}
 

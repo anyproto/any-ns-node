@@ -10,8 +10,12 @@ github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/ahmetb/govvv v0.3.0 h1:YGLGwEyiUwHFy5eh/RUhdupbuaCGBYn5T5GWXp+WJB0=
 github.com/ahmetb/govvv v0.3.0/go.mod h1:4WRFpdWtc/YtKgPFwa1dr5+9hiRY5uKAL08bOlxOR6s=
-github.com/anyproto/any-sync v0.3.8 h1:MusYy5HmkWQWeLGPetrnl9N+sVHOqkk+e4EXHfd6aeA=
-github.com/anyproto/any-sync v0.3.8/go.mod h1:ZM/hfNni7fdzSYzDqSg8QyO1iIxWskWjYiykT1qaceo=
+github.com/anthonyakentiev/any-sync v0.0.0-20231121164221-f1b7231086aa h1:zs4noZSrgI+rgcAaC6xeGAlz4jpD5MahPMvz+zrVEHU=
+github.com/anthonyakentiev/any-sync v0.0.0-20231121164221-f1b7231086aa/go.mod h1:ZM/hfNni7fdzSYzDqSg8QyO1iIxWskWjYiykT1qaceo=
+github.com/anyproto/any-sync v0.3.9-0.20231120194301-fa0493ad9c9d h1:v5DpYFnjeiUs6iAvzgumQ74rY5Zf7T7aiTKKWnF8or4=
+github.com/anyproto/any-sync v0.3.9-0.20231120194301-fa0493ad9c9d/go.mod h1:ZM/hfNni7fdzSYzDqSg8QyO1iIxWskWjYiykT1qaceo=
+github.com/anyproto/any-sync v0.3.9-0.20231121170253-392213a7bd64 h1:t71pTV2zuHDw6ZGTHNbiymFQDUstAlI+OVX11oDq7Y4=
+github.com/anyproto/any-sync v0.3.9-0.20231121170253-392213a7bd64/go.mod h1:ZM/hfNni7fdzSYzDqSg8QyO1iIxWskWjYiykT1qaceo=
 github.com/anyproto/go-chash v0.1.0 h1:I9meTPjXFRfXZHRJzjOHC/XF7Q5vzysKkiT/grsogXY=
 github.com/anyproto/go-chash v0.1.0/go.mod h1:0UjNQi3PDazP0fINpFYu6VKhuna+W/V+1vpXHAfNgLY=
 github.com/anyproto/go-slip10 v1.0.0 h1:uAEtSuudR3jJBOfkOXf3bErxVoxbuKwdoJN55M1i6IA=

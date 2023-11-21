@@ -23,7 +23,7 @@ import (
 	"github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
@@ -253,7 +253,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		assert.Error(t, err)
 
 		// 1 - pack some structure
-		nrr := as.AdminFundUserAccountRequest{
+		nrr := nsp.AdminFundUserAccountRequest{
 			OwnerEthAddress: "",
 			NamesCount:      0,
 		}
@@ -277,7 +277,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		defer fx.finish(t)
 
 		// 1 - pack some structure
-		nrr := as.AdminFundUserAccountRequest{
+		nrr := nsp.AdminFundUserAccountRequest{
 			OwnerEthAddress: "",
 			NamesCount:      0,
 		}
@@ -495,7 +495,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 
 		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -537,7 +537,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 
 		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "",
@@ -581,7 +581,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -615,7 +615,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -635,7 +635,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -670,7 +670,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -716,7 +716,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -758,7 +758,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		var req as.NameRegisterRequest = as.NameRegisterRequest{
+		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
@@ -1262,7 +1262,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 
 		op, err := fx.GetOperation(ctx, "123")
 		assert.NoError(t, err)
-		assert.Equal(t, op.OperationState, as.OperationState_Error)
+		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
 	mt.Run("should return NOT-FOUND if error field is set", func(mt *mtest.T) {
@@ -1307,7 +1307,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 
 		op, err := fx.GetOperation(ctx, "123")
 		assert.NoError(t, err)
-		assert.Equal(t, op.OperationState, as.OperationState_Error)
+		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
 	mt.Run("should return PENDING if UserOpHash field is null", func(mt *mtest.T) {
@@ -1351,7 +1351,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 
 		op, err := fx.GetOperation(ctx, "123")
 		assert.NoError(t, err)
-		assert.Equal(t, op.OperationState, as.OperationState_PendingOrNotFound)
+		assert.Equal(t, op.OperationState, nsp.OperationState_PendingOrNotFound)
 	})
 
 	mt.Run("should return error if Success field is false", func(mt *mtest.T) {
@@ -1398,7 +1398,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 
 		op, err := fx.GetOperation(ctx, "123")
 		assert.NoError(t, err)
-		assert.Equal(t, op.OperationState, as.OperationState_Error)
+		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
 	mt.Run("success if receipt has Success==true", func(mt *mtest.T) {
@@ -1445,6 +1445,6 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 
 		op, err := fx.GetOperation(ctx, "123")
 		assert.NoError(t, err)
-		assert.Equal(t, op.OperationState, as.OperationState_Completed)
+		assert.Equal(t, op.OperationState, nsp.OperationState_Completed)
 	})
 }

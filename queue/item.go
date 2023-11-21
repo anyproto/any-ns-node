@@ -3,7 +3,7 @@ package queue
 import (
 	"time"
 
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"go.uber.org/zap"
 )
 
@@ -32,20 +32,20 @@ const (
 	ItemType_NameRenew    QueueItemType = 2
 )
 
-func StatusToState(status QueueItemStatus) as.OperationState {
+func StatusToState(status QueueItemStatus) nsp.OperationState {
 	switch status {
 	case OperationStatus_Initial, OperationStatus_CommitSent, OperationStatus_CommitDone, OperationStatus_RegisterSent:
-		return as.OperationState_Pending
+		return nsp.OperationState_Pending
 
 	case OperationStatus_CommitError, OperationStatus_RegisterError, OperationStatus_Error:
-		return as.OperationState_Error
+		return nsp.OperationState_Error
 
 	case OperationStatus_Completed:
-		return as.OperationState_Completed
+		return nsp.OperationState_Completed
 	}
 
 	log.Fatal("unknown status: ", zap.Any("status", status))
-	return as.OperationState_Error
+	return nsp.OperationState_Error
 }
 
 // this structure is saved to mem queue and to DB
@@ -75,7 +75,7 @@ type QueueItem struct {
 }
 
 // convert item to in-memory queue struct from initial dRPC request struct
-func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) QueueItem {
+func queueItemFromNameRegisterRequest(req *nsp.NameRegisterRequest, count int64) QueueItem {
 	currTime := time.Now().Unix()
 
 	return QueueItem{
@@ -93,8 +93,8 @@ func queueItemFromNameRegisterRequest(req *as.NameRegisterRequest, count int64) 
 }
 
 // TODO: remove this
-func nameRegisterRequestFromQueueItem(item QueueItem) *as.NameRegisterRequest {
-	req := as.NameRegisterRequest{
+func nameRegisterRequestFromQueueItem(item QueueItem) *nsp.NameRegisterRequest {
+	req := nsp.NameRegisterRequest{
 		FullName:        item.FullName,
 		OwnerAnyAddress: item.OwnerAnyAddress,
 		OwnerEthAddress: item.OwnerEthAddress,

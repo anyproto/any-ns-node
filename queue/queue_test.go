@@ -19,7 +19,7 @@ import (
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 	"github.com/anyproto/any-ns-node/nonce_manager"
 	mock_nonce_manager "github.com/anyproto/any-ns-node/nonce_manager/mock"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
@@ -227,7 +227,7 @@ func TestAnynsQueue_SaveItemToDb(t *testing.T) {
 		// read status
 		s, err := fx.GetRequestStatus(pctx, item.Index)
 		require.NoError(t, err)
-		require.Equal(t, as.OperationState_Pending, s)
+		require.Equal(t, nsp.OperationState_Pending, s)
 	})
 }
 
@@ -286,7 +286,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 
 		s, err := fx.GetRequestStatus(pctx, 1)
 		require.NoError(t, err)
-		require.Equal(t, s, as.OperationState_Error)
+		require.Equal(t, s, nsp.OperationState_Error)
 	})
 
 	mt.Run("register failed", func(mt *mtest.T) {
@@ -346,7 +346,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 
 		s, err := fx.GetRequestStatus(pctx, 1)
 		require.NoError(t, err)
-		require.Equal(t, s, as.OperationState_Error)
+		require.Equal(t, s, nsp.OperationState_Error)
 	})
 
 	mt.Run("success", func(mt *mtest.T) {
@@ -412,7 +412,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 
 		s, err := fx.GetRequestStatus(pctx, 1)
 		require.NoError(t, err)
-		require.Equal(t, s, as.OperationState_Completed)
+		require.Equal(t, s, nsp.OperationState_Completed)
 	})
 }
 
@@ -516,23 +516,23 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 		// read status
 		s, err := fx.GetRequestStatus(pctx, 1)
 		require.NoError(t, err)
-		require.Equal(t, as.OperationState_Error, s)
+		require.Equal(t, nsp.OperationState_Error, s)
 
 		s, err = fx.GetRequestStatus(pctx, 2)
 		require.NoError(t, err)
-		require.Equal(t, as.OperationState_Error, s)
+		require.Equal(t, nsp.OperationState_Error, s)
 
 		s, err = fx.GetRequestStatus(pctx, 3)
 		require.NoError(t, err)
-		require.Equal(t, as.OperationState_Error, s)
+		require.Equal(t, nsp.OperationState_Error, s)
 
 		s, err = fx.GetRequestStatus(pctx, 4)
 		require.NoError(t, err)
-		require.Equal(t, as.OperationState_Error, s)
+		require.Equal(t, nsp.OperationState_Error, s)
 
 		s, err = fx.GetRequestStatus(pctx, 5)
 		require.NoError(t, err)
-		require.Equal(t, as.OperationState_Error, s)
+		require.Equal(t, nsp.OperationState_Error, s)
 	})
 }
 
@@ -552,7 +552,7 @@ func TestAnynsQueue_AddNewRequest(t *testing.T) {
 		require.NoError(t, err)
 		coll := client.Database("any-ns").Collection("queue")
 
-		operationId, err := fx.AddNewRequest(pctx, &as.NameRegisterRequest{
+		operationId, err := fx.AddNewRequest(pctx, &nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		})
@@ -568,7 +568,7 @@ func TestAnynsQueue_AddNewRequest(t *testing.T) {
 		require.NotEmpty(t, itemOut.SecretBase64)
 
 		// should add another one too
-		operationId, err = fx.AddNewRequest(pctx, &as.NameRegisterRequest{
+		operationId, err = fx.AddNewRequest(pctx, &nsp.NameRegisterRequest{
 			FullName:        "hello222.any",
 			OwnerEthAddress: "0x2225B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		})

@@ -20,7 +20,7 @@ import (
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	contracts "github.com/anyproto/any-ns-node/contracts"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
 const CName = "any-ns.aa-rpc"
@@ -76,7 +76,7 @@ func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 
 	log.Info("mongo connected!")
 
-	return as.DRPCRegisterAnynsAccountAbstraction(a.MustComponent(server.CName).(server.DRPCServer), arpc)
+	return nsp.DRPCRegisterAnynsAccountAbstraction(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
 
 // TODO: check if it is even called, this is not a app.ComponentRunnable instance
@@ -93,8 +93,8 @@ func (arpc *anynsAARpc) Name() (name string) {
 	return CName
 }
 
-func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccountRequest) (*as.UserAccount, error) {
-	var res as.UserAccount
+func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccountRequest) (*nsp.UserAccount, error) {
+	var res nsp.UserAccount
 	res.OwnerEthAddress = in.OwnerEthAddress
 
 	// 1 - get SCW address
@@ -143,8 +143,8 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *as.GetUserAccoun
 	return &res, nil
 }
 
-func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *as.GetOperationStatusRequest) (*as.OperationResponse, error) {
-	var out as.OperationResponse
+func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationStatusRequest) (*nsp.OperationResponse, error) {
+	var out nsp.OperationResponse
 
 	status, err := arpc.aa.GetOperation(ctx, in.OperationId)
 	if err != nil {
@@ -161,9 +161,9 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *as.GetOperationSta
 // WARNING: There is no way here to check that EthAddress of user matches AnyID
 // we trust user! If he passed wrong AnyID - it is his problem
 // and then Admin just passes those values to current method
-func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFundUserAccountRequestSigned) (*as.OperationResponse, error) {
+func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminFundUserAccountRequestSigned) (*nsp.OperationResponse, error) {
 	// 1 - unmarshal the signed request
-	var afuar as.AdminFundUserAccountRequest
+	var afuar nsp.AdminFundUserAccountRequest
 	err := proto.Unmarshal(in.Payload, &afuar)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundUserAccount", zap.Error(err))
@@ -193,16 +193,16 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *as.AdminFu
 
 	// 3 - return
 	// TODO: add to queue?
-	var out as.OperationResponse
+	var out nsp.OperationResponse
 	out.OperationId = fmt.Sprint(opID)
-	out.OperationState = as.OperationState_Pending
+	out.OperationState = nsp.OperationState_Pending
 
 	return &out, err
 }
 
-func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.AdminFundGasOperationsRequestSigned) (*as.OperationResponse, error) {
+func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.AdminFundGasOperationsRequestSigned) (*nsp.OperationResponse, error) {
 	// 1 - unmarshal the signed request
-	var afgor as.AdminFundGasOperationsRequest
+	var afgor nsp.AdminFundGasOperationsRequest
 	err := proto.Unmarshal(in.Payload, &afgor)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundGasOperationsRequest", zap.Error(err))
@@ -231,7 +231,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.Admin
 		return nil, errors.New("wrong OperationsCount")
 	}
 
-	var out as.OperationResponse
+	var out nsp.OperationResponse
 	err = arpc.mongoAddUserToTheWhitelist(ctx, common.HexToAddress(afgor.OwnerEthAddress), afgor.OwnerAnyID, afgor.OperationsCount)
 	if err != nil {
 		log.Error("failed to add user to the whitelist", zap.Error(err))
@@ -241,7 +241,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *as.Admin
 	return &out, err
 }
 
-func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (*as.GetDataNameRegisterResponse, error) {
+func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
 	err := anynsrpc.СheckRegisterParams(in)
 	if err != nil {
@@ -256,7 +256,7 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *as.NameRegi
 		return nil, err
 	}
 
-	var out as.GetDataNameRegisterResponse
+	var out nsp.GetDataNameRegisterResponse
 	// user should sign it
 	out.Data = dataOut
 	// user should pass it back to us
@@ -289,9 +289,9 @@ func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, sig
 }
 
 // once user got data by using method like GetDataNameRegister, and signed it, now he can create a new operation
-func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUserOperationRequestSigned) (*as.OperationResponse, error) {
+func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateUserOperationRequestSigned) (*nsp.OperationResponse, error) {
 	// 1 - unmarshal the signed request
-	var cuor as.CreateUserOperationRequest
+	var cuor nsp.CreateUserOperationRequest
 	err := proto.Unmarshal(in.Payload, &cuor)
 	if err != nil {
 		log.Error("can not unmarshal CreateUserOperationRequest", zap.Error(err))
@@ -334,9 +334,9 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *as.CreateUs
 	}
 
 	// 6 - return result
-	var out as.OperationResponse
+	var out nsp.OperationResponse
 	out.OperationId = opID
-	out.OperationState = as.OperationState_Pending
+	out.OperationState = nsp.OperationState_Pending
 
 	return nil, nil
 }

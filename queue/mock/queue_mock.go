@@ -12,9 +12,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	anyns_api "github.com/anyproto/any-ns-node/pb/anyns_api"
 	queue "github.com/anyproto/any-ns-node/queue"
 	app "github.com/anyproto/any-sync/app"
+	nameserviceproto "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	ethclient "github.com/ethereum/go-ethereum/ethclient"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,7 +43,7 @@ func (m *MockQueueService) EXPECT() *MockQueueServiceMockRecorder {
 }
 
 // AddNewRequest mocks base method.
-func (m *MockQueueService) AddNewRequest(ctx context.Context, req *anyns_api.NameRegisterRequest) (int64, error) {
+func (m *MockQueueService) AddNewRequest(ctx context.Context, req *nameserviceproto.NameRegisterRequest) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddNewRequest", ctx, req)
 	ret0, _ := ret[0].(int64)
@@ -96,10 +96,10 @@ func (mr *MockQueueServiceMockRecorder) FindAndProcessAllItemsInDbWithStatus(ctx
 }
 
 // GetRequestStatus mocks base method.
-func (m *MockQueueService) GetRequestStatus(ctx context.Context, operationId int64) (anyns_api.OperationState, error) {
+func (m *MockQueueService) GetRequestStatus(ctx context.Context, operationId int64) (nameserviceproto.OperationState, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRequestStatus", ctx, operationId)
-	ret0, _ := ret[0].(anyns_api.OperationState)
+	ret0, _ := ret[0].(nameserviceproto.OperationState)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
@@ -50,7 +50,7 @@ func isValidAnyAddress(address string) bool {
 	return true
 }
 
-func СheckRegisterParams(in *as.NameRegisterRequest) error {
+func СheckRegisterParams(in *nsp.NameRegisterRequest) error {
 	// 1 - check name
 	if !checkName(in.FullName) {
 		log.Error("invalid name", zap.String("name", in.FullName))

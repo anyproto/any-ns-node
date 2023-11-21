@@ -11,14 +11,15 @@ import (
 	"github.com/anyproto/any-ns-node/alchemysdk"
 	"github.com/anyproto/any-ns-node/anynsaarpc"
 	"github.com/anyproto/any-ns-node/anynsrpc"
-	"github.com/anyproto/any-ns-node/client"
+
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
 	"github.com/anyproto/any-ns-node/nonce_manager"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
 	commonaccount "github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/metric"
+	nsclient "github.com/anyproto/any-sync/nameservice/nameserviceclient"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"github.com/anyproto/any-sync/util/crypto"
 
 	"github.com/anyproto/any-sync/app"
@@ -55,7 +56,7 @@ var (
 	flagConfigFile = flag.String("c", "etc/nsnode-config.yml", "path to config file")
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
-	flagClient     = flag.Bool("cl", false, "run as client")
+	flagClient     = flag.Bool("cl", false, "run nsp client")
 	command        = flag.String("cmd", "", "command to run: [name-register, is-name-available, name-by-address, get-operation]")
 	params         = flag.String("params", "", "command params in json format")
 )
@@ -135,7 +136,7 @@ func runAsClient(a *app.App, ctx context.Context) {
 	log.Info("app started", zap.String("version", a.Version()))
 
 	// get a "client" service instance
-	var client = a.MustComponent(client.CName).(client.AnyNsClientService)
+	var client = a.MustComponent(nsclient.CName).(nsclient.AnyNsClientService)
 
 	// check commands
 	switch *command {
@@ -158,8 +159,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 	}
 }
 
-func clientIsNameAvailable(ctx context.Context, client client.AnyNsClientService) {
-	var req = &as.NameAvailableRequest{}
+func clientIsNameAvailable(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.NameAvailableRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
 		log.Fatal("wrong command parameters", zap.Error(err))
@@ -174,8 +175,8 @@ func clientIsNameAvailable(ctx context.Context, client client.AnyNsClientService
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientNameByAddress(ctx context.Context, client client.AnyNsClientService) {
-	var req = &as.NameByAddressRequest{}
+func clientNameByAddress(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.NameByAddressRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
 		log.Fatal("wrong command parameters", zap.Error(err))
@@ -190,8 +191,8 @@ func clientNameByAddress(ctx context.Context, client client.AnyNsClientService) 
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientGetUserAccount(ctx context.Context, client client.AnyNsClientService) {
-	var req = &as.GetUserAccountRequest{}
+func clientGetUserAccount(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.GetUserAccountRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
 		log.Fatal("wrong command parameters", zap.Error(err))
@@ -206,9 +207,9 @@ func clientGetUserAccount(ctx context.Context, client client.AnyNsClientService)
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func adminFundUserAccount(ctx context.Context, a *app.App, client client.AnyNsClientService) {
+func adminFundUserAccount(ctx context.Context, a *app.App, client nsclient.AnyNsClientService) {
 	// 1 - pack request
-	var req = &as.AdminFundUserAccountRequest{}
+	var req = &nsp.AdminFundUserAccountRequest{}
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
 		log.Fatal("wrong command parameters", zap.Error(err))
@@ -219,7 +220,7 @@ func adminFundUserAccount(ctx context.Context, a *app.App, client client.AnyNsCl
 		log.Fatal("can't marshal request", zap.Error(err))
 	}
 
-	var reqSigned = &as.AdminFundUserAccountRequestSigned{}
+	var reqSigned = &nsp.AdminFundUserAccountRequestSigned{}
 	reqSigned.Payload = marshalled
 
 	acc := a.MustComponent("config").(commonaccount.ConfigGetter).GetAccount()
@@ -248,8 +249,8 @@ func adminFundUserAccount(ctx context.Context, a *app.App, client client.AnyNsCl
 	log.Info("got response", zap.Any("response", resp))
 }
 
-func clientGetOperation(ctx context.Context, client client.AnyNsClientService) {
-	var req = &as.GetOperationStatusRequest{}
+func clientGetOperation(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.GetOperationStatusRequest{}
 
 	err := json.Unmarshal([]byte(*params), &req)
 	if err != nil {
@@ -277,7 +278,7 @@ func BootstrapClient(a *app.App) {
 		Register(quic.New()).
 		Register(secureservice.New()).
 		Register(server.New()).
-		Register(client.New())
+		Register(nsclient.New())
 }
 
 func BootstrapServer(a *app.App) {

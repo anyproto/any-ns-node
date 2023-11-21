@@ -10,7 +10,7 @@ import (
 	reflect "reflect"
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
-	anyns_api "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	app "github.com/anyproto/any-sync/app"
 	common "github.com/ethereum/go-ethereum/common"
 	gomock "go.uber.org/mock/gomock"
@@ -69,7 +69,7 @@ func (mr *MockAccountAbstractionServiceMockRecorder) AdminVerifyIdentity(payload
 }
 
 // GetDataNameRegister mocks base method.
-func (m *MockAccountAbstractionService) GetDataNameRegister(ctx context.Context, in *anyns_api.NameRegisterRequest) ([]byte, []byte, error) {
+func (m *MockAccountAbstractionService) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) ([]byte, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDataNameRegister", ctx, in)
 	ret0, _ := ret[0].([]byte)

@@ -24,7 +24,7 @@ import (
 
 	ac "github.com/anyproto/any-ns-node/anytype_crypto"
 	"github.com/anyproto/any-ns-node/config"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
 const CName = "any-ns.contracts"
@@ -162,7 +162,7 @@ func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, conn 
 }
 
 func (acontracts *anynsContracts) GetAdditionalNameInfo(ctx context.Context, conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error) {
-	var res as.NameAvailableResponse
+	var res nsp.NameAvailableResponse
 	res.Available = false
 
 	// 1 - if current owner is the NW contract - then ask it again about the "real owner"

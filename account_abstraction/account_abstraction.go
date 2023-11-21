@@ -13,10 +13,10 @@ import (
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	commonaccount "github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -41,7 +41,7 @@ type anynsAA struct {
 }
 
 type OperationInfo struct {
-	OperationState as.OperationState
+	OperationState nsp.OperationState
 }
 
 type AccountAbstractionService interface {
@@ -59,7 +59,7 @@ type AccountAbstractionService interface {
 	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (operationID string, err error)
 
 	// get data to sign with your PK
-	GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
+	GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
 
 	// after data is signed - now you are ready to send it
 	// contextData was received from functions like GetDataNameRegister and should be left intact
@@ -422,7 +422,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	return opHash, nil
 }
 
-func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *as.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
+func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
 	// settings from config:
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
@@ -699,7 +699,7 @@ func (aa *anynsAA) GetOperation(ctx context.Context, operationID string) (*Opera
 		// additional check - does not work too :-(
 		//return aa.getUserOperationByHash(ctx, operationID)
 
-		out.OperationState = as.OperationState_Error
+		out.OperationState = nsp.OperationState_Error
 		return &out, nil
 	}
 
@@ -709,15 +709,15 @@ func (aa *anynsAA) GetOperation(ctx context.Context, operationID string) (*Opera
 		// additional check - does not work too :-(
 		//return aa.getUserOperationByHash(ctx, operationID)
 
-		out.OperationState = as.OperationState_PendingOrNotFound
+		out.OperationState = nsp.OperationState_PendingOrNotFound
 		return &out, nil
 	}
 
 	// return results
 	if uoRes.Result.Success {
-		out.OperationState = as.OperationState_Completed
+		out.OperationState = nsp.OperationState_Completed
 	} else {
-		out.OperationState = as.OperationState_Error
+		out.OperationState = nsp.OperationState_Error
 	}
 
 	return &out, nil
@@ -757,17 +757,17 @@ func (aa *anynsAA) getUserOperationByHash(ctx context.Context, operationID strin
 
 	if err != nil || (uoRes.Error.Code != 0) {
 		log.Info("can not decode user operation response.", zap.String("operation", operationID), zap.Error(err))
-		out.OperationState = as.OperationState_Error
+		out.OperationState = nsp.OperationState_Error
 		return &out, nil
 	}
 
 	if uoRes.Result.UserOperation == "" {
 		log.Info("user operation is not found", zap.String("operation", operationID), zap.Error(err))
-		out.OperationState = as.OperationState_Error
+		out.OperationState = nsp.OperationState_Error
 		return &out, nil
 	}
 
-	out.OperationState = as.OperationState_Success
+	out.OperationState = nsp.OperationState_Success
 	return &out, nil
 }
 */

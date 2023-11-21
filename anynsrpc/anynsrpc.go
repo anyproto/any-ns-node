@@ -13,8 +13,8 @@ import (
 	"github.com/anyproto/any-sync/net/rpc/server"
 
 	contracts "github.com/anyproto/any-ns-node/contracts"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
 const CName = "any-ns.rpc"
@@ -36,14 +36,14 @@ func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.queue = a.MustComponent(queue.CName).(queue.QueueService)
 
-	return as.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
+	return nsp.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
 
 func (arpc *anynsRpc) Name() (name string) {
 	return CName
 }
 
-func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableRequest) (*as.NameAvailableResponse, error) {
+func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (*nsp.NameAvailableResponse, error) {
 	// 0 - create connection
 	conn, err := arpc.contracts.CreateEthConnection()
 	if err != nil {
@@ -70,7 +70,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	// the owner can be NameWrapper
 	log.Info("received owner address", zap.String("Owner addr", addr.Hex()))
 
-	var res as.NameAvailableResponse
+	var res nsp.NameAvailableResponse
 	var addrEmpty = common.Address{}
 
 	if addr == addrEmpty {
@@ -101,7 +101,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *as.NameAvailableR
 	return &res, nil
 }
 
-func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *as.NameByAddressRequest) (*as.NameByAddressResponse, error) {
+func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddressRequest) (*nsp.NameByAddressResponse, error) {
 	// 0 - check parameters
 	if !common.IsHexAddress(in.OwnerEthAddress) {
 		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
@@ -125,7 +125,7 @@ func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *as.NameByAddress
 	}
 
 	// 2 - return results
-	var res as.NameByAddressResponse
+	var res nsp.NameByAddressResponse
 
 	if name == "" {
 		res.Found = false

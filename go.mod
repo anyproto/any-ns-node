@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/ahmetb/govvv v0.3.0
-	github.com/anyproto/any-sync v0.3.8
+	github.com/anyproto/any-sync v0.3.9-0.20231121170253-392213a7bd64
 	github.com/cheggaaa/mb/v3 v3.0.2
 	github.com/cockroachdb/errors v1.11.1
 	github.com/ethereum/go-ethereum v1.13.4
@@ -17,7 +17,6 @@ require (
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
-	storj.io/drpc v0.0.33
 )
 
 require (
@@ -110,4 +109,5 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
+	storj.io/drpc v0.0.33 // indirect
 )

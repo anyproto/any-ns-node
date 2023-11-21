@@ -16,9 +16,9 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
-	as "github.com/anyproto/any-ns-node/pb/anyns_api"
 	"github.com/anyproto/any-ns-node/queue"
 	mock_queue "github.com/anyproto/any-ns-node/queue/mock"
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
 var ctx = context.Background()
@@ -69,7 +69,7 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 		})
 
 		pctx := context.Background()
-		resp, err := fx.IsNameAvailable(pctx, &as.NameAvailableRequest{
+		resp, err := fx.IsNameAvailable(pctx, &nsp.NameAvailableRequest{
 			FullName: "hello.any",
 		})
 
@@ -94,7 +94,7 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 		})
 
 		pctx := context.Background()
-		resp, err := fx.IsNameAvailable(pctx, &as.NameAvailableRequest{
+		resp, err := fx.IsNameAvailable(pctx, &nsp.NameAvailableRequest{
 			FullName: "hello.any",
 		})
 
@@ -118,7 +118,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		})
 
 		pctx := context.Background()
-		resp, err := fx.GetNameByAddress(pctx, &as.NameByAddressRequest{
+		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
 			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
 
@@ -138,7 +138,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		})
 
 		pctx := context.Background()
-		resp, err := fx.GetNameByAddress(pctx, &as.NameByAddressRequest{
+		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		})
 
@@ -158,7 +158,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		})
 
 		pctx := context.Background()
-		resp, err := fx.GetNameByAddress(pctx, &as.NameByAddressRequest{
+		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
 			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		})
 
