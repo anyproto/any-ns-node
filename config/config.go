@@ -40,8 +40,6 @@ type Config struct {
 	Yamux            yamux.Config           `yaml:"yamux"`
 	Mongo            Mongo                  `yaml:"mongo"`
 	Contracts        Contracts              `yaml:"contracts"`
-	Queue            Queue                  `yaml:"queue"`
-	Nonce            Nonce                  `yaml:"nonce"`
 	Aa               AA                     `yaml:"accountAbstraction"`
 	Metric           metric.Config          `yaml:"metric"`
 }
@@ -76,10 +74,6 @@ func (c *Config) GetYamux() yamux.Config {
 
 func (c *Config) GetDrpc() rpc.Config {
 	return c.Drpc
-}
-
-func (c *Config) GetQueue() Queue {
-	return c.Queue
 }
 
 func (c *Config) GetAA() AA {

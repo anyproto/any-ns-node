@@ -14,8 +14,6 @@ import (
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
-	"github.com/anyproto/any-ns-node/nonce_manager"
-	"github.com/anyproto/any-ns-node/queue"
 	commonaccount "github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/metric"
 	nsclient "github.com/anyproto/any-sync/nameservice/nameserviceclient"
@@ -285,12 +283,10 @@ func BootstrapServer(a *app.App) {
 	a.Register(account.New()).
 		Register(contracts.New()).
 		Register(metric.New()).
-		Register(nonce_manager.New()).
 		Register(nodeconf.New()).
 		Register(nodeconfstore.New()).
 		Register(nodeconfsource.New()).
 		Register(coordinatorclient.New()).
-		Register(queue.New()).
 		Register(alchemysdk.New()).
 		Register(pool.New()).
 		Register(peerservice.New()).

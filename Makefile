@@ -36,12 +36,6 @@ contracts/mock/contracts_mock.go: contracts/contracts.go
 	# go install go.uber.org/mock/mockgen@latest
 	mockgen -source=contracts/contracts.go > contracts/mock/contracts_mock.go
 
-queue/mock/queue_mock.go: queue/queue.go
-	mockgen -source=queue/queue.go > queue/mock/queue_mock.go
-
-nonce_manager/mock/nonce_manager_mock.go: nonce_manager/nonce_manager.go
-	mockgen -source=nonce_manager/nonce_manager.go > nonce_manager/mock/nonce_manager.go
-
 account_abstraction/mock/account_abstraction_mock.go: account_abstraction/account_abstraction.go
 	mockgen -source=account_abstraction/account_abstraction.go > account_abstraction/mock/account_abstraction_mock.go
 
@@ -49,7 +43,7 @@ alchemysdk/mock/alchemysdk_mock.go: alchemysdk/alchemysdk.go
 	mockgen -source=alchemysdk/alchemysdk.go > alchemysdk/mock/alchemysdk_mock.go
 
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go queue/mock/queue_mock.go nonce_manager/mock/nonce_manager_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go 
+mocks: contracts/mock/contracts_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go 
 
 .PHONY: test
 test: mocks

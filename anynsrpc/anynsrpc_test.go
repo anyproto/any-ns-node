@@ -16,8 +16,6 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
-	"github.com/anyproto/any-ns-node/queue"
-	mock_queue "github.com/anyproto/any-ns-node/queue/mock"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
@@ -175,7 +173,6 @@ type fixture struct {
 	ts        *rpctest.TestServer
 	config    *config.Config
 	contracts *mock_contracts.MockContractsService
-	queue     *mock_queue.MockQueueService
 
 	*anynsRpc
 }
@@ -194,16 +191,6 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
 	fx.contracts.EXPECT().Init(gomock.Any()).AnyTimes()
 
-	fx.queue = mock_queue.NewMockQueueService(fx.ctrl)
-	fx.queue.EXPECT().Name().Return(queue.CName).AnyTimes()
-	fx.queue.EXPECT().Init(gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().Run(gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().Close(gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().FindAndProcessAllItemsInDb(gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().FindAndProcessAllItemsInDbWithStatus(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().ProcessItem(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.queue.EXPECT().SaveItemToDb(gomock.Any(), gomock.Any()).AnyTimes()
-
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		GethUrl:   "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
@@ -214,7 +201,6 @@ func newFixture(t *testing.T) *fixture {
 		// Register(&accounttest.AccountTestService{}).
 		Register(fx.config).
 		Register(fx.contracts).
-		Register(fx.queue).
 		Register(fx.anynsRpc)
 
 	require.NoError(t, fx.a.Start(ctx))

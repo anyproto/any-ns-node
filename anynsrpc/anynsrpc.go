@@ -13,7 +13,6 @@ import (
 	"github.com/anyproto/any-sync/net/rpc/server"
 
 	contracts "github.com/anyproto/any-ns-node/contracts"
-	"github.com/anyproto/any-ns-node/queue"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
@@ -28,13 +27,11 @@ func New() app.Component {
 type anynsRpc struct {
 	contractsConfig config.Contracts
 	contracts       contracts.ContractsService
-	queue           queue.QueueService
 }
 
 func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
-	arpc.queue = a.MustComponent(queue.CName).(queue.QueueService)
 
 	return nsp.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
