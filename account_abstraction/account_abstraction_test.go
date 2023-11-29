@@ -272,6 +272,34 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	mt.Run("fail if wrong key", func(mt *mtest.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		// 1 - pack some structure
+		nrr := nsp.AdminFundUserAccountRequest{
+			OwnerEthAddress: "",
+			NamesCount:      0,
+		}
+
+		marshalled, err := nrr.Marshal()
+		require.NoError(t, err)
+
+		// 2 - sign it
+		signKey, err := crypto.DecodeKeyFromString(
+			// see here:
+			fx.config.Account.PeerKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		require.NoError(t, err)
+
+		sig, err := signKey.Sign(marshalled)
+		require.NoError(t, err)
+
+		err = fx.AdminVerifyIdentity(marshalled, sig)
+		assert.Error(t, err)
+	})
+
 	mt.Run("success", func(mt *mtest.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
@@ -287,7 +315,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 
 		// 2 - sign it
 		signKey, err := crypto.DecodeKeyFromString(
-			fx.config.Account.PeerKey,
+			fx.config.Account.SigningKey,
 			crypto.UnmarshalEd25519PrivateKey,
 			nil)
 		require.NoError(t, err)

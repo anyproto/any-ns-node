@@ -249,7 +249,18 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 
 func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err error) {
 	// 1 - load public key of admin
-	ownerAnyIdentity, err := crypto.DecodePeerId(aa.accountConfig.PeerId)
+	// (should be account.signingKey in config)
+	decodedPeerKey, err := crypto.DecodeKeyFromString(
+		aa.accountConfig.SigningKey,
+		crypto.UnmarshalEd25519PrivateKey,
+		nil)
+	if err != nil {
+		log.Error("failed to unmarshal public key", zap.Error(err))
+		return err
+	}
+
+	ownerAnyIdentityStr := decodedPeerKey.GetPublic().PeerId()
+	ownerAnyIdentity, err := crypto.DecodePeerId(ownerAnyIdentityStr)
 
 	if err != nil {
 		log.Error("failed to unmarshal public key", zap.Error(err))

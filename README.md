@@ -19,8 +19,10 @@ Example: `go run ./cmd --c=config-client.yml --cl --cmd=is-name-available --para
 Create an operation to register a new name.
 Parameters: `'{ "FullName": "suppa.any", "OwnerAnyAddress": "A6WVkd1MxX1i7hGQCcDhMFvfEzokPppRzxve2wdhTZ8jZTio", "OwnerEthAddress": "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF", "SpaceId": "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"}'`.
 
-## .yml Config files
+## .yml config files
 Please see example in the 'etc' subfolder.
+NOTICE: in order to call methods as an Admin - `account.signKey` should be used to sign messages.
+That's why you can run N ns nodes with different `account.peerId` and `account.peerKey` but with SAME `account.signKey`.
 
 ### Contracts section
 
