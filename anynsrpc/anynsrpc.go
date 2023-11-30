@@ -2,17 +2,12 @@ package anynsrpc
 
 import (
 	"context"
-	"errors"
 
-	"github.com/ethereum/go-ethereum/common"
-	"go.uber.org/zap"
-
-	"github.com/anyproto/any-ns-node/config"
+	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/rpc/server"
 
-	contracts "github.com/anyproto/any-ns-node/contracts"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
@@ -25,13 +20,11 @@ func New() app.Component {
 }
 
 type anynsRpc struct {
-	contractsConfig config.Contracts
-	contracts       contracts.ContractsService
+	cache cache.CacheService
 }
 
 func (arpc *anynsRpc) Init(a *app.App) (err error) {
-	arpc.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
-	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+	arpc.cache = a.MustComponent(cache.CName).(cache.CacheService)
 
 	return nsp.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
@@ -41,63 +34,16 @@ func (arpc *anynsRpc) Name() (name string) {
 }
 
 func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (*nsp.NameAvailableResponse, error) {
-	// 0 - create connection
-	conn, err := arpc.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to connect to geth", zap.Error(err))
-		return nil, err
-	}
-
-	// 1 - convert to name hash
-	nh, err := contracts.NameHash(in.FullName)
-	if err != nil {
-		log.Error("can not convert FullName to namehash", zap.Error(err))
-		return nil, err
-	}
-
-	// 2 - call contract's method
-	log.Info("getting owner for name", zap.String("FullName", in.GetFullName()))
-	addr, err := arpc.contracts.GetOwnerForNamehash(ctx, conn, nh)
-	if err != nil {
-		log.Error("failed to get owner", zap.Error(err))
-		return nil, err
-	}
-
-	// 3 - covert to result
-	// the owner can be NameWrapper
-	log.Info("received owner address", zap.String("Owner addr", addr.Hex()))
-
-	var res nsp.NameAvailableResponse
-	var addrEmpty = common.Address{}
-
-	if addr == addrEmpty {
-		log.Info("name is not registered yet...")
-		res.Available = true
-		return &res, nil
-	}
-
-	// 4 - if name is not available, then get additional info
-	log.Info("name is NOT available...Getting additional info")
-	ea, aa, si, exp, err := arpc.contracts.GetAdditionalNameInfo(ctx, conn, addr, in.GetFullName())
-	if err != nil {
-		log.Error("failed to get additional info", zap.Error(err))
-		return nil, err
-	}
-
-	// convert unixtime (big int) to string
-	//timestamp := time.Unix(exp.Int64(), 0)
-	//timeString := timestamp.Format("2001-01-02 15:04:05")
-
-	log.Info("name is already registered...")
-	res.Available = false
-	res.OwnerEthAddress = ea
-	res.OwnerAnyAddress = aa
-	res.SpaceId = si
-	res.NameExpires = exp.Int64()
-
-	return &res, nil
+	// check in cache (Mongo)
+	return arpc.cache.IsNameAvailable(ctx, in)
 }
 
+func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddressRequest) (*nsp.NameByAddressResponse, error) {
+	// check in cache (Mongo)
+	return arpc.cache.GetNameByAddress(ctx, in)
+}
+
+/*
 func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddressRequest) (*nsp.NameByAddressResponse, error) {
 	// 0 - check parameters
 	if !common.IsHexAddress(in.OwnerEthAddress) {
@@ -132,4 +78,4 @@ func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddres
 	res.Found = true
 	res.Name = name
 	return &res, nil
-}
+}*/

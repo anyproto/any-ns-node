@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/anyproto/any-ns-node/anynsrpc"
+	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
@@ -35,10 +36,12 @@ type anynsAARpc struct {
 	confContracts config.Contracts
 	confMongo     config.Mongo
 
-	itemColl *mongo.Collection
+	usersColl *mongo.Collection
+	opColl    *mongo.Collection
 
 	contracts contracts.ContractsService
 	aa        accountabstraction.AccountAbstractionService
+	cache     cache.CacheService
 }
 
 // TODO: index it
@@ -52,16 +55,33 @@ type findAAUserByAddress struct {
 	Address string `bson:"address"`
 }
 
+// see nameserviceprotoюCreateUserOperationRequest
+type AAUserOperation struct {
+	OperationID string `bson:"operation_id"`
+
+	Data       []byte `bson:"data"`
+	SignedData []byte `bson:"signed_data"`
+	Context    []byte `bson:"context"`
+
+	OwnerEthAddress string `bson:"owner_eth_address"`
+	OwnerAnyID      string `bson:"owner_any_id"`
+	FullName        string `bson:"full_name"`
+}
+
+type findUserOperationByID struct {
+	OperationID string `bson:"operation_id"`
+}
+
 func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.aa = a.MustComponent(accountabstraction.CName).(accountabstraction.AccountAbstractionService)
+	arpc.cache = a.MustComponent(cache.CName).(cache.CacheService)
 
 	// connect to mongo
 	uri := arpc.confMongo.Connect
 	dbName := arpc.confMongo.Database
-	collectionName := "aa-users"
 
 	// 1 - connect to DB
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
@@ -69,8 +89,12 @@ func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 		return err
 	}
 
-	arpc.itemColl = client.Database(dbName).Collection(collectionName)
-	if arpc.itemColl == nil {
+	arpc.usersColl = client.Database(dbName).Collection("aa-users")
+	if arpc.usersColl == nil {
+		return errors.New("failed to connect to MongoDB")
+	}
+	arpc.opColl = client.Database(dbName).Collection("aa-operations")
+	if arpc.opColl == nil {
 		return errors.New("failed to connect to MongoDB")
 	}
 
@@ -82,9 +106,13 @@ func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 // TODO: check if it is even called, this is not a app.ComponentRunnable instance
 // so maybe it won't be called
 func (arpc *anynsAARpc) Close(ctx context.Context) (err error) {
-	if arpc.itemColl != nil {
-		err = arpc.itemColl.Database().Client().Disconnect(ctx)
-		arpc.itemColl = nil
+	if arpc.usersColl != nil {
+		err = arpc.usersColl.Database().Client().Disconnect(ctx)
+		arpc.usersColl = nil
+	}
+	if arpc.opColl != nil {
+		err = arpc.opColl.Database().Client().Disconnect(ctx)
+		arpc.opColl = nil
 	}
 	return
 }
@@ -146,6 +174,14 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccou
 func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationStatusRequest) (*nsp.OperationResponse, error) {
 	var out nsp.OperationResponse
 
+	// 0 - get operation from Mongo first (we will need it later to update cache)
+	op, err := arpc.mongoGetOperation(ctx, in.OperationId)
+	if err != nil {
+		log.Error("failed to get operation from Mongo", zap.Error(err))
+		return nil, err
+	}
+
+	// 1 - get operation status from the AA service
 	status, err := arpc.aa.GetOperation(ctx, in.OperationId)
 	if err != nil {
 		log.Error("failed to get operation info", zap.Error(err))
@@ -154,6 +190,30 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 
 	out.OperationId = fmt.Sprint(in.OperationId)
 	out.OperationState = status.OperationState
+
+	// 2 - update cache (only once operation was completed and cache is empty)
+	if status.OperationState == nsp.OperationState_Completed {
+		// is cache empty?
+		_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
+			FullName: op.FullName,
+		})
+
+		if err == nil {
+			log.Info("name is already in cache", zap.String("FullName", op.FullName))
+			return &out, nil
+		}
+
+		// yes, the cache is empty...
+		log.Debug("operation completed, updating cache", zap.String("FullName", op.FullName))
+		err = arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
+			FullName: op.FullName,
+		})
+
+		if err != nil {
+			log.Error("failed to update cache", zap.Error(err))
+			return nil, err
+		}
+	}
 
 	return &out, nil
 }
@@ -333,7 +393,14 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 		return nil, err
 	}
 
-	// 6 - return result
+	// 6 - save operation to mongo (can be used later)
+	err = arpc.mongoSaveOperation(ctx, opID, cuor)
+	if err != nil {
+		log.Error("failed to save operation to Mongo", zap.Error(err))
+		return nil, err
+	}
+
+	// 7 - return result
 	var out nsp.OperationResponse
 	out.OperationId = opID
 	out.OperationState = nsp.OperationState_Pending

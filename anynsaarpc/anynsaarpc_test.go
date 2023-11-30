@@ -21,6 +21,8 @@ import (
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	mock_accountabstraction "github.com/anyproto/any-ns-node/account_abstraction/mock"
+	"github.com/anyproto/any-ns-node/cache"
+	mock_cache "github.com/anyproto/any-ns-node/cache/mock"
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
@@ -36,6 +38,7 @@ type fixture struct {
 	config    *config.Config
 	contracts *mock_contracts.MockContractsService
 	aa        *mock_accountabstraction.MockAccountAbstractionService
+	cache     *mock_cache.MockCacheService
 
 	*anynsAARpc
 }
@@ -56,6 +59,10 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+	fx.cache = mock_cache.NewMockCacheService(fx.ctrl)
+	fx.cache.EXPECT().Name().Return(cache.CName).AnyTimes()
+	fx.cache.EXPECT().Init(gomock.Any()).AnyTimes()
 
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
@@ -84,6 +91,7 @@ func newFixture(t *testing.T) *fixture {
 		Register(fx.config).
 		Register(fx.contracts).
 		Register(fx.aa).
+		Register(fx.cache).
 		Register(fx.anynsAARpc)
 
 	require.NoError(t, fx.a.Start(ctx))
@@ -204,14 +212,22 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 }
 
 func TestAnynsRpc_GetOperation(t *testing.T) {
-
-	t.Run("success", func(t *testing.T) {
+	t.Run("fail if no operation is in the DB", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
+
+		pctx := context.Background()
 
 		gosr := nsp.GetOperationStatusRequest{
 			OperationId: "123",
 		}
+		_, err := fx.GetOperation(pctx, &gosr)
+		require.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
 			return &accountabstraction.OperationInfo{
@@ -219,13 +235,154 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 			}, nil
 		})
 
+		// create operation in Mongo first
+		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+			FullName:        "hello.any",
+		})
+		require.NoError(t, err)
+
 		pctx := context.Background()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
 		resp, err := fx.GetOperation(pctx, &gosr)
 
 		require.NoError(t, err)
 		require.Equal(t, resp.OperationId, "123")
 		// not found
 		require.Equal(t, resp.OperationState, nsp.OperationState_Pending)
+	})
+
+	t.Run("opertaion completed - check in cache", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Completed,
+			}, nil
+		})
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+			// name already in cache!
+			return &nsp.NameAvailableResponse{}, nil
+		})
+
+		// create operation in Mongo first
+		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+			FullName:        "hello.any",
+		})
+		require.NoError(t, err)
+
+		pctx := context.Background()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+		resp, err := fx.GetOperation(pctx, &gosr)
+
+		require.NoError(t, err)
+		require.Equal(t, resp.OperationId, "123")
+		// not found
+		require.Equal(t, resp.OperationState, nsp.OperationState_Completed)
+	})
+
+	t.Run("opertaion completed - update in cache", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Completed,
+			}, nil
+		})
+
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).MinTimes(1)
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+			// name is not in cache!
+			// should call UpdateCache
+			return nil, errors.New("not found")
+		})
+
+		// create operation in Mongo first
+		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+			FullName:        "hello.any",
+		})
+		require.NoError(t, err)
+
+		pctx := context.Background()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+		resp, err := fx.GetOperation(pctx, &gosr)
+
+		require.NoError(t, err)
+		require.Equal(t, resp.OperationId, "123")
+		// not found
+		require.Equal(t, resp.OperationState, nsp.OperationState_Completed)
+	})
+
+	t.Run("should return error if update in cache failed", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Completed,
+			}, nil
+		})
+
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+			return errors.New("failed to update in cache")
+		})
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+			// name is not in cache!
+			// should call UpdateCache
+			return nil, errors.New("not found")
+		})
+
+		// create operation in Mongo first
+		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+			FullName:        "hello.any",
+		})
+		require.NoError(t, err)
+
+		pctx := context.Background()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+		_, err = fx.GetOperation(pctx, &gosr)
+
+		require.Error(t, err)
 	})
 }
 
@@ -426,6 +583,106 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 
 		err = fx.mongoDecreaseUserOperationsCount(pctx, owner)
 		assert.NoError(t, err)
+	})
+}
+
+func TestAnynsRpc_MongoSaveOperation(t *testing.T) {
+	t.Run("should create new item", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+
+		err := fx.mongoSaveOperation(pctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+			FullName:        "hello.any",
+		})
+		assert.NoError(t, err)
+
+		// check in the DB
+		uri := fx.config.Mongo.Connect
+		dbName := fx.config.Mongo.Database
+		collectionName := "aa-operations"
+
+		client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+		assert.NoError(t, err)
+
+		var itemColl *mongo.Collection = client.Database(dbName).Collection(collectionName)
+		item := &AAUserOperation{}
+		err = itemColl.FindOne(ctx, findUserOperationByID{OperationID: "123"}).Decode(&item)
+		assert.NoError(t, err)
+
+		assert.Equal(t, item.OperationID, "123")
+		assert.Equal(t, item.OwnerEthAddress, strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
+		assert.Equal(t, item.OwnerAnyID, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+		assert.Equal(t, item.Data, []byte("data"))
+		assert.Equal(t, item.FullName, "hello.any")
+	})
+
+	t.Run("should not update existing item", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+
+		err := fx.mongoSaveOperation(pctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+		})
+		assert.NoError(t, err)
+
+		err = fx.mongoSaveOperation(pctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+		})
+		assert.Error(t, err)
+	})
+}
+
+func TestAnynsRpc_MongoGetOpertaion(t *testing.T) {
+	t.Run("should return error if not found", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		_, err := fx.mongoGetOperation(ctx, "123")
+		assert.Error(t, err)
+	})
+
+	t.Run("should return item", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
+			// should be converted to lower case
+			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerAnyID:      "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+			Data:            []byte("data"),
+			SignedData:      []byte("signed_data"),
+			Context:         []byte("context"),
+			FullName:        "hello.any",
+		})
+		assert.NoError(t, err)
+
+		item, err := fx.mongoGetOperation(ctx, "123")
+		assert.NoError(t, err)
+		assert.Equal(t, item.OperationID, "123")
+		assert.Equal(t, item.OwnerEthAddress, strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"))
+		assert.Equal(t, item.OwnerAnyID, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+		assert.Equal(t, item.Data, []byte("data"))
+		assert.Equal(t, item.FullName, "hello.any")
 	})
 }
 

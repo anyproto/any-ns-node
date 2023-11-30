@@ -3,7 +3,9 @@ package anynsaarpc
 import (
 	"context"
 	"errors"
+	"strings"
 
+	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"github.com/ethereum/go-ethereum/common"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -20,12 +22,12 @@ func (arpc *anynsAARpc) mongoAddUserToTheWhitelist(ctx context.Context, owner co
 
 	// 2 - get item from mongo
 	item := &AAUser{}
-	err = arpc.itemColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
+	err = arpc.usersColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
 
 	if err != nil {
 		// 3.1 - if not found - create new
 		if err == mongo.ErrNoDocuments {
-			_, err = arpc.itemColl.InsertOne(ctx, AAUser{
+			_, err = arpc.usersColl.InsertOne(ctx, AAUser{
 				Address:         owner.Hex(),
 				AnyID:           ownerAnyID,
 				OperationsCount: newOperations,
@@ -55,7 +57,7 @@ func (arpc *anynsAARpc) mongoAddUserToTheWhitelist(ctx context.Context, owner co
 	item.OperationsCount += newOperations // update operations count
 
 	// 4 - write it back to DB
-	_, err = arpc.itemColl.ReplaceOne(ctx, findAAUserByAddress{Address: owner.Hex()}, item, optns)
+	_, err = arpc.usersColl.ReplaceOne(ctx, findAAUserByAddress{Address: owner.Hex()}, item, optns)
 	if err != nil {
 		log.Error("failed to update item in DB", zap.Error(err))
 		return err
@@ -69,7 +71,7 @@ func (arpc *anynsAARpc) mongoAddUserToTheWhitelist(ctx context.Context, owner co
 // if ownerAnyID is empty -> do not check it
 func (arpc *anynsAARpc) mongoGetUserOperationsCount(ctx context.Context, owner common.Address, ownerAnyID string) (operations uint64, err error) {
 	item := &AAUser{}
-	err = arpc.itemColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
+	err = arpc.usersColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
 
 	if err != nil {
 		log.Error("failed to get item from DB", zap.Error(err))
@@ -91,7 +93,7 @@ func (arpc *anynsAARpc) mongoDecreaseUserOperationsCount(ctx context.Context, ow
 
 	// 1 - get item from mongo
 	item := &AAUser{}
-	err = arpc.itemColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
+	err = arpc.usersColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
 
 	if err != nil {
 		log.Error("failed to get item from DB", zap.Error(err))
@@ -109,7 +111,7 @@ func (arpc *anynsAARpc) mongoDecreaseUserOperationsCount(ctx context.Context, ow
 	// update operations count
 	item.OperationsCount -= 1
 
-	_, err = arpc.itemColl.ReplaceOne(ctx, findAAUserByAddress{Address: owner.Hex()}, item, optns)
+	_, err = arpc.usersColl.ReplaceOne(ctx, findAAUserByAddress{Address: owner.Hex()}, item, optns)
 	if err != nil {
 		log.Error("failed to update item in DB", zap.Error(err))
 		return err
@@ -117,4 +119,45 @@ func (arpc *anynsAARpc) mongoDecreaseUserOperationsCount(ctx context.Context, ow
 
 	log.Info("decreased op count in the whitelist", zap.String("owner", owner.Hex()))
 	return nil
+}
+
+func (arpc *anynsAARpc) mongoSaveOperation(ctx context.Context, opID string, cuor nsp.CreateUserOperationRequest) error {
+	// 1 - check if operation with this ID already exists
+	_, err := arpc.mongoGetOperation(ctx, opID)
+	if err == nil {
+		log.Error("operation with this ID already exists", zap.String("opID", opID))
+		return errors.New("operation with this ID already exists")
+	}
+
+	// 2 - create a new AAUserOperation object
+	op := &AAUserOperation{
+		OperationID: opID,
+
+		Data:            cuor.Data,
+		SignedData:      cuor.SignedData,
+		Context:         cuor.Context,
+		OwnerEthAddress: strings.ToLower(cuor.OwnerEthAddress),
+		OwnerAnyID:      cuor.OwnerAnyID,
+		FullName:        cuor.FullName,
+	}
+
+	_, err = arpc.opColl.InsertOne(ctx, op)
+	if err != nil {
+		log.Error("failed to save operation to DB", zap.String("opID", opID), zap.Error(err))
+		return err
+	}
+
+	log.Info("saved operation to DB", zap.String("opID", opID))
+	return nil
+}
+
+func (arpc *anynsAARpc) mongoGetOperation(ctx context.Context, opID string) (op AAUserOperation, err error) {
+	err = arpc.opColl.FindOne(ctx, findUserOperationByID{OperationID: opID}).Decode(&op)
+
+	if err != nil {
+		log.Error("failed to get operation from DB", zap.String("opID", opID), zap.Error(err))
+		return AAUserOperation{}, err
+	}
+
+	return op, nil
 }

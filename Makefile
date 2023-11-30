@@ -42,8 +42,11 @@ account_abstraction/mock/account_abstraction_mock.go: account_abstraction/accoun
 alchemysdk/mock/alchemysdk_mock.go: alchemysdk/alchemysdk.go
 	mockgen -source=alchemysdk/alchemysdk.go > alchemysdk/mock/alchemysdk_mock.go
 
+cache/mock/cache_mock.go: cache/cache.go
+	mockgen -source=cache/cache.go > cache/mock/cache_mock.go
+
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go 
+mocks: contracts/mock/contracts_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go cache/mock/cache_mock.go
 
 .PHONY: test
 test: mocks

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/anyproto/any-ns-node/alchemysdk"
 	"github.com/anyproto/any-ns-node/anynsaarpc"
 	"github.com/anyproto/any-ns-node/anynsrpc"
+	"github.com/anyproto/any-ns-node/cache"
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
@@ -142,6 +144,9 @@ func runAsClient(a *app.App, ctx context.Context) {
 		clientIsNameAvailable(ctx, client)
 	case "name-by-address":
 		clientNameByAddress(ctx, client)
+	// hidden command
+	case "benchmark":
+		clientBenchmark(ctx, client)
 
 	// AccountAbstraction methods:
 	case "get-user-account":
@@ -171,6 +176,38 @@ func clientIsNameAvailable(ctx context.Context, client nsclient.AnyNsClientServi
 		log.Fatal("can't get response", zap.Error(err))
 	}
 	log.Info("got response", zap.Any("response", resp))
+}
+
+// run is-name-avail 1000 times
+func clientBenchmark(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.NameAvailableRequest{}
+
+	// calculate time difference
+	start := time.Now()
+
+	// do 1000 iterations
+	for i := 0; i < 1000; i++ {
+		// generate random name with .any suffix
+		length := 10
+		b := make([]byte, length+2)
+		_, err := rand.Read(b)
+		if err != nil {
+			log.Fatal("can't generate random name", zap.Error(err))
+		}
+
+		req.FullName = fmt.Sprintf("%x", b)[2:length+2] + ".any"
+
+		log.Info("sending request", zap.String("name", req.FullName))
+
+		resp, err := client.IsNameAvailable(ctx, req)
+		if err != nil {
+			log.Fatal("can't get response", zap.Error(err))
+		}
+		log.Info("got response", zap.Bool("Available", resp.Available))
+	}
+
+	elapsed := time.Since(start)
+	log.Info("Benchmark took", zap.Duration("elapsed", elapsed))
 }
 
 func clientNameByAddress(ctx context.Context, client nsclient.AnyNsClientService) {
@@ -288,6 +325,7 @@ func BootstrapServer(a *app.App) {
 		Register(nodeconfsource.New()).
 		Register(coordinatorclient.New()).
 		Register(alchemysdk.New()).
+		Register(cache.New()).
 		Register(pool.New()).
 		Register(peerservice.New()).
 		Register(yamux.New()).
