@@ -11,34 +11,11 @@ package mock_alchemysdk
 import (
 	reflect "reflect"
 
-	alchemysdk "github.com/anyproto/any-ns-node/alchemysdk"
+	alchemysdk "github.com/anyproto/alchemy-aa-sdk/alchemysdk"
 	app "github.com/anyproto/any-sync/app"
 	common "github.com/ethereum/go-ethereum/common"
 	gomock "go.uber.org/mock/gomock"
 )
-
-// MockEntryPointAddress is a mock of EntryPointAddress interface.
-type MockEntryPointAddress struct {
-	ctrl     *gomock.Controller
-	recorder *MockEntryPointAddressMockRecorder
-}
-
-// MockEntryPointAddressMockRecorder is the mock recorder for MockEntryPointAddress.
-type MockEntryPointAddressMockRecorder struct {
-	mock *MockEntryPointAddress
-}
-
-// NewMockEntryPointAddress creates a new mock instance.
-func NewMockEntryPointAddress(ctrl *gomock.Controller) *MockEntryPointAddress {
-	mock := &MockEntryPointAddress{ctrl: ctrl}
-	mock.recorder = &MockEntryPointAddressMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockEntryPointAddress) EXPECT() *MockEntryPointAddressMockRecorder {
-	return m.recorder
-}
 
 // MockAlchemyAAService is a mock of AlchemyAAService interface.
 type MockAlchemyAAService struct {

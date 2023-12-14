@@ -22,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
+
+	asdk "github.com/anyproto/alchemy-aa-sdk/alchemysdk"
 )
 
 const CName = "any-ns.aa"
@@ -379,7 +381,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	}
 
 	// parse response
-	responseStruct := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+	responseStruct := asdk.JSONRPCResponseGasAndPaymaster{}
 	err = json.Unmarshal(response, &responseStruct)
 	if err != nil {
 		log.Error("failed to unmarshal response", zap.Error(err))
@@ -505,7 +507,7 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 		return nil, nil, err
 	}
 	// parse response
-	responseStruct := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+	responseStruct := asdk.JSONRPCResponseGasAndPaymaster{}
 	err = json.Unmarshal(response, &responseStruct)
 	if err != nil {
 		log.Error("failed to unmarshal response", zap.Error(err))
@@ -634,7 +636,7 @@ func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, si
 	requestId := aa.getNextAlchemyRequestID()
 
 	// 1 - Unmarshal UserOperations from contextData
-	var uo alchemysdk.UserOperation
+	var uo asdk.UserOperation
 	err = json.Unmarshal(contextData, &uo)
 	if err != nil {
 		log.Error("can not unmarshal JSON", zap.Error(err))

@@ -24,7 +24,8 @@ import (
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
-	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+
+	asdk "github.com/anyproto/alchemy-aa-sdk/alchemysdk"
 )
 
 var ctx = context.Background()
@@ -94,10 +95,7 @@ func (fx *fixture) finish(t *testing.T) {
 }
 
 func TestAAS_GetSmartWalletAddress(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if can not connect to smart contract", func(mt *mtest.T) {
+	t.Run("fail if can not connect to smart contract", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -117,7 +115,7 @@ func TestAAS_GetSmartWalletAddress(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -135,10 +133,7 @@ func TestAAS_GetSmartWalletAddress(t *testing.T) {
 }
 
 func TestAAS_GetNonceForSmartWalletAddress(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if can not connect to smart contract", func(mt *mtest.T) {
+	t.Run("fail if can not connect to smart contract", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -151,7 +146,7 @@ func TestAAS_GetNonceForSmartWalletAddress(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -172,10 +167,7 @@ func TestAAS_GetNonceForSmartWalletAddress(t *testing.T) {
 }
 
 func TestAAS_GetNamesCountLeft(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if can not get token balance", func(mt *mtest.T) {
+	t.Run("fail if can not get token balance", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -189,7 +181,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(0), count)
 	})
 
-	mt.Run("success if no tokens", func(mt *mtest.T) {
+	t.Run("success if no tokens", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -203,7 +195,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(0), count)
 	})
 
-	mt.Run("success if not enough tokens", func(mt *mtest.T) {
+	t.Run("success if not enough tokens", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -223,7 +215,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(0), count)
 	})
 
-	mt.Run("success if got N tokens", func(mt *mtest.T) {
+	t.Run("success if got N tokens", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -242,10 +234,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 	})
 }
 func TestAAS_VerifyAdminIdentity(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail", func(mt *mtest.T) {
+	t.Run("fail", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		// 0 - garbage data test
@@ -272,7 +261,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if wrong key", func(mt *mtest.T) {
+	t.Run("fail if wrong key", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -300,7 +289,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -336,10 +325,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 }
 
 func TestAAS_MintAccessTokens(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if names count is ZERO", func(mt *mtest.T) {
+	t.Run("fail if names count is ZERO", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -349,7 +335,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success if SCW was already deployed", func(mt *mtest.T) {
+	t.Run("success if SCW was already deployed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -373,8 +359,8 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -387,7 +373,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -400,7 +386,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -418,7 +404,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	mt.Run("success even if SCW is not deployed", func(mt *mtest.T) {
+	t.Run("success even if SCW is not deployed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -442,8 +428,8 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -456,7 +442,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -469,7 +455,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -489,10 +475,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 }
 
 func TestAAS_GetDataNameRegister(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if no fullname specified", func(mt *mtest.T) {
+	t.Run("fail if no fullname specified", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -502,8 +485,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -515,8 +498,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -534,7 +517,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if no any address specified", func(mt *mtest.T) {
+	t.Run("fail if no any address specified", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -544,8 +527,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -557,8 +540,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -576,7 +559,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if cannot CreateRequestGasAndPaymasterData", func(mt *mtest.T) {
+	t.Run("fail if cannot CreateRequestGasAndPaymasterData", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -590,8 +573,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -603,8 +586,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -620,7 +603,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if cannot SendRequest", func(mt *mtest.T) {
+	t.Run("fail if cannot SendRequest", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -637,8 +620,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return nil, errors.New("fail")
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -654,7 +637,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if SendRequest return wrong JSON", func(mt *mtest.T) {
+	t.Run("fail if SendRequest return wrong JSON", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -677,8 +660,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -689,7 +672,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if SendRequest return error code", func(mt *mtest.T) {
+	t.Run("fail if SendRequest return error code", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -706,8 +689,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// set error
 			response.Error.Code = 123
@@ -723,8 +706,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -735,7 +718,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if CreateRequestStep1 failed", func(mt *mtest.T) {
+	t.Run("fail if CreateRequestStep1 failed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -752,8 +735,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -765,8 +748,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, errors.New("fail")
 		}).AnyTimes()
@@ -777,7 +760,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -794,8 +777,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -807,8 +790,8 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo alchemysdk.UserOperation, err error) {
-			var uoOut alchemysdk.UserOperation
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
 
 			return []byte{}, uoOut, nil
 		}).AnyTimes()
@@ -823,10 +806,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForMint(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -841,10 +821,7 @@ func TestAAS_GetCallDataForMint(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForAprove(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		from := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
 		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
 
@@ -857,10 +834,7 @@ func TestAAS_GetCallDataForAprove(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		erc20tokenAddr := common.HexToAddress("0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6")
 
 		// just some random data
@@ -888,10 +862,7 @@ func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForCommit(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		// just some random data
 		commitmentStr := "0x1234"
 		commitment, err := hex.DecodeString(commitmentStr[2:])
@@ -908,10 +879,7 @@ func TestAAS_GetCallDataForCommit(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForRegister(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		secret, err := hex.DecodeString("a4f49c1a7b979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f21218")
 		assert.NoError(t, err)
 
@@ -937,10 +905,7 @@ func TestAAS_GetCallDataForRegister(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForNameRegister(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -959,10 +924,7 @@ func TestAAS_GetCallDataForNameRegister(t *testing.T) {
 }
 
 func TestAAS_SendUserOperation(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if context is not a valid JSON", func(mt *mtest.T) {
+	t.Run("fail if context is not a valid JSON", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -971,8 +933,8 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -985,7 +947,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -998,7 +960,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1019,7 +981,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if CreateRequestStep2 failed", func(mt *mtest.T) {
+	t.Run("fail if CreateRequestStep2 failed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1028,8 +990,8 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -1042,7 +1004,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1055,7 +1017,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1072,7 +1034,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		// contextData is a marshalled UserOperation
-		var uo alchemysdk.UserOperation
+		var uo asdk.UserOperation
 		contextData, err := json.Marshal(uo)
 		assert.NoError(t, err)
 
@@ -1082,7 +1044,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if SendRequest returns error", func(mt *mtest.T) {
+	t.Run("fail if SendRequest returns error", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1095,7 +1057,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1108,7 +1070,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1123,7 +1085,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		// contextData is a marshalled UserOperation
-		var uo alchemysdk.UserOperation
+		var uo asdk.UserOperation
 		contextData, err := json.Marshal(uo)
 		assert.NoError(t, err)
 
@@ -1133,7 +1095,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("do not fail even if CreateRequestGetUserOperationReceipt fails", func(mt *mtest.T) {
+	t.Run("do not fail even if CreateRequestGetUserOperationReceipt fails", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1142,8 +1104,8 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -1156,7 +1118,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1175,7 +1137,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		// contextData is a marshalled UserOperation
-		var uo alchemysdk.UserOperation
+		var uo asdk.UserOperation
 		contextData, err := json.Marshal(uo)
 		assert.NoError(t, err)
 
@@ -1185,7 +1147,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1194,8 +1156,8 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert alchemysdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := alchemysdk.JSONRPCResponseGasAndPaymaster{}
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -1208,7 +1170,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestAndSign(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}, z interface{}, xx interface{}, yy interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequest
+			var req asdk.JSONRPCRequest
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1221,7 +1183,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1236,7 +1198,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		fx.alchemy.EXPECT().CreateRequestStep2(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		// contextData is a marshalled UserOperation
-		var uo alchemysdk.UserOperation
+		var uo asdk.UserOperation
 		contextData, err := json.Marshal(uo)
 		assert.NoError(t, err)
 
@@ -1249,15 +1211,12 @@ func TestAAS_SendUserOperation(t *testing.T) {
 }
 
 func TestAAS_GetOperationInfo(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("should return NOT-FOUND if error", func(mt *mtest.T) {
+	t.Run("should return NOT-FOUND if error", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			response := alchemysdk.JSONRPCResponseUserOpHash{}
+			response := asdk.JSONRPCResponseUserOpHash{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -1270,7 +1229,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1283,8 +1242,8 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		}).AnyTimes()
 
 		// error here
-		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *alchemysdk.JSONRPCResponseGetOp, err error) {
-			//var out alchemysdk.JSONRPCResponseGetOp
+		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *asdk.JSONRPCResponseGetOp, err error) {
+			//var out asdk.JSONRPCResponseGetOp
 			return nil, errors.New("bad error")
 		}).AnyTimes()
 
@@ -1293,12 +1252,12 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
-	mt.Run("should return NOT-FOUND if error field is set", func(mt *mtest.T) {
+	t.Run("should return NOT-FOUND if error field is set", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			response := alchemysdk.JSONRPCResponseUserOpHash{}
+			response := asdk.JSONRPCResponseUserOpHash{}
 			response.Error.Code = 123
 			response.Error.Message = "bad error"
 
@@ -1313,7 +1272,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1325,8 +1284,8 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *alchemysdk.JSONRPCResponseGetOp, err error) {
-			var out alchemysdk.JSONRPCResponseGetOp
+		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *asdk.JSONRPCResponseGetOp, err error) {
+			var out asdk.JSONRPCResponseGetOp
 			out.Error.Code = 123
 			out.Error.Message = "bad error"
 
@@ -1338,12 +1297,12 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
-	mt.Run("should return PENDING if UserOpHash field is null", func(mt *mtest.T) {
+	t.Run("should return PENDING if UserOpHash field is null", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			response := alchemysdk.JSONRPCResponseUserOpHash{}
+			response := asdk.JSONRPCResponseUserOpHash{}
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(response)
@@ -1356,7 +1315,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1368,8 +1327,8 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *alchemysdk.JSONRPCResponseGetOp, err error) {
-			var out alchemysdk.JSONRPCResponseGetOp
+		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *asdk.JSONRPCResponseGetOp, err error) {
+			var out asdk.JSONRPCResponseGetOp
 			out.Result.UserOpHash = "" // here
 			out.Error.Code = 0
 			out.Error.Message = ""
@@ -1382,12 +1341,12 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_PendingOrNotFound)
 	})
 
-	mt.Run("should return error if Success field is false", func(mt *mtest.T) {
+	t.Run("should return error if Success field is false", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			response := alchemysdk.JSONRPCResponseUserOpHash{}
+			response := asdk.JSONRPCResponseUserOpHash{}
 			response.Error.Code = 0
 			response.Error.Message = ""
 
@@ -1402,7 +1361,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1414,8 +1373,8 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *alchemysdk.JSONRPCResponseGetOp, err error) {
-			var out alchemysdk.JSONRPCResponseGetOp
+		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *asdk.JSONRPCResponseGetOp, err error) {
+			var out asdk.JSONRPCResponseGetOp
 			out.Result.UserOpHash = "123"
 			out.Result.Success = false // here
 			out.Error.Code = 0
@@ -1429,12 +1388,12 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
-	mt.Run("success if receipt has Success==true", func(mt *mtest.T) {
+	t.Run("success if receipt has Success==true", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			response := alchemysdk.JSONRPCResponseUserOpHash{}
+			response := asdk.JSONRPCResponseUserOpHash{}
 			response.Error.Code = 0
 			response.Error.Message = ""
 
@@ -1449,7 +1408,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		}).AnyTimes()
 
 		fx.alchemy.EXPECT().CreateRequestGetUserOperationReceipt(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			var req alchemysdk.JSONRPCRequestGetUserOperationReceipt
+			var req asdk.JSONRPCRequestGetUserOperationReceipt
 
 			// convert to JSON
 			jsonDATA, err := json.Marshal(req)
@@ -1461,8 +1420,8 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *alchemysdk.JSONRPCResponseGetOp, err error) {
-			var out alchemysdk.JSONRPCResponseGetOp
+		fx.alchemy.EXPECT().DecodeResponseGetUserOperationReceipt(gomock.Any()).DoAndReturn(func(one interface{}) (ret *asdk.JSONRPCResponseGetOp, err error) {
+			var out asdk.JSONRPCResponseGetOp
 			out.Result.UserOpHash = "123" // here
 			out.Result.Success = true     // here
 			out.Error.Code = 0
