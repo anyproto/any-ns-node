@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
-	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 	"go.uber.org/mock/gomock"
 )
 
@@ -41,10 +40,7 @@ func (fx *fixture) finish(t *testing.T) {
 }
 
 func TestAAS_Keccak256(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		hexString := hex.EncodeToString(keccak256("0x"))
 		assert.Equal(t, hexString, "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 
@@ -54,10 +50,7 @@ func TestAAS_Keccak256(t *testing.T) {
 }
 
 func TestAAS_PackUserOperation(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		var request UserOperation
 
 		request.Sender = "0x045F756F248799F4413a026100Ae49e5E7F2031E"
@@ -84,10 +77,7 @@ func TestAAS_PackUserOperation(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForExecute(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		erc20tokenAddr := common.HexToAddress("0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6")
 
 		// just some random data
@@ -105,10 +95,7 @@ func TestAAS_GetCallDataForExecute(t *testing.T) {
 }
 
 func TestAAS_GetUserOperationHash(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		var request UserOperation
 
 		request.Sender = "0x045F756F248799F4413a026100Ae49e5E7F2031E"
@@ -133,7 +120,7 @@ func TestAAS_GetUserOperationHash(t *testing.T) {
 		assert.Equal(t, outStr, "0x61b655b51d4cb1a6f6fb3a98f5f1e95b1955891c7488dc34d87fe32a4424e4a5")
 	})
 
-	mt.Run("success 2", func(mt *mtest.T) {
+	t.Run("success 2", func(t *testing.T) {
 		var request UserOperation
 
 		request.Sender = "0xb856DBD4fA1A79a46D426f537455e7d3E79ab7c4"
@@ -160,10 +147,7 @@ func TestAAS_GetUserOperationHash(t *testing.T) {
 }
 
 func TestAAS_SignDataHashWithEthereumPrivateKey(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		myPK := "ac4bab11ad6b7ec2c84e5e293710828234ab63b62d377a23681228be588fab57"
 		privateKeyECDSA, err := crypto.HexToECDSA(myPK)
 		assert.NoError(t, err)
@@ -178,7 +162,7 @@ func TestAAS_SignDataHashWithEthereumPrivateKey(t *testing.T) {
 		assert.Equal(t, "0x"+hex.EncodeToString(out), "0x210af945f4be3a6a179e10240fd8ed5cd3d9317734d36a7b9bb969a9139bb3fc69c0f095cc52b616b1120887ceb71fd811a849ef59dc847ad3ef8c56004c5be61b")
 	})
 
-	mt.Run("success 2", func(mt *mtest.T) {
+	t.Run("success 2", func(t *testing.T) {
 		myPK := "ac4bab11ad6b7ec2c84e5e293710828234ab63b62d377a23681228be588fab57"
 		privateKeyECDSA, err := crypto.HexToECDSA(myPK)
 		assert.NoError(t, err)
@@ -195,10 +179,7 @@ func TestAAS_SignDataHashWithEthereumPrivateKey(t *testing.T) {
 }
 
 func TestAA_CreateRequestGasAndPaymasterData(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -268,7 +249,7 @@ func TestAA_CreateRequestGasAndPaymasterData(t *testing.T) {
 		assert.Equal(t, out.Params[0].DummySignature, "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c")
 	})
 
-	mt.Run("success with non-null InitCode", func(mt *mtest.T) {
+	t.Run("success with non-null InitCode", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -309,10 +290,7 @@ func TestAA_CreateRequestGasAndPaymasterData(t *testing.T) {
 }
 
 func TestAAS_SignDataWithEthereumPrivateKey(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		myPK := "ac4bab11ad6b7ec2c84e5e293710828234ab63b62d377a23681228be588fab57"
 
 		// prepare data
@@ -345,10 +323,7 @@ func TestAAS_SignDataWithEthereumPrivateKey(t *testing.T) {
 }
 
 func TestAA_CreateRequest(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -416,7 +391,7 @@ func TestAA_CreateRequest(t *testing.T) {
 		assert.Equal(t, out.Params[0].Signature, "0x571ec8a77c9ed42958db1f2f31b3883f773cb4bb6a225208fa13ea8f53dc435939c22e6fae79da717977881d5288bc7de2b840b54b27df6230906244c665e6d51b")
 	})
 
-	mt.Run("success - include InitCode", func(mt *mtest.T) {
+	t.Run("success - include InitCode", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -464,7 +439,7 @@ func TestAA_CreateRequest(t *testing.T) {
 		assert.Equal(t, out.Params[0].Signature, "0xd1e8c6a31b68ea76f58428f95c59e6eaea030869ffd198acd1bf767448a726553bc94a719f5fcdccc28a95bd527c9f526ce813e38791ffcf7ba5d5cfb0b854011c")
 	})
 
-	mt.Run("success - ADMIN for ADMIN", func(mt *mtest.T) {
+	t.Run("success - ADMIN for ADMIN", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -565,10 +540,7 @@ func TestAA_CreateRequest(t *testing.T) {
 }
 
 func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if wrong input", func(mt *mtest.T) {
+	t.Run("fail if wrong input", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -578,7 +550,7 @@ func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -591,10 +563,7 @@ func TestAA_DecodeSendUserOperationResponse(t *testing.T) {
 }
 
 func TestAA_GetAccountInitCode(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 

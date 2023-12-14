@@ -24,7 +24,6 @@ import (
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
 
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
-	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
 var ctx = context.Background()
@@ -94,10 +93,7 @@ func (fx *fixture) finish(t *testing.T) {
 }
 
 func TestAAS_GetSmartWalletAddress(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if can not connect to smart contract", func(mt *mtest.T) {
+	t.Run("fail if can not connect to smart contract", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -117,7 +113,7 @@ func TestAAS_GetSmartWalletAddress(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -135,10 +131,7 @@ func TestAAS_GetSmartWalletAddress(t *testing.T) {
 }
 
 func TestAAS_GetNonceForSmartWalletAddress(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if can not connect to smart contract", func(mt *mtest.T) {
+	t.Run("fail if can not connect to smart contract", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -151,7 +144,7 @@ func TestAAS_GetNonceForSmartWalletAddress(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -172,10 +165,7 @@ func TestAAS_GetNonceForSmartWalletAddress(t *testing.T) {
 }
 
 func TestAAS_GetNamesCountLeft(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if can not get token balance", func(mt *mtest.T) {
+	t.Run("fail if can not get token balance", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -189,7 +179,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(0), count)
 	})
 
-	mt.Run("success if no tokens", func(mt *mtest.T) {
+	t.Run("success if no tokens", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -203,7 +193,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(0), count)
 	})
 
-	mt.Run("success if not enough tokens", func(mt *mtest.T) {
+	t.Run("success if not enough tokens", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -223,7 +213,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(0), count)
 	})
 
-	mt.Run("success if got N tokens", func(mt *mtest.T) {
+	t.Run("success if got N tokens", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -242,10 +232,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 	})
 }
 func TestAAS_VerifyAdminIdentity(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail", func(mt *mtest.T) {
+	t.Run("fail", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		// 0 - garbage data test
@@ -272,7 +259,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if wrong key", func(mt *mtest.T) {
+	t.Run("fail if wrong key", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -300,7 +287,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -336,10 +323,7 @@ func TestAAS_VerifyAdminIdentity(t *testing.T) {
 }
 
 func TestAAS_MintAccessTokens(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if names count is ZERO", func(mt *mtest.T) {
+	t.Run("fail if names count is ZERO", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -349,7 +333,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success if SCW was already deployed", func(mt *mtest.T) {
+	t.Run("success if SCW was already deployed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -418,7 +402,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	mt.Run("success even if SCW is not deployed", func(mt *mtest.T) {
+	t.Run("success even if SCW is not deployed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -489,10 +473,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 }
 
 func TestAAS_GetDataNameRegister(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if no fullname specified", func(mt *mtest.T) {
+	t.Run("fail if no fullname specified", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -534,7 +515,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if no any address specified", func(mt *mtest.T) {
+	t.Run("fail if no any address specified", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -576,7 +557,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if cannot CreateRequestGasAndPaymasterData", func(mt *mtest.T) {
+	t.Run("fail if cannot CreateRequestGasAndPaymasterData", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -620,7 +601,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if cannot SendRequest", func(mt *mtest.T) {
+	t.Run("fail if cannot SendRequest", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -654,7 +635,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if SendRequest return wrong JSON", func(mt *mtest.T) {
+	t.Run("fail if SendRequest return wrong JSON", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -689,7 +670,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if SendRequest return error code", func(mt *mtest.T) {
+	t.Run("fail if SendRequest return error code", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -735,7 +716,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if CreateRequestStep1 failed", func(mt *mtest.T) {
+	t.Run("fail if CreateRequestStep1 failed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -777,7 +758,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -823,10 +804,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForMint(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -841,10 +819,7 @@ func TestAAS_GetCallDataForMint(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForAprove(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		from := common.HexToAddress("0x045F756F248799F4413a026100Ae49e5E7F2031E")
 		registrarController := common.HexToAddress("0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA")
 
@@ -857,10 +832,7 @@ func TestAAS_GetCallDataForAprove(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		erc20tokenAddr := common.HexToAddress("0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6")
 
 		// just some random data
@@ -888,10 +860,7 @@ func TestAAS_GetCallDataForBatchExecute(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForCommit(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		// just some random data
 		commitmentStr := "0x1234"
 		commitment, err := hex.DecodeString(commitmentStr[2:])
@@ -908,10 +877,7 @@ func TestAAS_GetCallDataForCommit(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForRegister(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		secret, err := hex.DecodeString("a4f49c1a7b979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f21218")
 		assert.NoError(t, err)
 
@@ -937,10 +903,7 @@ func TestAAS_GetCallDataForRegister(t *testing.T) {
 }
 
 func TestAAS_GetCallDataForNameRegister(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -959,10 +922,7 @@ func TestAAS_GetCallDataForNameRegister(t *testing.T) {
 }
 
 func TestAAS_SendUserOperation(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("fail if context is not a valid JSON", func(mt *mtest.T) {
+	t.Run("fail if context is not a valid JSON", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1019,7 +979,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if CreateRequestStep2 failed", func(mt *mtest.T) {
+	t.Run("fail if CreateRequestStep2 failed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1082,7 +1042,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("fail if SendRequest returns error", func(mt *mtest.T) {
+	t.Run("fail if SendRequest returns error", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1133,7 +1093,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	mt.Run("do not fail even if CreateRequestGetUserOperationReceipt fails", func(mt *mtest.T) {
+	t.Run("do not fail even if CreateRequestGetUserOperationReceipt fails", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1185,7 +1145,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	mt.Run("success", func(mt *mtest.T) {
+	t.Run("success", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1249,10 +1209,7 @@ func TestAAS_SendUserOperation(t *testing.T) {
 }
 
 func TestAAS_GetOperationInfo(t *testing.T) {
-	var mt = mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	defer mt.Close()
-
-	mt.Run("should return NOT-FOUND if error", func(mt *mtest.T) {
+	t.Run("should return NOT-FOUND if error", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1293,7 +1250,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
-	mt.Run("should return NOT-FOUND if error field is set", func(mt *mtest.T) {
+	t.Run("should return NOT-FOUND if error field is set", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1338,7 +1295,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
-	mt.Run("should return PENDING if UserOpHash field is null", func(mt *mtest.T) {
+	t.Run("should return PENDING if UserOpHash field is null", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1382,7 +1339,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_PendingOrNotFound)
 	})
 
-	mt.Run("should return error if Success field is false", func(mt *mtest.T) {
+	t.Run("should return error if Success field is false", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -1429,7 +1386,7 @@ func TestAAS_GetOperationInfo(t *testing.T) {
 		assert.Equal(t, op.OperationState, nsp.OperationState_Error)
 	})
 
-	mt.Run("success if receipt has Success==true", func(mt *mtest.T) {
+	t.Run("success if receipt has Success==true", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
