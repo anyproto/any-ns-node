@@ -42,6 +42,8 @@ type Config struct {
 	Contracts        Contracts              `yaml:"contracts"`
 	Aa               AA                     `yaml:"accountAbstraction"`
 	Metric           metric.Config          `yaml:"metric"`
+	// use mongo cache to read data from
+	ReadFromCache bool `yaml:"readFromCache"`
 }
 
 func (c *Config) Init(a *app.App) (err error) {

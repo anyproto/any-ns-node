@@ -45,6 +45,7 @@ network:
             - paymentProcessingNode
     creationTime: 2023-07-21T11:51:12.970882+01:00
 networkStorePath: .
+readFromCache: true
 log:
   production: false
 contracts:
