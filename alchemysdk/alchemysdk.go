@@ -68,6 +68,10 @@ func (aa *alchemysdk) CreateRequestGetUserOperationReceipt(operationHash string,
 	return asdk.CreateRequestGetUserOperationReceipt(operationHash, id)
 }
 
+func (aa *alchemysdk) SendRequest(apiKey string, jsonDATA []byte) ([]byte, error) {
+	return asdk.SendRequest(apiKey, jsonDATA)
+}
+
 func (aa *alchemysdk) DecodeResponseSendRequest(response []byte) (opHash string, err error) {
 	return asdk.DecodeResponseSendRequest(response)
 }
