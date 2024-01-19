@@ -23,10 +23,10 @@ var log = logger.NewNamed(CName)
 type NameDataItem struct {
 	FullName string `bson:"name"`
 	// always store in LOWER CASE!
-	OwnerEthAddress string `bson:"owner_eth_address"`
-	OwnerAnyAddress string `bson:"owner_any_address"`
-	SpaceId         string `bson:"space_id"`
-	NameExpires     int64  `bson:"name_expires"`
+	OwnerScwEthAddress string `bson:"owner_scw_eth_address"`
+	OwnerAnyAddress    string `bson:"owner_any_address"`
+	SpaceId            string `bson:"space_id"`
+	NameExpires        int64  `bson:"name_expires"`
 }
 
 // TODO: index it
@@ -36,7 +36,7 @@ type findNameDataByName struct {
 
 // TODO: index it
 type findNameDataByAddress struct {
-	OwnerEthAddress string `bson:"owner_eth_address"`
+	OwnerScwEthAddress string `bson:"owner_scw_eth_address"`
 }
 
 func New() app.Component {
@@ -122,11 +122,11 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 
 	// 2 - if found in the cache -> return false
 	return &nsp.NameAvailableResponse{
-		Available:       false,
-		OwnerEthAddress: item.OwnerEthAddress,
-		OwnerAnyAddress: item.OwnerAnyAddress,
-		SpaceId:         item.SpaceId,
-		NameExpires:     item.NameExpires,
+		Available:          false,
+		OwnerScwEthAddress: item.OwnerScwEthAddress,
+		OwnerAnyAddress:    item.OwnerAnyAddress,
+		SpaceId:            item.SpaceId,
+		NameExpires:        item.NameExpires,
 	}, nil
 }
 
@@ -135,8 +135,8 @@ func (cs *cacheService) GetNameByAddress(ctx context.Context, in *nsp.NameByAddr
 	item := &NameDataItem{}
 
 	// WARNING: convert to lower!
-	inEthAddr := strings.ToLower(in.OwnerEthAddress)
-	err = cs.itemColl.FindOne(ctx, findNameDataByAddress{OwnerEthAddress: inEthAddr}).Decode(&item)
+	inEthAddr := strings.ToLower(in.OwnerScwEthAddress)
+	err = cs.itemColl.FindOne(ctx, findNameDataByAddress{OwnerScwEthAddress: inEthAddr}).Decode(&item)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -161,7 +161,7 @@ func (cs *cacheService) setNameData(ctx context.Context, in *NameDataItem) (err 
 	opts := options.Replace().SetUpsert(true)
 
 	// WARNING: convert to lower case!
-	in.OwnerEthAddress = strings.ToLower(in.OwnerEthAddress)
+	in.OwnerScwEthAddress = strings.ToLower(in.OwnerScwEthAddress)
 
 	_, err = cs.itemColl.ReplaceOne(ctx, filter, in, opts)
 	if err != nil {
@@ -218,7 +218,7 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 	// 4 - update cache
 	var ndi NameDataItem
 	ndi.FullName = in.FullName
-	ndi.OwnerEthAddress = strings.ToLower(ea)
+	ndi.OwnerScwEthAddress = strings.ToLower(ea)
 	ndi.OwnerAnyAddress = aa
 	ndi.SpaceId = si
 	ndi.NameExpires = exp.Int64()

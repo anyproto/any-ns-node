@@ -185,8 +185,8 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 				// occupied
 				Available: false,
 				// owner
-				OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
+				OwnerScwEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+				OwnerAnyAddress:    "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 			}, nil
 		})
 
@@ -198,7 +198,7 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.False(t, resp.Available)
-		assert.Equal(t, resp.OwnerEthAddress, "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
+		assert.Equal(t, resp.OwnerScwEthAddress, "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 		assert.Equal(t, resp.OwnerAnyAddress, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
 		assert.Equal(t, resp.SpaceId, "")
 	})
@@ -218,7 +218,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 
 		pctx := context.Background()
 		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
-			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
+			OwnerScwEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
 
 		require.NoError(t, err)
@@ -240,7 +240,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 
 		pctx := context.Background()
 		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
-			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerScwEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		})
 
 		require.NoError(t, err)
@@ -263,7 +263,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 
 		pctx := context.Background()
 		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
-			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
+			OwnerScwEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
 
 		require.NoError(t, err)
@@ -286,7 +286,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 
 		pctx := context.Background()
 		_, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
-			OwnerEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
+			OwnerScwEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 		})
 
 		require.Error(t, err)
@@ -311,7 +311,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 
 		pctx := context.Background()
 		resp, err := fx.GetNameByAddress(pctx, &nsp.NameByAddressRequest{
-			OwnerEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+			OwnerScwEthAddress: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 		})
 
 		require.NoError(t, err)

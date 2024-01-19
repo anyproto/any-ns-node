@@ -69,7 +69,7 @@ func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddres
 	// 1 - if ReadFromCache is false -> always first read from smart contracts
 	// if not, then always just read quickly from cache
 	if !arpc.readFromCache {
-		log.Debug("EXCPLICIT: reverse resolve using no cache", zap.String("FullName", in.OwnerEthAddress))
+		log.Debug("EXCPLICIT: reverse resolve using no cache", zap.String("FullName", in.OwnerScwEthAddress))
 		return arpc.getNameByAddressDirectly(ctx, in)
 	}
 
@@ -79,8 +79,8 @@ func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddres
 
 func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.NameByAddressRequest) (*nsp.NameByAddressResponse, error) {
 	// 0 - check parameters
-	if !common.IsHexAddress(in.OwnerEthAddress) {
-		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
+	if !common.IsHexAddress(in.OwnerScwEthAddress) {
+		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerScwEthAddress))
 		return nil, errors.New("invalid ETH address")
 	}
 
@@ -91,8 +91,8 @@ func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.Name
 		return nil, err
 	}
 
-	// convert in.OwnerEthAddress to common.Address
-	var addr = common.HexToAddress(in.OwnerEthAddress)
+	// convert in.OwnerScwEthAddress to common.Address
+	var addr = common.HexToAddress(in.OwnerScwEthAddress)
 
 	name, err := arpc.contracts.GetNameByAddress(conn, addr)
 	if err != nil {
