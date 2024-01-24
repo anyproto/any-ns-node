@@ -69,7 +69,7 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().CalculateTxParams(gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -475,90 +475,6 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 }
 
 func TestAAS_GetDataNameRegister(t *testing.T) {
-	t.Run("fail if no fullname specified", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
-			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
-			return byteArr, nil
-		}).AnyTimes()
-
-		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := asdk.JSONRPCResponseGasAndPaymaster{}
-
-			// convert to JSON
-			jsonDATA, err := json.Marshal(response)
-			assert.NoError(t, err)
-
-			// convert to []byte
-			byteArr := []byte(jsonDATA)
-
-			return byteArr, nil
-		}).AnyTimes()
-
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
-			var uoOut asdk.UserOperation
-
-			return []byte{}, uoOut, nil
-		}).AnyTimes()
-
-		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
-		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
-			FullName:        "",
-			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
-		}
-
-		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
-		assert.Error(t, err)
-	})
-
-	t.Run("fail if no any address specified", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
-			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
-			return byteArr, nil
-		}).AnyTimes()
-
-		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
-			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
-			response := asdk.JSONRPCResponseGasAndPaymaster{}
-
-			// convert to JSON
-			jsonDATA, err := json.Marshal(response)
-			assert.NoError(t, err)
-
-			// convert to []byte
-			byteArr := []byte(jsonDATA)
-
-			return byteArr, nil
-		}).AnyTimes()
-
-		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
-			var uoOut asdk.UserOperation
-
-			return []byte{}, uoOut, nil
-		}).AnyTimes()
-
-		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
-		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
-			FullName:        "hello.any",
-			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
-		}
-
-		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
-		assert.Error(t, err)
-	})
-
 	t.Run("fail if cannot CreateRequestGasAndPaymasterData", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
@@ -596,7 +512,6 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
@@ -630,7 +545,6 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
@@ -650,7 +564,6 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		// return wrong JSON
@@ -685,7 +598,6 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
@@ -731,7 +643,6 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
@@ -773,7 +684,6 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
@@ -799,6 +709,253 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		dataToSign, contextData, err := fx.GetDataNameRegister(context.Background(), &req)
+		assert.NoError(t, err)
+		assert.NotNil(t, contextData)
+		assert.NotNil(t, dataToSign)
+	})
+}
+
+func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
+	t.Run("fail if cannot CreateRequestGasAndPaymasterData", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}) (out []byte, err error) {
+			return []byte{}, errors.New("fail")
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		_, _, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if cannot SendRequest", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, s interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}, y interface{}) (out []byte, err error) {
+			return []byte{}, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			return nil, errors.New("fail")
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		_, _, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if SendRequest return wrong JSON", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		// return wrong JSON
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			byteArr := []byte("123A")
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		_, _, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if SendRequest return error code", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
+
+			// set error
+			response.Error.Code = 123
+			response.Error.Message = "Something really bad happened, sorry"
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		_, _, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if CreateRequestStep1 failed", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
+
+			return []byte{}, uoOut, errors.New("fail")
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		_, _, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CallContract(gomock.Any(), gomock.Any()).DoAndReturn(func(tokenAddress interface{}, scw interface{}) ([]byte, error) {
+			byteArr := common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a").Bytes()
+			return byteArr, nil
+		}).AnyTimes()
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
+			// convert asdk.JSONRPCResponseGasAndPaymaster to []byte array
+			response := asdk.JSONRPCResponseGasAndPaymaster{}
+
+			// convert to JSON
+			jsonDATA, err := json.Marshal(response)
+			assert.NoError(t, err)
+
+			// convert to []byte
+			byteArr := []byte(jsonDATA)
+
+			return byteArr, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestStep1(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}, scw interface{}, nonce interface{}, gasPrice interface{}, x interface{}) (out []byte, uo asdk.UserOperation, err error) {
+			var uoOut asdk.UserOperation
+
+			return []byte{}, uoOut, nil
+		}).AnyTimes()
+
+		fx.alchemy.EXPECT().CreateRequestGasAndPaymasterData(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+		dataToSign, contextData, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
 		assert.NoError(t, err)
 		assert.NotNil(t, contextData)
 		assert.NotNil(t, dataToSign)
@@ -913,8 +1070,9 @@ func TestAAS_GetCallDataForNameRegister(t *testing.T) {
 		ownerAnyAddress := "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy"
 		ownerEthAddress := "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF"
 		spaceID := "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"
+		isReverseRecordUpdate := true
 
-		_, err := fx.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID)
+		_, err := fx.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID, isReverseRecordUpdate)
 		assert.NoError(t, err)
 
 		// the result has some randomness in it (secret)

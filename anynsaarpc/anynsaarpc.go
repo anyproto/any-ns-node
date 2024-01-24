@@ -325,6 +325,30 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameReg
 	return &out, nil
 }
 
+func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (*nsp.GetDataNameRegisterResponse, error) {
+	// 1 - check params
+	err := anynsrpc.СheckRegisterForSpaceParams(in)
+	if err != nil {
+		log.Error("invalid parameters", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - get data to sign
+	dataOut, contextData, err := arpc.aa.GetDataNameRegisterForSpace(ctx, in)
+	if err != nil {
+		log.Error("failed to mint tokens", zap.Error(err))
+		return nil, err
+	}
+
+	var out nsp.GetDataNameRegisterResponse
+	// user should sign it
+	out.Data = dataOut
+	// user should pass it back to us
+	out.Context = contextData
+
+	return &out, nil
+}
+
 func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, signature []byte) (err error) {
 	// to read in the PeerID format
 	ownerAnyIdentity, err := crypto.DecodePeerId(ownerIdStr)

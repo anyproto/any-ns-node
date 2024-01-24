@@ -88,6 +88,22 @@ func (mr *MockAccountAbstractionServiceMockRecorder) GetDataNameRegister(ctx, in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDataNameRegister", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetDataNameRegister), ctx, in)
 }
 
+// GetDataNameRegisterForSpace mocks base method.
+func (m *MockAccountAbstractionService) GetDataNameRegisterForSpace(ctx context.Context, in *nameserviceproto.NameRegisterForSpaceRequest) ([]byte, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDataNameRegisterForSpace", ctx, in)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetDataNameRegisterForSpace indicates an expected call of GetDataNameRegisterForSpace.
+func (mr *MockAccountAbstractionServiceMockRecorder) GetDataNameRegisterForSpace(ctx, in any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDataNameRegisterForSpace", reflect.TypeOf((*MockAccountAbstractionService)(nil).GetDataNameRegisterForSpace), ctx, in)
+}
+
 // GetNamesCountLeft mocks base method.
 func (m *MockAccountAbstractionService) GetNamesCountLeft(ctx context.Context, scw common.Address) (uint64, error) {
 	m.ctrl.T.Helper()

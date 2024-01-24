@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/anyproto/any-ns-node/alchemysdk"
-	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
 	commonaccount "github.com/anyproto/any-sync/accountservice"
@@ -60,8 +59,9 @@ type AccountAbstractionService interface {
 	// will mint + approve tokens to the specified smart wallet
 	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (operationID string, err error)
 
-	// get data to sign with your PK
+	// get data to sign with your PK:
 	GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
+	GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (dataOut []byte, contextData []byte, err error)
 
 	// after data is signed - now you are ready to send it
 	// contextData was received from functions like GetDataNameRegister and should be left intact
@@ -436,6 +436,27 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 }
 
 func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (dataOut []byte, contextData []byte, err error) {
+	// do not attach SpaceID here, instead use GetDataNameRegisterForSpace method
+	spaceID := ""
+
+	// always update reverse record!
+	// Example:
+	// 1 - register alice.any -> ANYID123123
+	// 2 - register xxxx.any -> ANYID123123
+	// reverse resolve ANYID123123 will return xxxx.any
+	isReverseRecordUpdate := true
+
+	return aa.getDataNameRegister(ctx, in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, spaceID, isReverseRecordUpdate)
+}
+
+func (aa *anynsAA) GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (dataOut []byte, contextData []byte, err error) {
+	// Registering for space should not update reverse record for owner
+	isReverseRecordUpdate := false
+
+	return aa.getDataNameRegister(ctx, in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId, isReverseRecordUpdate)
+}
+
+func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool) (dataOut []byte, contextData []byte, err error) {
 	// settings from config:
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
@@ -444,15 +465,8 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 	var chainID int64 = int64(aa.aaConfig.ChainID)
 	var id int = aa.getNextAlchemyRequestID()
 
-	// 0 - check params
-	err = anynsrpc.СheckRegisterParams(in)
-	if err != nil {
-		log.Error("invalid parameters", zap.Error(err))
-		return nil, nil, err
-	}
-
-	// 1 - determine users's SCW
-	addr := common.HexToAddress(in.OwnerEthAddress)
+	// 0 - determine users's SCW
+	addr := common.HexToAddress(ownerEthAddress)
 	scw, err := aa.GetSmartWalletAddress(ctx, addr)
 	if err != nil {
 		log.Error("failed to get smart wallet address for admin", zap.Error(err))
@@ -471,7 +485,7 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 		factoryAddr = common.HexToAddress(aa.aaConfig.AccountFactory)
 	}
 
-	// 2 - get nonce
+	// 1 - get nonce
 	nonce, err := aa.getNonceForSmartWalletAddress(ctx, scw)
 	if err != nil {
 		log.Error("failed to get nonce", zap.Error(err))
@@ -479,8 +493,8 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 	}
 	log.Info("got nonce", zap.String("scw", scw.String()), zap.Int64("nonce", nonce.Int64()))
 
-	// 3 - create user operation
-	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId)
+	// 2 - create user operation
+	callData, err := aa.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID, isReverseRecordUpdate)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return nil, nil, err
@@ -500,7 +514,7 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 
 	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
 
-	// 5 - send it
+	// 3 - send it
 	response, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATAPre)
 	if err != nil {
 		log.Error("failed to send request", zap.Error(err))
@@ -526,7 +540,7 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 
 	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
 
-	// 6 - get data to sign
+	// 4 - get data to sign
 	jsonData, uo, err := aa.alchemy.CreateRequestStep1(callData, responseStruct, chainID, entryPointAddr, scw, uint64(nonce.Int64()))
 	if err != nil {
 		log.Error("failed to create request", zap.Error(err))
@@ -543,14 +557,13 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 	return jsonData, contextData, nil
 }
 
-func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string) ([]byte, error) {
+func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool) ([]byte, error) {
 	registrarController := common.HexToAddress(aa.contractsConfig.AddrRegistrar)
 	resolverAddress := common.HexToAddress(aa.contractsConfig.AddrResolver)
 	registrantAccount := common.HexToAddress(ownerEthAddress)
 
 	var nameFirstPart string = contracts.RemoveTLD(fullName)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
-	var isReverseRecord bool = true
 	var ownerControlledFuses uint16 = 0
 
 	// 1 - get new random secret
@@ -580,7 +593,8 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 		controller,
 		fullName,
 		ownerAnyAddress,
-		ownerEthAddress)
+		ownerEthAddress,
+		isReverseRecordUpdate)
 
 	if err != nil {
 		log.Error("can not calculate a commitment", zap.Error(err))
@@ -608,7 +622,7 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 		secret32,
 		resolverAddress,
 		callData,
-		isReverseRecord,
+		isReverseRecordUpdate,
 		ownerControlledFuses)
 
 	if err != nil {

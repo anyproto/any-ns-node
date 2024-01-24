@@ -305,18 +305,18 @@ func (mr *MockContractsServiceMockRecorder) IsContractDeployed(ctx, client, addr
 }
 
 // MakeCommitment mocks base method.
-func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) ([32]byte, error) {
+func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecordUpdate bool) ([32]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MakeCommitment", nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	ret := m.ctrl.Call(m, "MakeCommitment", nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate)
 	ret0, _ := ret[0].([32]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // MakeCommitment indicates an expected call of MakeCommitment.
-func (mr *MockContractsServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate)
 }
 
 // Name mocks base method.

@@ -695,7 +695,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		pctx := context.Background()
@@ -711,7 +711,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		pctx := context.Background()
@@ -727,23 +727,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "oWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
-		}
-
-		pctx := context.Background()
-		_, err := fx.GetDataNameRegister(pctx, &req)
-		assert.Error(t, err)
-	})
-
-	t.Run("fail if space ID is invalid", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
-			FullName:        "hello.any",
-			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "baxxxybeibs62gqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		pctx := context.Background()
@@ -759,7 +743,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
 			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
-			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
 		fx.aa.EXPECT().GetDataNameRegister(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (dataOut []byte, contextData []byte, err error) {
@@ -768,6 +752,76 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 
 		pctx := context.Background()
 		_, err := fx.GetDataNameRegister(pctx, &req)
+		assert.NoError(t, err)
+	})
+}
+
+func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
+	t.Run("fail if name is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegisterForSpace(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if eth address is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegisterForSpace(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("fail if Any address is invalid", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "oWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegisterForSpace(pctx, &req)
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+
+		fx.aa.EXPECT().GetDataNameRegisterForSpace(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (dataOut []byte, contextData []byte, err error) {
+			return []byte("data"), []byte("context"), nil
+		})
+
+		pctx := context.Background()
+		_, err := fx.GetDataNameRegisterForSpace(pctx, &req)
 		assert.NoError(t, err)
 	})
 }
