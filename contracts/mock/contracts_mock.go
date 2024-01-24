@@ -260,6 +260,21 @@ func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(ctx, client, nam
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), ctx, client, namehash)
 }
 
+// GetOwnerOfSmartContractWallet mocks base method.
+func (m *MockContractsService) GetOwnerOfSmartContractWallet(ctx context.Context, client *ethclient.Client, address common.Address) (common.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOwnerOfSmartContractWallet", ctx, client, address)
+	ret0, _ := ret[0].(common.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOwnerOfSmartContractWallet indicates an expected call of GetOwnerOfSmartContractWallet.
+func (mr *MockContractsServiceMockRecorder) GetOwnerOfSmartContractWallet(ctx, client, address any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerOfSmartContractWallet", reflect.TypeOf((*MockContractsService)(nil).GetOwnerOfSmartContractWallet), ctx, client, address)
+}
+
 // Init mocks base method.
 func (m *MockContractsService) Init(a *app.App) error {
 	m.ctrl.T.Helper()

@@ -102,7 +102,8 @@ func TestCacheService_IsNameAvailable(t *testing.T) {
 		// 1 - insert item to DB
 		_, err := fx.itemColl.InsertOne(ctx, NameDataItem{
 			FullName:           "test.any",
-			OwnerScwEthAddress: "owner",
+			OwnerEthAddress:    "owner",
+			OwnerScwEthAddress: "owner_scw",
 			OwnerAnyAddress:    "anyid",
 		})
 		require.NoError(t, err)
@@ -120,7 +121,8 @@ func TestCacheService_IsNameAvailable(t *testing.T) {
 		// 1 - insert item to DB
 		_, err := fx.itemColl.InsertOne(ctx, NameDataItem{
 			FullName:           "test.any",
-			OwnerScwEthAddress: "owner",
+			OwnerEthAddress:    "owner",
+			OwnerScwEthAddress: "owner_scw",
 			OwnerAnyAddress:    "anyid",
 		})
 		require.NoError(t, err)
@@ -130,7 +132,8 @@ func TestCacheService_IsNameAvailable(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.False(t, out.Available)
-		assert.Equal(t, "owner", out.OwnerScwEthAddress)
+		assert.Equal(t, "owner", out.OwnerEthAddress)
+		assert.Equal(t, "owner_scw", out.OwnerScwEthAddress)
 		assert.Equal(t, "anyid", out.OwnerAnyAddress)
 	})
 }
@@ -143,13 +146,14 @@ func TestCacheService_GetNameByAddress(t *testing.T) {
 		// 1 - insert item to DB
 		_, err := fx.itemColl.InsertOne(ctx, NameDataItem{
 			FullName:           "test.any",
-			OwnerScwEthAddress: "owner",
+			OwnerEthAddress:    "owner",
+			OwnerScwEthAddress: "owner_scw",
 			OwnerAnyAddress:    "anyid",
 		})
 		require.NoError(t, err)
 
 		// 2 - call GetNameByAddress
-		out, err := fx.GetNameByAddress(ctx, &nsp.NameByAddressRequest{OwnerScwEthAddress: "owner"})
+		out, err := fx.GetNameByAddress(ctx, &nsp.NameByAddressRequest{OwnerScwEthAddress: "owner_scw"})
 		require.NoError(t, err)
 
 		require.True(t, out.Found)
@@ -164,6 +168,7 @@ func TestCacheService_GetNameByAddress(t *testing.T) {
 		_, err := fx.itemColl.InsertOne(ctx, NameDataItem{
 			FullName: "test.any",
 			// should be always stored in lower case
+			OwnerEthAddress:    "owner",
 			OwnerScwEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 			OwnerAnyAddress:    "anyid",
 		})
@@ -185,7 +190,8 @@ func TestCacheService_GetNameByAddress(t *testing.T) {
 
 		// 1 - insert item to DB
 		_, err := fx.itemColl.InsertOne(ctx, NameDataItem{
-			FullName: "test.any",
+			FullName:        "test.any",
+			OwnerEthAddress: "owner",
 			// should be always stored in lower case
 			OwnerScwEthAddress: strings.ToLower("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"),
 			OwnerAnyAddress:    "anyid",
@@ -209,7 +215,8 @@ func TestCacheService_setNameData(t *testing.T) {
 		// 1 - insert item to DB
 		err := fx.setNameData(ctx, &NameDataItem{
 			FullName:           "test.any",
-			OwnerScwEthAddress: "owner",
+			OwnerEthAddress:    "owner",
+			OwnerScwEthAddress: "owner_scw",
 			OwnerAnyAddress:    "anyid",
 		})
 		require.NoError(t, err)
@@ -220,7 +227,8 @@ func TestCacheService_setNameData(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "test.any", item.FullName)
-		require.Equal(t, "owner", item.OwnerScwEthAddress)
+		require.Equal(t, "owner", item.OwnerEthAddress)
+		require.Equal(t, "owner_scw", item.OwnerScwEthAddress)
 		require.Equal(t, "anyid", item.OwnerAnyAddress)
 
 		// 3 - call IsNameAvailable
@@ -228,7 +236,8 @@ func TestCacheService_setNameData(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.False(t, out.Available)
-		assert.Equal(t, "owner", out.OwnerScwEthAddress)
+		assert.Equal(t, "owner", out.OwnerEthAddress)
+		assert.Equal(t, "owner_scw", out.OwnerScwEthAddress)
 		assert.Equal(t, "anyid", out.OwnerAnyAddress)
 	})
 
@@ -239,7 +248,8 @@ func TestCacheService_setNameData(t *testing.T) {
 		// 1 - insert item to DB
 		err := fx.setNameData(ctx, &NameDataItem{
 			FullName:           "test.any",
-			OwnerScwEthAddress: "owner",
+			OwnerEthAddress:    "owner",
+			OwnerScwEthAddress: "owner_scw",
 			OwnerAnyAddress:    "anyid",
 		})
 		require.NoError(t, err)
@@ -247,7 +257,8 @@ func TestCacheService_setNameData(t *testing.T) {
 		// 2 - insert item to DB
 		err = fx.setNameData(ctx, &NameDataItem{
 			FullName:           "test.any",
-			OwnerScwEthAddress: "owner2",
+			OwnerEthAddress:    "owner2",
+			OwnerScwEthAddress: "owner_scw2",
 			OwnerAnyAddress:    "anyid2",
 		})
 		require.NoError(t, err)
@@ -258,7 +269,8 @@ func TestCacheService_setNameData(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "test.any", item.FullName)
-		require.Equal(t, "owner2", item.OwnerScwEthAddress)
+		require.Equal(t, "owner2", item.OwnerEthAddress)
+		require.Equal(t, "owner_scw2", item.OwnerScwEthAddress)
 		require.Equal(t, "anyid2", item.OwnerAnyAddress)
 	})
 }
@@ -356,6 +368,11 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 			return "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", big.NewInt(12390243), nil
 		})
 
+		// >>> see this:
+		fx.contracts.EXPECT().GetOwnerOfSmartContractWallet(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, addr interface{}) (common.Address, error) {
+			return common.HexToAddress("0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5"), nil
+		})
+
 		// call it
 		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{
 			FullName: "test.any",
@@ -370,6 +387,7 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 
 		require.Equal(t, "test.any", item.FullName)
 		// should be in lower case
+		require.Equal(t, "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5", item.OwnerEthAddress)
 		require.Equal(t, "0x10d5b0e279e5e4c1d1df5f57dfb7e84813920a51", item.OwnerScwEthAddress)
 		require.Equal(t, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", item.OwnerAnyAddress)
 	})
@@ -381,6 +399,7 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 		// 1 - create item in DB first
 		err := fx.setNameData(ctx, &NameDataItem{
 			FullName:           "test.any",
+			OwnerEthAddress:    "owner111",
 			OwnerScwEthAddress: "0x10d5b0e279e5e4c1d1df5f57dfb7e84813920a51",
 			OwnerAnyAddress:    "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 		})
@@ -400,6 +419,11 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 			return "0xAAB27b150451726EC7738aa1d0A94505c8729bd1", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", big.NewInt(12390243), nil
 		})
 
+		// >>> see this:
+		fx.contracts.EXPECT().GetOwnerOfSmartContractWallet(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, addr interface{}) (common.Address, error) {
+			return common.HexToAddress("0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5"), nil
+		})
+
 		err = fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{
 			FullName: "test.any",
 		})
@@ -413,6 +437,7 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 
 		require.Equal(t, "test.any", item.FullName)
 		// should be in lower case
+		require.Equal(t, "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5", item.OwnerEthAddress)
 		require.Equal(t, "0xaab27b150451726ec7738aa1d0a94505c8729bd1", item.OwnerScwEthAddress)
 		require.Equal(t, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", item.OwnerAnyAddress)
 	})

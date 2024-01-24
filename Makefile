@@ -88,13 +88,17 @@ anytype_crypto/anytype_registrar_stub.go: ../deployments/sepolia/AnytypeRegistra
 	abigen --bin contract.bin --abi contract.abi --pkg anytype_crypto --type AnytypeRegistrarImplementation --out anytype_crypto/anytype_registrar_stub.go
 	rm contract.bin contract.abi
 
+anytype_crypto/scw_stub.go: ./abis/SCW_ABI.json
+	abigen --abi contract.abi --pkg anytype_crypto --type SCW --out anytype_crypto/scw_stub.go
+
 # Go stubs generated from *.sol files
 anytype_crypto:\
     anytype_crypto/ens_registry_stub.go\
     anytype_crypto/name_wrapper_stub.go\
     anytype_crypto/anytype_resolver_stub.go\
     anytype_crypto/anytype_controller_private_stub.go\
-    anytype_crypto/anytype_registrar_stub.go
+    anytype_crypto/anytype_registrar_stub.go\
+    anytype_crypto/scw_stub.go
 
 # Build everything
 .PHONY: all

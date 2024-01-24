@@ -23,6 +23,7 @@ var log = logger.NewNamed(CName)
 type NameDataItem struct {
 	FullName string `bson:"name"`
 	// always store in LOWER CASE!
+	OwnerEthAddress    string `bson:"owner_eth_address"`
 	OwnerScwEthAddress string `bson:"owner_scw_eth_address"`
 	OwnerAnyAddress    string `bson:"owner_any_address"`
 	SpaceId            string `bson:"space_id"`
@@ -123,6 +124,7 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 	// 2 - if found in the cache -> return false
 	return &nsp.NameAvailableResponse{
 		Available:          false,
+		OwnerEthAddress:    item.OwnerEthAddress,
 		OwnerScwEthAddress: item.OwnerScwEthAddress,
 		OwnerAnyAddress:    item.OwnerAnyAddress,
 		SpaceId:            item.SpaceId,
@@ -160,8 +162,9 @@ func (cs *cacheService) setNameData(ctx context.Context, in *NameDataItem) (err 
 	filter := findNameDataByName{FullName: in.FullName}
 	opts := options.Replace().SetUpsert(true)
 
-	// WARNING: convert to lower case!
+	// WARNING: always convert to lower case!
 	in.OwnerScwEthAddress = strings.ToLower(in.OwnerScwEthAddress)
+	in.OwnerEthAddress = strings.ToLower(in.OwnerEthAddress)
 
 	_, err = cs.itemColl.ReplaceOne(ctx, filter, in, opts)
 	if err != nil {
@@ -215,10 +218,17 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 		return err
 	}
 
+	own, err := cs.contracts.GetOwnerOfSmartContractWallet(ctx, conn, common.HexToAddress(ea))
+	if err != nil {
+		log.Error("failed to get SCW -> owner", zap.Error(err))
+		return err
+	}
+
 	// 4 - update cache
 	var ndi NameDataItem
 	ndi.FullName = in.FullName
 	ndi.OwnerScwEthAddress = strings.ToLower(ea)
+	ndi.OwnerEthAddress = strings.ToLower(own.Hex())
 	ndi.OwnerAnyAddress = aa
 	ndi.SpaceId = si
 	ndi.NameExpires = exp.Int64()

@@ -44,6 +44,8 @@ type ContractsService interface {
 	CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
 	GetBalanceOf(ctx context.Context, client *ethclient.Client, tokenAddress common.Address, address common.Address) (*big.Int, error)
 	IsContractDeployed(ctx context.Context, client *ethclient.Client, address common.Address) (bool, error)
+	// will return .owner of the contract
+	GetOwnerOfSmartContractWallet(ctx context.Context, client *ethclient.Client, address common.Address) (common.Address, error)
 
 	// ENS methods
 	GetOwnerForNamehash(ctx context.Context, client *ethclient.Client, namehash [32]byte) (common.Address, error)
@@ -159,6 +161,36 @@ func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, conn 
 	own, err := reg.Owner(&callOpts, nh)
 
 	return own, err
+}
+
+func (acontracts *anynsContracts) GetOwnerOfSmartContractWallet(ctx context.Context, client *ethclient.Client, scwAddress common.Address) (common.Address, error) {
+	// 1 - check if address is a smart contract
+	isDeployed, err := acontracts.IsContractDeployed(ctx, client, scwAddress)
+	if err != nil {
+		log.Error("failed to check if contract is deployed", zap.Error(err))
+		return common.Address{}, err
+	}
+
+	if !isDeployed {
+		log.Info("address is not a smart contract")
+		return common.Address{}, errors.New("address is not a smart contract")
+	}
+
+	scw, err := acontracts.ConnectToSCW(client, scwAddress)
+	if err != nil {
+		log.Error("failed to connect to contract", zap.Error(err))
+		return common.Address{}, err
+	}
+
+	// 2.2 - call contract's method
+	callOpts := bind.CallOpts{}
+	owner, err := scw.Owner(&callOpts)
+	if err != nil {
+		log.Error("failed to get Owner", zap.Error(err))
+		return common.Address{}, err
+	}
+
+	return owner, nil
 }
 
 func (acontracts *anynsContracts) GetAdditionalNameInfo(ctx context.Context, conn *ethclient.Client, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error) {
@@ -384,6 +416,18 @@ func (acontracts *anynsContracts) ConnectToController(conn *ethclient.Client) (*
 	}
 
 	return ac, err
+}
+
+func (acontracts *anynsContracts) ConnectToSCW(conn *ethclient.Client, address common.Address) (*ac.SCW, error) {
+	// 1 - create new contract instance
+	scw, err := ac.NewSCW(address, conn)
+
+	if err != nil || scw == nil {
+		log.Error("failed to instantiate SCW contract", zap.Error(err))
+		return nil, err
+	}
+
+	return scw, err
 }
 
 func (acontracts *anynsContracts) GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error) {
