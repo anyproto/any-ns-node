@@ -212,17 +212,40 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 }
 
 func TestAnynsRpc_GetOperation(t *testing.T) {
-	t.Run("fail if no operation is in the DB", func(t *testing.T) {
+	/*
+		// TODO: mock Mongo and return error in the mongoGetOperation
+		t.Run("fail if Mongo returns error", func(t *testing.T) {
+			fx := newFixture(t)
+			defer fx.finish(t)
+
+			pctx := context.Background()
+
+			gosr := nsp.GetOperationStatusRequest{
+				OperationId: "123",
+			}
+			_, err := fx.GetOperation(pctx, &gosr)
+			require.Error(t, err)
+		})
+	*/
+
+	t.Run("success even if no operation is in the DB", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Pending,
+			}, nil
+		})
 
 		pctx := context.Background()
 
 		gosr := nsp.GetOperationStatusRequest{
 			OperationId: "123",
 		}
-		_, err := fx.GetOperation(pctx, &gosr)
-		require.Error(t, err)
+		resp, err := fx.GetOperation(pctx, &gosr)
+		require.NoError(t, err)
+		require.Equal(t, resp.OperationState, nsp.OperationState_Pending)
 	})
 
 	t.Run("success", func(t *testing.T) {

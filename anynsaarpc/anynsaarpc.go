@@ -175,8 +175,12 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	var out nsp.OperationResponse
 
 	// 0 - get operation from Mongo first (we will need it later to update cache)
+	// some operation has not been saved to Mongo (like AdminFundUserAccount)
 	op, err := arpc.mongoGetOperation(ctx, in.OperationId)
-	if err != nil {
+	cacheOperationFound := (err != mongo.ErrNoDocuments)
+
+	// trigger error only in case Mongo returns something bad (not found is ok)
+	if err != nil && cacheOperationFound {
 		log.Error("failed to get operation from Mongo", zap.Error(err))
 		return nil, err
 	}
@@ -192,7 +196,7 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	out.OperationState = status.OperationState
 
 	// 2 - update cache (only once operation was completed and cache is empty)
-	if status.OperationState == nsp.OperationState_Completed {
+	if cacheOperationFound && (status.OperationState == nsp.OperationState_Completed) {
 		// is cache empty?
 		_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
 			FullName: op.FullName,
@@ -251,12 +255,19 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 		return nil, err
 	}
 
-	// 3 - return
-	// TODO: add to queue?
+	/*
+		// 5 - save operation to mongo
+		err = arpc.mongoSaveOperation(ctx, opID, cuor)
+		if err != nil {
+			log.Error("failed to save operation to Mongo", zap.Error(err))
+			return nil, err
+		}
+	*/
+
+	// 6 - return
 	var out nsp.OperationResponse
 	out.OperationId = fmt.Sprint(opID)
 	out.OperationState = nsp.OperationState_Pending
-
 	return &out, err
 }
 

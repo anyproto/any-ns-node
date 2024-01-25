@@ -260,8 +260,8 @@ func adminFundUserAccount(ctx context.Context, a *app.App, client nsclient.AnyNs
 
 	acc := a.MustComponent("config").(commonaccount.ConfigGetter).GetAccount()
 
-	peerKey, err := crypto.DecodeKeyFromString(
-		acc.PeerKey,
+	signKey, err := crypto.DecodeKeyFromString(
+		acc.SigningKey,
 		crypto.UnmarshalEd25519PrivateKey,
 		nil)
 
@@ -269,8 +269,8 @@ func adminFundUserAccount(ctx context.Context, a *app.App, client nsclient.AnyNs
 		log.Fatal("can't read signing key", zap.Error(err))
 	}
 
-	// PeerKey is used to sign the request
-	sign, err := peerKey.Sign(marshalled)
+	// SignKey is used to sign the request
+	sign, err := signKey.Sign(marshalled)
 	if err != nil {
 		log.Fatal("can't sign request", zap.Error(err))
 	}
