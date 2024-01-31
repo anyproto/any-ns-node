@@ -59,8 +59,8 @@ github.com/allegro/bigcache v1.2.1/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2uc
 github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883/go.mod h1:rCTlJbsFo29Kk6CurOXKm700vrz8f0KW0JNfpkRJY/8=
 github.com/anyproto/alchemy-aa-sdk v0.0.1 h1:IFsokM/ZHge/p4cbvh+7JFEDJxsObf0augyVpuVjXEk=
 github.com/anyproto/alchemy-aa-sdk v0.0.1/go.mod h1:jDbif5vOi9jSlavoSLs9ssIutETHWP/YMY2I/Lh52Q4=
-github.com/anyproto/any-sync v0.3.18-0.20240126210344-1e1ce475f9e7 h1:jdY5gw8DGT6F3ytQtbdRH5PNjMpqqzthQMDncYzvny4=
-github.com/anyproto/any-sync v0.3.18-0.20240126210344-1e1ce475f9e7/go.mod h1:iHEUzsccp6o6bpO2CoBFFDQ7gJazljyMdjgRlfG37i8=
+github.com/anyproto/any-sync v0.3.19-alpha h1:Liz8Mv/2wieL1JPKFRHwnRmGWE4FkrtqvDioltGoMZE=
+github.com/anyproto/any-sync v0.3.19-alpha/go.mod h1:exw/7+W3jfkuaVWsStQD8s8aLFT9L2NBiW/DVwTNi/E=
 github.com/anyproto/go-chash v0.1.0 h1:I9meTPjXFRfXZHRJzjOHC/XF7Q5vzysKkiT/grsogXY=
 github.com/anyproto/go-chash v0.1.0/go.mod h1:0UjNQi3PDazP0fINpFYu6VKhuna+W/V+1vpXHAfNgLY=
 github.com/anyproto/go-slip10 v1.0.0 h1:uAEtSuudR3jJBOfkOXf3bErxVoxbuKwdoJN55M1i6IA=
@@ -259,8 +259,8 @@ github.com/google/pprof v0.0.0-20231023181126-ff6d637d2a7b/go.mod h1:czg5+yv1E0Z
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/subcommands v1.2.0/go.mod h1:ZjhPrFU+Olkh9WazFPsl27BQ4UPiG37m3yTrtFlrHVk=
 github.com/google/uuid v1.1.5/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/google/uuid v1.4.0 h1:MtMxsa51/r9yyhkyLsVeVt0B+BGQZzpQiTQ4eHZ8bc4=
-github.com/google/uuid v1.4.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.5.0 h1:1p67kYwdtXjb0gL0BPiP1Av9wiZPo5A8z2cWkTZ+eyU=
+github.com/google/uuid v1.5.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
