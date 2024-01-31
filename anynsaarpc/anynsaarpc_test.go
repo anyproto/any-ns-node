@@ -71,7 +71,7 @@ func newFixture(t *testing.T) *fixture {
 
 	fx.config.Mongo = config.Mongo{
 		Connect:  "mongodb://localhost:27017",
-		Database: "any-ns-tst",
+		Database: "any-ns-test",
 	}
 
 	// drop everything
