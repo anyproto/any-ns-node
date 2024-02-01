@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-sync/app"
@@ -130,7 +129,7 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccou
 	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
 	if err != nil {
 		log.Error("failed to get smart wallet address", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get smart wallet address")
 	}
 
 	res.OwnerSmartContracWalletAddress = scwa.Hex()
@@ -139,20 +138,20 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccou
 	client, err := arpc.contracts.CreateEthConnection()
 	if err != nil {
 		log.Error("failed to create eth connection", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to create eth connection")
 	}
 
 	res.OwnerSmartContracWalletDeployed, err = arpc.contracts.IsContractDeployed(ctx, client, scwa)
 	if err != nil {
 		log.Error("failed to check if contract is deployed", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get smart wallet")
 	}
 
 	// 3 - the rest
 	res.NamesCountLeft, err = arpc.aa.GetNamesCountLeft(ctx, scwa)
 	if err != nil {
 		log.Error("failed to get names count left", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get names count left")
 	}
 
 	res.OperationsCountLeft, err = arpc.mongoGetUserOperationsCount(
@@ -164,7 +163,7 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccou
 
 	if err != nil {
 		log.Error("failed to get operations count left", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get operations count left")
 	}
 
 	// return
@@ -182,14 +181,14 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	// trigger error only in case Mongo returns something bad (not found is ok)
 	if err != nil && cacheOperationFound {
 		log.Error("failed to get operation from Mongo", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get cache")
 	}
 
 	// 1 - get operation status from the AA service
 	status, err := arpc.aa.GetOperation(ctx, in.OperationId)
 	if err != nil {
 		log.Error("failed to get operation info", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get operation from cache")
 	}
 
 	out.OperationId = fmt.Sprint(in.OperationId)
@@ -203,7 +202,7 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 		})
 
 		if err == nil {
-			log.Info("name is already in cache", zap.String("FullName", op.FullName))
+			log.Debug("name is already in cache", zap.String("FullName", op.FullName))
 			return &out, nil
 		}
 
@@ -215,7 +214,7 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 
 		if err != nil {
 			log.Error("failed to update cache", zap.Error(err))
-			return nil, err
+			return nil, errors.New("failed to update in cache")
 		}
 	}
 
@@ -231,28 +230,28 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 	err := proto.Unmarshal(in.Payload, &afuar)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundUserAccount", zap.Error(err))
-		return nil, err
+		return nil, errors.New("can not unmarshal AdminFundUserAccount")
 	}
 
 	// 2 - check signature
 	err = arpc.aa.AdminVerifyIdentity(in.Payload, in.Signature)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
-		return nil, err
+		return nil, errors.New("not an Admin!!!")
 	}
 
 	// 3 - determine SCW of user wallet
 	scwa, err := arpc.aa.GetSmartWalletAddress(ctx, common.HexToAddress(afuar.OwnerEthAddress))
 	if err != nil {
 		log.Error("failed to get smart wallet address", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get smart wallet address")
 	}
 
 	// 4 - mint tokens to that SCW
 	opID, err := arpc.aa.AdminMintAccessTokens(ctx, scwa, big.NewInt(int64(afuar.NamesCount)))
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to mint access tokens")
 	}
 
 	/*
@@ -277,14 +276,14 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 	err := proto.Unmarshal(in.Payload, &afgor)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundGasOperationsRequest", zap.Error(err))
-		return nil, err
+		return nil, errors.New("can not unmarshal AdminFundGasOperationsRequest")
 	}
 
 	// 2 - check signature
 	err = arpc.aa.AdminVerifyIdentity(in.Payload, in.Signature)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
-		return nil, err
+		return nil, errors.New("not an Admin!!!")
 	}
 
 	// validate all params
@@ -306,7 +305,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 	err = arpc.mongoAddUserToTheWhitelist(ctx, common.HexToAddress(afgor.OwnerEthAddress), afgor.OwnerAnyID, afgor.OperationsCount)
 	if err != nil {
 		log.Error("failed to add user to the whitelist", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to add user to the whitelist")
 	}
 
 	return &out, err
@@ -314,17 +313,17 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 
 func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
-	err := anynsrpc.СheckRegisterParams(in)
+	err := checkRegisterParams(in)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
-		return nil, err
+		return nil, errors.New("invalid parameters")
 	}
 
 	// 2 - get data to sign
 	dataOut, contextData, err := arpc.aa.GetDataNameRegister(ctx, in)
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to mint tokens")
 	}
 
 	var out nsp.GetDataNameRegisterResponse
@@ -338,17 +337,17 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameReg
 
 func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
-	err := anynsrpc.СheckRegisterForSpaceParams(in)
+	err := checkRegisterForSpaceParams(in)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
-		return nil, err
+		return nil, errors.New("invalid parameters")
 	}
 
 	// 2 - get data to sign
 	dataOut, contextData, err := arpc.aa.GetDataNameRegisterForSpace(ctx, in)
 	if err != nil {
 		log.Error("failed to mint tokens", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to mint tokens")
 	}
 
 	var out nsp.GetDataNameRegisterResponse
@@ -370,7 +369,7 @@ func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, sig
 
 	if err != nil {
 		log.Error("failed to unmarshal public key", zap.Error(err))
-		return err
+		return errors.New("failed to unmarshal public key")
 	}
 
 	// 2 - verify signature
@@ -390,14 +389,14 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 	err := proto.Unmarshal(in.Payload, &cuor)
 	if err != nil {
 		log.Error("can not unmarshal CreateUserOperationRequest", zap.Error(err))
-		return nil, err
+		return nil, errors.New("can not unmarshal CreateUserOperationRequest")
 	}
 
 	// 2 - check users's signature
 	err = arpc.VerifyAnyIdentity(cuor.OwnerAnyID, in.Payload, in.Signature)
 	if err != nil {
 		log.Error("wrong Anytype signature", zap.Error(err))
-		return nil, err
+		return nil, errors.New("wrong Anytype signature")
 	}
 
 	// 3 - check if user has enough operations left
@@ -405,7 +404,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 	ops, err := arpc.mongoGetUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress), cuor.OwnerAnyID)
 	if err != nil {
 		log.Error("failed to get operations count", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get operations count")
 	}
 
 	if ops < 1 {
@@ -418,21 +417,21 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 	opID, err := arpc.aa.SendUserOperation(ctx, cuor.Context, cuor.SignedData)
 	if err != nil {
 		log.Error("failed to send user operation", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to send user operation")
 	}
 
 	// 5 - decrease operations count for that user
 	err = arpc.mongoDecreaseUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress))
 	if err != nil {
 		log.Error("failed to decrease operations count", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to decrease operations count")
 	}
 
 	// 6 - save operation to mongo (can be used later)
 	err = arpc.mongoSaveOperation(ctx, opID, cuor)
 	if err != nil {
 		log.Error("failed to save operation to Mongo", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to save operation")
 	}
 
 	// 7 - return result

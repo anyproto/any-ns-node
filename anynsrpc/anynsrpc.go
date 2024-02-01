@@ -57,7 +57,7 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailable
 
 		if err != nil {
 			log.Error("failed to update in cache", zap.Error(err))
-			return nil, err
+			return nil, errors.New("failed to update in cache")
 		}
 	}
 
@@ -88,7 +88,7 @@ func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.Name
 	conn, err := arpc.contracts.CreateEthConnection()
 	if err != nil {
 		log.Error("failed to connect to geth", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to connect to geth")
 	}
 
 	// convert in.OwnerScwEthAddress to common.Address
@@ -97,7 +97,7 @@ func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.Name
 	name, err := arpc.contracts.GetNameByAddress(conn, addr)
 	if err != nil {
 		log.Error("failed to get name by address", zap.Error(err))
-		return nil, err
+		return nil, errors.New("failed to get name by address")
 	}
 
 	// 2 - return results

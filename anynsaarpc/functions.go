@@ -1,4 +1,4 @@
-package anynsrpc
+package anynsaarpc
 
 import (
 	"errors"
@@ -9,6 +9,62 @@ import (
 	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
 )
+
+func checkRegisterParams(in *nsp.NameRegisterRequest) error {
+	// 1 - check name
+	if !checkName(in.FullName) {
+		log.Error("invalid name", zap.String("name", in.FullName))
+		return errors.New("invalid name")
+	}
+
+	// 2 - check ETH address
+	if !common.IsHexAddress(in.OwnerEthAddress) {
+		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
+		return errors.New("invalid ETH address")
+	}
+
+	// 3 - check Any address
+	if !checkAnyAddress(in.OwnerAnyAddress) {
+		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
+		return errors.New("invalid Any address")
+	}
+
+	// everything is OK
+	return nil
+}
+
+func checkRegisterForSpaceParams(in *nsp.NameRegisterForSpaceRequest) error {
+	// 1 - check name
+	if !checkName(in.FullName) {
+		log.Error("invalid name", zap.String("name", in.FullName))
+		return errors.New("invalid name")
+	}
+
+	// 2 - check ETH address
+	if !common.IsHexAddress(in.OwnerEthAddress) {
+		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
+		return errors.New("invalid ETH address")
+	}
+
+	// 3 - check Any address
+	if !checkAnyAddress(in.OwnerAnyAddress) {
+		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
+		return errors.New("invalid Any address")
+	}
+
+	// 4 - space ID (if not empty)
+	if in.SpaceId != "" {
+		_, err := cid.Decode(in.SpaceId)
+
+		if err != nil {
+			log.Error("invalid SpaceId", zap.String("Any SpaceId", in.SpaceId))
+			return errors.New("invalid SpaceId")
+		}
+	}
+
+	// everything is OK
+	return nil
+}
 
 func checkName(name string) bool {
 	// get name parts
@@ -48,62 +104,6 @@ func isValidAnyAddress(address string) bool {
 	}
 
 	return true
-}
-
-func СheckRegisterParams(in *nsp.NameRegisterRequest) error {
-	// 1 - check name
-	if !checkName(in.FullName) {
-		log.Error("invalid name", zap.String("name", in.FullName))
-		return errors.New("invalid name")
-	}
-
-	// 2 - check ETH address
-	if !common.IsHexAddress(in.OwnerEthAddress) {
-		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
-		return errors.New("invalid ETH address")
-	}
-
-	// 3 - check Any address
-	if !checkAnyAddress(in.OwnerAnyAddress) {
-		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
-		return errors.New("invalid Any address")
-	}
-
-	// everything is OK
-	return nil
-}
-
-func СheckRegisterForSpaceParams(in *nsp.NameRegisterForSpaceRequest) error {
-	// 1 - check name
-	if !checkName(in.FullName) {
-		log.Error("invalid name", zap.String("name", in.FullName))
-		return errors.New("invalid name")
-	}
-
-	// 2 - check ETH address
-	if !common.IsHexAddress(in.OwnerEthAddress) {
-		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerEthAddress))
-		return errors.New("invalid ETH address")
-	}
-
-	// 3 - check Any address
-	if !checkAnyAddress(in.OwnerAnyAddress) {
-		log.Error("invalid Any address", zap.String("Any address", in.OwnerAnyAddress))
-		return errors.New("invalid Any address")
-	}
-
-	// 4 - space ID (if not empty)
-	if in.SpaceId != "" {
-		_, err := cid.Decode(in.SpaceId)
-
-		if err != nil {
-			log.Error("invalid SpaceId", zap.String("Any SpaceId", in.SpaceId))
-			return errors.New("invalid SpaceId")
-		}
-	}
-
-	// everything is OK
-	return nil
 }
 
 func checkAnyAddress(addr string) bool {

@@ -103,6 +103,39 @@ func (fx *fixture) finish(t *testing.T) {
 	fx.ctrl.Finish()
 }
 
+func TestIsValidAnyAddress(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		len := len("12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy")
+		assert.Equal(t, len, 52)
+
+		valid := []string{
+			"12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy", // Anytype address
+		}
+
+		for _, address := range valid {
+			res := isValidAnyAddress(address)
+			assert.Equal(t, res, true)
+		}
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		invalid := []string{
+			"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",         // Legacy Bitcoin address
+			"3FZbgi29cpjq2GjdwV8eyHuJJnkLtktZc5",         // Segwit Bitcoin address
+			"bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", // Bech32 Bitcoin address
+			"invalidaddress",                             // Invalid address
+			"",                                           // Empty address
+			"0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", // Ethereum address
+			"bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze", // CID
+		}
+
+		for _, address := range invalid {
+			res := isValidAnyAddress(address)
+			assert.Equal(t, res, false)
+		}
+	})
+}
+
 func TestAnynsRpc_GetUserAccount(t *testing.T) {
 	t.Run("return not found error if no such account", func(t *testing.T) {
 		fx := newFixture(t)
