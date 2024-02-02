@@ -449,7 +449,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		anyID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 0)
 		assert.Error(t, err)
@@ -461,7 +461,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		anyID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
@@ -490,7 +490,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		anyID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
@@ -507,7 +507,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		anyID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
@@ -612,7 +612,7 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		anyID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
@@ -632,7 +632,7 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
-		anyID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		anyID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, anyID, 1)
 		assert.NoError(t, err)
@@ -888,7 +888,8 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 		defer fx.finish(t)
 
 		// 1 - enable user
-		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		//PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		//SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 
@@ -910,8 +911,8 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 		identityMarshalled, err := decodedPeerKey.GetPublic().Marshall()
 		assert.NoError(t, err)
 
-		// convert PeerId to marashalled PubKey
-		pid, err := crypto.DecodePeerId(PeerId)
+		// convert AnytypeID to marashalled PubKey
+		pid, err := crypto.DecodeAccountAddress(AnytypeID)
 		assert.NoError(t, err)
 
 		// compare 2 PubKeys (should be same)
@@ -927,7 +928,7 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 		//err = fx.VerifyAnyIdentity(string(identityMarshalled2), marshalled, signature)
 		//assert.NoError(t, err)
 
-		err = fx.VerifyAnyIdentity(PeerId, marshalled, signature)
+		err = fx.VerifyAnyIdentity(AnytypeID, marshalled, signature)
 		assert.NoError(t, err)
 	})
 }
@@ -941,10 +942,11 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		//PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		//PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 
-		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, AnytypeID, 1)
 		assert.NoError(t, err)
 
 		var cuor nsp.CreateUserOperationRequest
@@ -959,7 +961,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		cuor.OwnerEthAddress = owner.Hex()
 
 		// OwnerAnyID in string format
-		cuor.OwnerAnyID = PeerId
+		cuor.OwnerAnyID = AnytypeID
 
 		marshalled, err := cuor.Marshal()
 		assert.NoError(t, err)
@@ -991,11 +993,12 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		//PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 		//SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
-		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, AnytypeID, 1)
 		assert.NoError(t, err)
 
 		var cuor nsp.CreateUserOperationRequest
@@ -1016,14 +1019,8 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 			nil)
 		assert.NoError(t, err)
 
-		//identity, err := decodedPeerKey.GetPublic().Marshall()
-		//assert.NoError(t, err)
-
-		// OwnerAnyID here is in the marshalled format
-		//cuor.OwnerAnyID = string(identity)
-
 		// OwnerAnyID in string format
-		cuor.OwnerAnyID = PeerId
+		cuor.OwnerAnyID = AnytypeID
 
 		marshalled, err := cuor.Marshal()
 		assert.NoError(t, err)
@@ -1051,11 +1048,12 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
-		PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		//PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
 		//SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
-		err := fx.mongoAddUserToTheWhitelist(pctx, owner, PeerId, 1)
+		err := fx.mongoAddUserToTheWhitelist(pctx, owner, AnytypeID, 1)
 		assert.NoError(t, err)
 
 		var cuor nsp.CreateUserOperationRequest
@@ -1083,7 +1081,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		//cuor.OwnerAnyID = string(identity)
 
 		// OwnerAnyID in string format
-		cuor.OwnerAnyID = PeerId
+		cuor.OwnerAnyID = AnytypeID
 
 		marshalled, err := cuor.Marshal()
 		assert.NoError(t, err)

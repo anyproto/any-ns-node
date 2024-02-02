@@ -360,12 +360,11 @@ func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp
 }
 
 func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, signature []byte) (err error) {
-	// to read in the PeerID format
-	ownerAnyIdentity, err := crypto.DecodePeerId(ownerIdStr)
+	// read in the PeerID format
+	//ownerAnyIdentity, err := crypto.DecodePeerId(ownerIdStr)
 
-	// to read ID in the marshaled format
-	//arr := []byte(ownerIdStr)
-	//ownerAnyIdentity, err := crypto.UnmarshalEd25519PublicKeyProto(arr)
+	// read in the Account format (A5jC4SX...)
+	ownerAnyIdentity, err := crypto.DecodeAccountAddress(ownerIdStr)
 
 	if err != nil {
 		log.Error("failed to unmarshal public key", zap.Error(err))
