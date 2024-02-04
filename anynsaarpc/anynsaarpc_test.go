@@ -888,14 +888,12 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 		defer fx.finish(t)
 
 		// 1 - enable user
-		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
-		//PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
-		//SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
-		PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+		AnytypeID := "A5pn5zo7MDspEvR1qHtZdnP8KG4nLmVaj9emFW2r7Kaho1Ny"
+		SignKey := "yUxvxE5ugUTXOfX6wsYBO0ROw4Na/p9InOsgcuuuiJYIMxqQloJhelUH6Kyold890pHIHtw4mEfbeKgBVnzkfg=="
 
 		// OwnerAnyID
-		decodedPeerKey, err := crypto.DecodeKeyFromString(
-			PeerKey,
+		decodedSignKey, err := crypto.DecodeKeyFromString(
+			SignKey,
 			crypto.UnmarshalEd25519PrivateKey,
 			nil)
 		assert.NoError(t, err)
@@ -903,12 +901,12 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 		marshalled, err := hex.DecodeString("123445ffff")
 		assert.NoError(t, err)
 
-		signature, err := decodedPeerKey.Sign(marshalled)
+		signature, err := decodedSignKey.Sign(marshalled)
 		assert.NoError(t, err)
 
 		// Identity here is in the marshalled format
-		x := decodedPeerKey.GetPublic()
-		identityMarshalled, err := decodedPeerKey.GetPublic().Marshall()
+		x := decodedSignKey.GetPublic()
+		identityMarshalled, err := decodedSignKey.GetPublic().Marshall()
 		assert.NoError(t, err)
 
 		// convert AnytypeID to marashalled PubKey
@@ -923,10 +921,6 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 
 		// compare identityMarshalled with identity
 		assert.Equal(t, identityMarshalled, identityMarshalled2)
-
-		// VerifyAnyIdentity used marshalled version before!
-		//err = fx.VerifyAnyIdentity(string(identityMarshalled2), marshalled, signature)
-		//assert.NoError(t, err)
 
 		err = fx.VerifyAnyIdentity(AnytypeID, marshalled, signature)
 		assert.NoError(t, err)
@@ -943,8 +937,8 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
 		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
-		//PeerId := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
-		//PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+		// sign with WRONG key here
+		SignKeyBad := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
 		err := fx.mongoAddUserToTheWhitelist(pctx, owner, AnytypeID, 1)
 		assert.NoError(t, err)
@@ -969,10 +963,8 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		var cuor_signed nsp.CreateUserOperationRequestSigned
 		cuor_signed.Payload = marshalled
 
-		// sign with WRONG key here
-		SignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 		wrongKey, err := crypto.DecodeKeyFromString(
-			SignKey,
+			SignKeyBad,
 			crypto.UnmarshalEd25519PrivateKey,
 			nil)
 		assert.NoError(t, err)

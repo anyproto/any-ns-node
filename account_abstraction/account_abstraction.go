@@ -252,7 +252,7 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err error) {
 	// 1 - load public key of admin
 	// (should be account.signingKey in config)
-	decodedPeerKey, err := crypto.DecodeKeyFromString(
+	decodedSignKey, err := crypto.DecodeKeyFromString(
 		aa.accountConfig.SigningKey,
 		crypto.UnmarshalEd25519PrivateKey,
 		nil)
@@ -261,7 +261,7 @@ func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err er
 		return err
 	}
 
-	ownerAnyIdentityStr := decodedPeerKey.GetPublic().PeerId()
+	ownerAnyIdentityStr := decodedSignKey.GetPublic().PeerId()
 	ownerAnyIdentity, err := crypto.DecodePeerId(ownerAnyIdentityStr)
 
 	if err != nil {
