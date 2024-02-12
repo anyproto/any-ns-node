@@ -5,7 +5,7 @@ go 1.21.3
 require (
 	github.com/ahmetb/govvv v0.3.0
 	github.com/anyproto/alchemy-aa-sdk v0.0.1
-	github.com/anyproto/any-sync v0.3.18-0.20240126210344-1e1ce475f9e7
+	github.com/anyproto/any-sync v0.3.20
 	github.com/ethereum/go-ethereum v1.13.5
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
@@ -49,7 +49,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/pprof v0.0.0-20231023181126-ff6d637d2a7b // indirect
-	github.com/google/uuid v1.4.0 // indirect
+	github.com/google/uuid v1.5.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
