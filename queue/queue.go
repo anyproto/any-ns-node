@@ -736,8 +736,9 @@ func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem
 	var secret32 [32]byte
 	copy(secret32[:], secret)
 
-	// TODO: isReverseRecordUpdate
-	isReverseRecordUpdate := false
+	// Currently by default this is always true!
+	// NameRegisterRequest has no field for this
+	isReverseRecordUpdate := true
 
 	tx, err := aqueue.contracts.Register(
 		ctx,
