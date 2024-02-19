@@ -1,7 +1,7 @@
 package account
 
 import (
-	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/commonspace/object/accountdata"
 	"github.com/anyproto/any-sync/util/crypto"
@@ -21,7 +21,7 @@ func New() app.Component {
 }
 
 func (s *service) Init(a *app.App) (err error) {
-	acc := a.MustComponent("config").(commonaccount.ConfigGetter).GetAccount()
+	acc := a.MustComponent("config").(accountservice.ConfigGetter).GetAccount()
 
 	decodedSigningKey, err := crypto.DecodeKeyFromString(
 		acc.SigningKey,
@@ -42,5 +42,5 @@ func (s *service) Init(a *app.App) (err error) {
 }
 
 func (s *service) Name() (name string) {
-	return commonaccount.CName
+	return accountservice.CName
 }

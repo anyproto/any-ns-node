@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
-	"github.com/anyproto/any-sync/commonspace/object/accountdata"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +26,7 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
+	"github.com/anyproto/any-ns-node/verification"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
@@ -43,7 +44,7 @@ type fixture struct {
 	*anynsAARpc
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T, adminSignKey string) *fixture {
 	fx := &fixture{
 		a:      new(app.App),
 		ctrl:   gomock.NewController(t),
@@ -72,6 +73,11 @@ func newFixture(t *testing.T) *fixture {
 	fx.config.Mongo = config.Mongo{
 		Connect:  "mongodb://localhost:27017",
 		Database: "any-ns-test",
+	}
+
+	fx.config.Account = accountservice.Config{
+		SigningKey: adminSignKey,
+		PeerKey:    "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
 	}
 
 	// drop everything
@@ -105,15 +111,15 @@ func (fx *fixture) finish(t *testing.T) {
 
 func TestIsValidAnyAddress(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		len := len("12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy")
-		assert.Equal(t, len, 52)
+		len := len("A5jC4SXWYEhdFswASPoMYAqWjZb9szm5EGXvS9CMyCE9JCD4")
+		assert.Equal(t, len, 48)
 
 		valid := []string{
-			"12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy", // Anytype address
+			"A5jC4SXWYEhdFswASPoMYAqWjZb9szm5EGXvS9CMyCE9JCD4", // Anytype address
 		}
 
 		for _, address := range valid {
-			res := isValidAnyAddress(address)
+			res := verification.IsValidAnyAddress(address)
 			assert.Equal(t, res, true)
 		}
 	})
@@ -130,7 +136,7 @@ func TestIsValidAnyAddress(t *testing.T) {
 		}
 
 		for _, address := range invalid {
-			res := isValidAnyAddress(address)
+			res := verification.IsValidAnyAddress(address)
 			assert.Equal(t, res, false)
 		}
 	})
@@ -138,7 +144,7 @@ func TestIsValidAnyAddress(t *testing.T) {
 
 func TestAnynsRpc_GetUserAccount(t *testing.T) {
 	t.Run("return not found error if no such account", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
@@ -155,7 +161,7 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
@@ -191,16 +197,13 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 
 	t.Run("success when asked to add 0 additional name requests", func(t *testing.T) {
-		fx := newFixture(t)
+		realSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+
+		fx := newFixture(t, realSignKey)
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
 			return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
-		})
-
-		fx.aa.EXPECT().AdminVerifyIdentity(gomock.Any(), gomock.Any()).DoAndReturn(func(payload []byte, signature []byte) (err error) {
-			// no error, IT IS THE ADMIN!
-			return nil
 		})
 
 		fx.aa.EXPECT().AdminMintAccessTokens(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, scw common.Address, count *big.Int) (op string, err error) {
@@ -210,14 +213,6 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 
 		// create payload
 		var in nsp.AdminFundUserAccountRequestSigned
-
-		accountKeys, err := accountdata.NewRandom()
-		require.NoError(t, err)
-
-		/*
-			fx.aa.EXPECT().GetSmartWalletAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (address common.Address, err error) {
-				return common.HexToAddress("0x77d454b313e9D1Acb8cD0cFa140A27544aEC483a"), nil
-			})*/
 
 		// pack
 		nrr := nsp.AdminFundUserAccountRequest{
@@ -230,8 +225,14 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		marshalled, err := nrr.Marshal()
 		require.NoError(t, err)
 
+		signKey, err := crypto.DecodeKeyFromString(
+			realSignKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		require.NoError(t, err)
+
 		in.Payload = marshalled
-		in.Signature, err = accountKeys.SignKey.Sign(in.Payload)
+		in.Signature, err = signKey.Sign(in.Payload)
 		require.NoError(t, err)
 
 		pctx := context.Background()
@@ -248,7 +249,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 	/*
 		// TODO: mock Mongo and return error in the mongoGetOperation
 		t.Run("fail if Mongo returns error", func(t *testing.T) {
-			fx := newFixture(t)
+			fx := newFixture(t, "")
 			defer fx.finish(t)
 
 			pctx := context.Background()
@@ -262,7 +263,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 	*/
 
 	t.Run("success even if no operation is in the DB", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
@@ -282,7 +283,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
@@ -317,7 +318,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 	})
 
 	t.Run("opertaion completed - check in cache", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
@@ -357,7 +358,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 	})
 
 	t.Run("opertaion completed - update in cache", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
@@ -400,7 +401,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 	})
 
 	t.Run("should return error if update in cache failed", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
@@ -444,7 +445,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 
 func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 	t.Run("fail if wrong operations count", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -456,7 +457,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 	})
 
 	t.Run("success if user never existed", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -485,7 +486,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 	})
 
 	t.Run("fail if user has existed before but Any ID is different", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -502,7 +503,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 	})
 
 	t.Run("success if user has existed before", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -537,7 +538,7 @@ func TestAnynsRpc_MongoAddUserToTheWhitelist(t *testing.T) {
 
 func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 	t.Run("fail if nothing is found operations count", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -549,7 +550,7 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 	})
 
 	t.Run("fail if wrong Any ID", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -564,7 +565,7 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 	})
 
 	t.Run("success if AnyID is empty (do not compare it!)", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -579,7 +580,7 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -596,7 +597,7 @@ func TestAnynsRpc_MongoGetUserOperationsCount(t *testing.T) {
 
 func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 	t.Run("fail if user is not found", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -607,7 +608,7 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 	})
 
 	t.Run("fail if user has no operations already", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -627,7 +628,7 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -644,7 +645,7 @@ func TestAnynsRpc_MongoDecreaseUserOperationsCount(t *testing.T) {
 
 func TestAnynsRpc_MongoSaveOperation(t *testing.T) {
 	t.Run("should create new item", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -681,7 +682,7 @@ func TestAnynsRpc_MongoSaveOperation(t *testing.T) {
 	})
 
 	t.Run("should not update existing item", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		pctx := context.Background()
@@ -710,7 +711,7 @@ func TestAnynsRpc_MongoSaveOperation(t *testing.T) {
 
 func TestAnynsRpc_MongoGetOpertaion(t *testing.T) {
 	t.Run("should return error if not found", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		_, err := fx.mongoGetOperation(ctx, "123")
@@ -718,7 +719,7 @@ func TestAnynsRpc_MongoGetOpertaion(t *testing.T) {
 	})
 
 	t.Run("should return item", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
@@ -744,13 +745,13 @@ func TestAnynsRpc_MongoGetOpertaion(t *testing.T) {
 
 func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 	t.Run("fail if name is invalid", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -760,13 +761,13 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 	})
 
 	t.Run("fail if eth address is invalid", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -776,7 +777,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 	})
 
 	t.Run("fail if Any address is invalid", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
@@ -792,13 +793,13 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -814,13 +815,13 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 
 func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 	t.Run("fail if name is invalid", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -830,13 +831,13 @@ func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 	})
 
 	t.Run("fail if eth address is invalid", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -846,7 +847,7 @@ func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 	})
 
 	t.Run("fail if Any address is invalid", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
@@ -862,13 +863,13 @@ func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -884,7 +885,7 @@ func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 
 func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		// 1 - enable user
@@ -922,14 +923,14 @@ func TestAnynsRpc_VerifyAnyIdentity(t *testing.T) {
 		// compare identityMarshalled with identity
 		assert.Equal(t, identityMarshalled, identityMarshalled2)
 
-		err = fx.VerifyAnyIdentity(AnytypeID, marshalled, signature)
+		err = verification.VerifyAnyIdentity(AnytypeID, marshalled, signature)
 		assert.NoError(t, err)
 	})
 }
 
 func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 	t.Run("fail if wrong signature", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		// 1 - enable user
@@ -978,7 +979,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 	})
 
 	t.Run("fail if SendUserOperation failed", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		// 1 - enable user
@@ -1033,7 +1034,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
+		fx := newFixture(t, "")
 		defer fx.finish(t)
 
 		// 1 - enable user

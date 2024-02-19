@@ -58,20 +58,6 @@ func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(ctx, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), ctx, scw, amount)
 }
 
-// AdminVerifyIdentity mocks base method.
-func (m *MockAccountAbstractionService) AdminVerifyIdentity(payload, signature []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AdminVerifyIdentity", payload, signature)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AdminVerifyIdentity indicates an expected call of AdminVerifyIdentity.
-func (mr *MockAccountAbstractionServiceMockRecorder) AdminVerifyIdentity(payload, signature any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminVerifyIdentity", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminVerifyIdentity), payload, signature)
-}
-
 // GetDataNameRegister mocks base method.
 func (m *MockAccountAbstractionService) GetDataNameRegister(ctx context.Context, in *nameserviceproto.NameRegisterRequest) ([]byte, []byte, error) {
 	m.ctrl.T.Helper()

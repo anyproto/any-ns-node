@@ -334,18 +334,18 @@ func (mr *MockContractsServiceMockRecorder) Name() *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockContractsService) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string) (*types.Transaction, error) {
+func (m *MockContractsService) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecord bool) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Register", ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	ret := m.ctrl.Call(m, "Register", ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord)
 }
 
 // RenewName mocks base method.

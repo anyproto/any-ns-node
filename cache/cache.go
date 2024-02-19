@@ -63,8 +63,8 @@ type cacheService struct {
 	confMongo config.Mongo
 	itemColl  *mongo.Collection
 
-	contractsConfig config.Contracts
-	contracts       contracts.ContractsService
+	confContracts config.Contracts
+	contracts     contracts.ContractsService
 }
 
 func (cs *cacheService) Name() (name string) {
@@ -73,7 +73,7 @@ func (cs *cacheService) Name() (name string) {
 
 func (cs *cacheService) Init(a *app.App) (err error) {
 	cs.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
-	cs.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
+	cs.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	cs.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 
 	// connect to mongo

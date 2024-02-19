@@ -13,10 +13,12 @@ import (
 	"github.com/anyproto/any-ns-node/anynsaarpc"
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/cache"
+	"github.com/anyproto/any-ns-node/nonce_manager"
+	"github.com/anyproto/any-ns-node/queue"
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
-	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/metric"
 	nsclient "github.com/anyproto/any-sync/nameservice/nameserviceclient"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
@@ -57,7 +59,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run nsp client")
-	command        = flag.String("cmd", "", "command to run: [name-register, is-name-available, name-by-address, get-operation]")
+	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-fund-user, is-name-available, name-by-address, get-operation]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -140,6 +142,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 
 	// check commands
 	switch *command {
+	case "admin-name-register":
+		adminNameRegister(ctx, a, client)
 	case "is-name-available":
 		clientIsNameAvailable(ctx, client)
 	case "name-by-address":
@@ -172,6 +176,48 @@ func clientIsNameAvailable(ctx context.Context, client nsclient.AnyNsClientServi
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.IsNameAvailable(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func adminNameRegister(ctx context.Context, a *app.App, client nsclient.AnyNsClientService) {
+	var req = &nsp.NameRegisterRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	marshalled, err := req.Marshal()
+	if err != nil {
+		log.Fatal("can't marshal request", zap.Error(err))
+	}
+
+	var reqSigned = &nsp.NameRegisterRequestSigned{}
+	reqSigned.Payload = marshalled
+
+	acc := a.MustComponent("config").(accountservice.ConfigGetter).GetAccount()
+
+	signKey, err := crypto.DecodeKeyFromString(
+		acc.SigningKey,
+		crypto.UnmarshalEd25519PrivateKey,
+		nil)
+
+	if err != nil {
+		log.Fatal("can't read signing key", zap.Error(err))
+	}
+
+	// SignKey is used to sign the request
+	sign, err := signKey.Sign(marshalled)
+	if err != nil {
+		log.Fatal("can't sign request", zap.Error(err))
+	}
+	reqSigned.Signature = sign
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.AdminRegisterName(ctx, reqSigned)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}
@@ -258,7 +304,7 @@ func adminFundUserAccount(ctx context.Context, a *app.App, client nsclient.AnyNs
 	var reqSigned = &nsp.AdminFundUserAccountRequestSigned{}
 	reqSigned.Payload = marshalled
 
-	acc := a.MustComponent("config").(commonaccount.ConfigGetter).GetAccount()
+	acc := a.MustComponent("config").(accountservice.ConfigGetter).GetAccount()
 
 	signKey, err := crypto.DecodeKeyFromString(
 		acc.SigningKey,
@@ -334,5 +380,7 @@ func BootstrapServer(a *app.App) {
 		Register(server.New()).
 		Register(accountabstraction.New()).
 		Register(anynsrpc.New()).
-		Register(anynsaarpc.New())
+		Register(anynsaarpc.New()).
+		Register(queue.New()).
+		Register(nonce_manager.New())
 }

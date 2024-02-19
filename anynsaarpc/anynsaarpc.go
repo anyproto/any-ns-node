@@ -8,10 +8,11 @@ import (
 
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
+	"github.com/anyproto/any-ns-node/verification"
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/rpc/server"
-	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,6 +35,7 @@ func New() app.Component {
 type anynsAARpc struct {
 	confContracts config.Contracts
 	confMongo     config.Mongo
+	confAccount   accountservice.Config
 
 	usersColl *mongo.Collection
 	opColl    *mongo.Collection
@@ -75,6 +77,8 @@ func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+	arpc.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
+
 	arpc.aa = a.MustComponent(accountabstraction.CName).(accountabstraction.AccountAbstractionService)
 	arpc.cache = a.MustComponent(cache.CName).(cache.CacheService)
 
@@ -234,7 +238,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 	}
 
 	// 2 - check signature
-	err = arpc.aa.AdminVerifyIdentity(in.Payload, in.Signature)
+	err = verification.VerifyAdminIdentity(arpc.confAccount.SigningKey, in.Payload, in.Signature)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, errors.New("not an Admin!!!")
@@ -280,7 +284,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 	}
 
 	// 2 - check signature
-	err = arpc.aa.AdminVerifyIdentity(in.Payload, in.Signature)
+	err = verification.VerifyAdminIdentity(arpc.confAccount.SigningKey, in.Payload, in.Signature)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, errors.New("not an Admin!!!")
@@ -313,7 +317,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 
 func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
-	err := checkRegisterParams(in)
+	err := verification.CheckRegisterParams(in)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, errors.New("invalid parameters")
@@ -337,7 +341,7 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameReg
 
 func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
-	err := checkRegisterForSpaceParams(in)
+	err := verification.CheckRegisterForSpaceParams(in)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, errors.New("invalid parameters")
@@ -359,28 +363,6 @@ func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp
 	return &out, nil
 }
 
-func (arpc *anynsAARpc) VerifyAnyIdentity(ownerIdStr string, payload []byte, signature []byte) (err error) {
-	// read in the PeerID format
-	//ownerAnyIdentity, err := crypto.DecodePeerId(ownerIdStr)
-
-	// read in the Account format (A5jC4SX...)
-	ownerAnyIdentity, err := crypto.DecodeAccountAddress(ownerIdStr)
-
-	if err != nil {
-		log.Error("failed to unmarshal public key", zap.Error(err))
-		return errors.New("failed to unmarshal public key")
-	}
-
-	// 2 - verify signature
-	res, err := ownerAnyIdentity.Verify(payload, signature)
-	if err != nil || !res {
-		return errors.New("signature is different")
-	}
-
-	// success
-	return nil
-}
-
 // once user got data by using method like GetDataNameRegister, and signed it, now he can create a new operation
 func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateUserOperationRequestSigned) (*nsp.OperationResponse, error) {
 	// 1 - unmarshal the signed request
@@ -392,7 +374,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 	}
 
 	// 2 - check users's signature
-	err = arpc.VerifyAnyIdentity(cuor.OwnerAnyID, in.Payload, in.Signature)
+	err = verification.VerifyAnyIdentity(cuor.OwnerAnyID, in.Payload, in.Signature)
 	if err != nil {
 		log.Error("wrong Anytype signature", zap.Error(err))
 		return nil, errors.New("wrong Anytype signature")

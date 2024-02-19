@@ -9,9 +9,7 @@ import (
 	"testing"
 
 	"github.com/anyproto/any-sync/app"
-	"github.com/anyproto/any-sync/commonspace/object/accountdata"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
-	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
@@ -233,96 +231,6 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		assert.Equal(t, uint64(12), count)
 	})
 }
-func TestAAS_VerifyAdminIdentity(t *testing.T) {
-	t.Run("fail", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		// 0 - garbage data test
-		err := fx.AdminVerifyIdentity([]byte("payload"), []byte("signature"))
-		assert.Error(t, err)
-
-		// 1 - pack some structure
-		nrr := nsp.AdminFundUserAccountRequest{
-			OwnerEthAddress: "",
-			NamesCount:      0,
-		}
-
-		marshalled, err := nrr.Marshal()
-		require.NoError(t, err)
-
-		// 2 - sign it with some random (wrong) key
-		accountKeys, err := accountdata.NewRandom()
-		require.NoError(t, err)
-
-		sig, err := accountKeys.SignKey.Sign(marshalled)
-		require.NoError(t, err)
-
-		err = fx.AdminVerifyIdentity(marshalled, sig)
-		assert.Error(t, err)
-	})
-
-	t.Run("fail if wrong key", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		// 1 - pack some structure
-		nrr := nsp.AdminFundUserAccountRequest{
-			OwnerEthAddress: "",
-			NamesCount:      0,
-		}
-
-		marshalled, err := nrr.Marshal()
-		require.NoError(t, err)
-
-		// 2 - sign it
-		signKey, err := crypto.DecodeKeyFromString(
-			// see here:
-			fx.config.Account.PeerKey,
-			crypto.UnmarshalEd25519PrivateKey,
-			nil)
-		require.NoError(t, err)
-
-		sig, err := signKey.Sign(marshalled)
-		require.NoError(t, err)
-
-		err = fx.AdminVerifyIdentity(marshalled, sig)
-		assert.Error(t, err)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		// 1 - pack some structure
-		nrr := nsp.AdminFundUserAccountRequest{
-			OwnerEthAddress: "",
-			NamesCount:      0,
-		}
-
-		marshalled, err := nrr.Marshal()
-		require.NoError(t, err)
-
-		// 2 - sign it
-		signKey, err := crypto.DecodeKeyFromString(
-			fx.config.Account.SigningKey,
-			crypto.UnmarshalEd25519PrivateKey,
-			nil)
-		require.NoError(t, err)
-
-		sig, err := signKey.Sign(marshalled)
-		require.NoError(t, err)
-
-		// get associated pub key
-		//pubKey := signKey.GetPublic()
-		// identity str
-		//identityStr := pubKey.Account()
-		// A5ommzwhpR5ngp11q9q1P2MMzhUE46Hi421RJbPqswALyoyr
-		//log.Info("identity", zap.String("identity", identityStr))
-
-		err = fx.AdminVerifyIdentity(marshalled, sig)
-		assert.NoError(t, err)
-	})
-}
 
 func TestAAS_MintAccessTokens(t *testing.T) {
 	t.Run("fail if names count is ZERO", func(t *testing.T) {
@@ -511,7 +419,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 		}
 
 		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
@@ -544,7 +452,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 		}
 
 		_, _, err := fx.GetDataNameRegister(context.Background(), &req)
@@ -563,7 +471,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 		}
 
 		// return wrong JSON
@@ -597,7 +505,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
@@ -642,7 +550,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
@@ -683,7 +591,7 @@ func TestAAS_GetDataNameRegister(t *testing.T) {
 		var req nsp.NameRegisterRequest = nsp.NameRegisterRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 		}
 
 		fx.alchemy.EXPECT().SendRequest(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (out []byte, err error) {
@@ -752,7 +660,7 @@ func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -786,7 +694,7 @@ func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -806,7 +714,7 @@ func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -841,7 +749,7 @@ func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -887,7 +795,7 @@ func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -929,7 +837,7 @@ func TestAAS_GetDataNameRegisterForSpace(t *testing.T) {
 		var req nsp.NameRegisterForSpaceRequest = nsp.NameRegisterForSpaceRequest{
 			FullName:        "hello.any",
 			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
-			OwnerAnyAddress: "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
@@ -1044,7 +952,7 @@ func TestAAS_GetCallDataForRegister(t *testing.T) {
 		var secret32 [32]byte
 		copy(secret32[:], secret)
 
-		ownerAnyAddress := "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy"
+		ownerAnyAddress := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 		spaceID := "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"
 		callData, _ := contracts.PrepareCallData_SetContentHashSpaceID("xxx123.any", ownerAnyAddress, spaceID)
 
@@ -1057,7 +965,7 @@ func TestAAS_GetCallDataForRegister(t *testing.T) {
 
 		data, err := GetCallDataForRegister(nameFirstPart, registrantAccount, registrationTime, secret32, resolver, callData, isReverseRecord, ownerControlledFuses)
 		assert.NoError(t, err)
-		assert.Equal(t, "0x"+hex.EncodeToString(data), "0x74694a2b0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000e34230c1f916e9d628d5f9863eb3f5667d8fcb370000000000000000000000000000000000000000000000000000000000003024a4f49c1a7b979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f212180000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f60000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006787878313233000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000a4f49c1a7b979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f212181bf35d6d1b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000003b626166796265696273363267717469676e75636b66716c6372376c68686968677a6832766f7278746d633561666d36757868347a64636d7577757500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a4304e6ade979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f212181bf35d6d1b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000034313244334b6f6f5750414e7a565a674871414c353743636852483471384e476a6f574470555368566f7642453362686858637a7900000000000000000000000000000000000000000000000000000000000000000000000000000000")
+		assert.Equal(t, "0x"+hex.EncodeToString(data), "0x74694a2b0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000e34230c1f916e9d628d5f9863eb3f5667d8fcb370000000000000000000000000000000000000000000000000000000000003024a4f49c1a7b979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f212180000000000000000000000008ae88b2b35f15d6320d77ab8ec7e3410f78376f60000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006787878313233000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000a4f49c1a7b979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f212181bf35d6d1b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000003b626166796265696273363267717469676e75636b66716c6372376c68686968677a6832766f7278746d633561666d36757868347a64636d7577757500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a4304e6ade979dc0ea76cd083a97af07e5983e7041f84bc672134e5b24f212181bf35d6d1b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000003041356b32643973465a7738347969735478526e7a3262505264315950665666687871796d5a36794553707246544736350000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
 	})
 }
 
@@ -1067,7 +975,7 @@ func TestAAS_GetCallDataForNameRegister(t *testing.T) {
 		defer fx.finish(t)
 
 		fullName := "hello.any"
-		ownerAnyAddress := "12D3KooWPANzVZgHqAL57CchRH4q8NGjoWDpUShVovBE3bhhXczy"
+		ownerAnyAddress := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
 		ownerEthAddress := "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF"
 		spaceID := "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"
 		isReverseRecordUpdate := true

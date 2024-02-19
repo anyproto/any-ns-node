@@ -53,7 +53,7 @@ type ContractsService interface {
 
 	MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string, isReverseRecordUpdate bool) ([32]byte, error)
 	Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
-	Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error)
+	Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string, isReverseRecord bool) (*types.Transaction, error)
 	RenewName(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, fullName string, durationSec uint64, controller *ac.AnytypeRegistrarControllerPrivate) (*types.Transaction, error)
 	GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error)
 
@@ -608,7 +608,7 @@ func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Cl
 	return tx, nil
 }
 
-func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string) (*types.Transaction, error) {
+func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string, isReverseRecord bool) (*types.Transaction, error) {
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
 	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
 
@@ -618,7 +618,6 @@ func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.
 		return nil, err
 	}
 
-	var isReverseRecord bool = true
 	var ownerControlledFuses uint16 = 0
 
 	tx, err := controller.Register(

@@ -3,7 +3,7 @@ package config
 import (
 	"os"
 
-	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/metric"
 	"github.com/anyproto/any-sync/net/rpc"
 	"github.com/anyproto/any-sync/net/transport/quic"
@@ -33,7 +33,7 @@ func NewFromFile(path string) (c *Config, err error) {
 type Config struct {
 	Drpc             rpc.Config             `yaml:"drpc"`
 	Log              logger.Config          `yaml:"log"`
-	Account          commonaccount.Config   `yaml:"account"`
+	Account          accountservice.Config  `yaml:"account"`
 	Network          nodeconf.Configuration `yaml:"network"`
 	NetworkStorePath string                 `yaml:"networkStorePath"`
 	Quic             quic.Config            `yaml:"quic"`
@@ -42,6 +42,8 @@ type Config struct {
 	Contracts        Contracts              `yaml:"contracts"`
 	Aa               AA                     `yaml:"accountAbstraction"`
 	Metric           metric.Config          `yaml:"metric"`
+	Nonce            Nonce                  `yaml:"nonce"`
+	Queue            Queue                  `yaml:"queue"`
 	// use mongo cache to read data from
 	ReadFromCache bool `yaml:"readFromCache"`
 }
@@ -62,7 +64,7 @@ func (c *Config) GetNodeConf() nodeconf.Configuration {
 	return c.Network
 }
 
-func (c *Config) GetAccount() commonaccount.Config {
+func (c *Config) GetAccount() accountservice.Config {
 	return c.Account
 }
 
@@ -88,4 +90,12 @@ func (c *Config) GetQuic() quic.Config {
 
 func (c *Config) GetMetric() metric.Config {
 	return c.Metric
+}
+
+func (c *Config) GetNonce() Nonce {
+	return c.Nonce
+}
+
+func (c *Config) GetQueue() Queue {
+	return c.Queue
 }

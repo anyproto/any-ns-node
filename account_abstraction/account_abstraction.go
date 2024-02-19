@@ -12,11 +12,10 @@ import (
 	"github.com/anyproto/any-ns-node/alchemysdk"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
-	commonaccount "github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
-	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -34,11 +33,11 @@ func New() app.Component {
 }
 
 type anynsAA struct {
-	accountConfig   commonaccount.Config
-	aaConfig        config.AA
-	contractsConfig config.Contracts
-	contracts       contracts.ContractsService
-	alchemy         alchemysdk.AlchemyAAService
+	confAccount   accountservice.Config
+	aaConfig      config.AA
+	confContracts config.Contracts
+	contracts     contracts.ContractsService
+	alchemy       alchemysdk.AlchemyAAService
 }
 
 type OperationInfo struct {
@@ -54,8 +53,6 @@ type AccountAbstractionService interface {
 	IsScwDeployed(ctx context.Context, scw common.Address) (bool, error)
 	GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error)
 
-	// will return error if signature is invalid
-	AdminVerifyIdentity(payload []byte, signature []byte) (err error)
 	// will mint + approve tokens to the specified smart wallet
 	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (operationID string, err error)
 
@@ -71,9 +68,9 @@ type AccountAbstractionService interface {
 }
 
 func (aa *anynsAA) Init(a *app.App) (err error) {
-	aa.accountConfig = a.MustComponent(config.CName).(*config.Config).GetAccount()
+	aa.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
 	aa.aaConfig = a.MustComponent(config.CName).(*config.Config).GetAA()
-	aa.contractsConfig = a.MustComponent(config.CName).(*config.Config).GetContracts()
+	aa.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	aa.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	aa.alchemy = a.MustComponent(alchemysdk.CName).(alchemysdk.AlchemyAAService)
 
@@ -220,7 +217,7 @@ func (aa *anynsAA) getNonceForSmartWalletAddress(ctx context.Context, scw common
 }
 
 func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error) {
-	tokenAddress := common.HexToAddress(aa.contractsConfig.AddrToken)
+	tokenAddress := common.HexToAddress(aa.confContracts.AddrToken)
 
 	client, err := aa.contracts.CreateEthConnection()
 	if err != nil {
@@ -235,7 +232,7 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 	}
 
 	// N tokens per name (current testnet settings)
-	weiPerToken := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(int64(aa.contractsConfig.TokenDecimals)), nil)
+	weiPerToken := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(int64(aa.confContracts.TokenDecimals)), nil)
 	oneNamePriceWei := weiPerToken.Mul(big.NewInt(int64(aa.aaConfig.NameTokensPerName)), weiPerToken)
 
 	count = balance.Div(balance, oneNamePriceWei).Uint64()
@@ -249,48 +246,18 @@ func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (c
 	return count, nil
 }
 
-func (aa *anynsAA) AdminVerifyIdentity(payload []byte, signature []byte) (err error) {
-	// 1 - load public key of admin
-	// (should be account.signingKey in config)
-	decodedSignKey, err := crypto.DecodeKeyFromString(
-		aa.accountConfig.SigningKey,
-		crypto.UnmarshalEd25519PrivateKey,
-		nil)
-	if err != nil {
-		log.Error("failed to unmarshal public key", zap.Error(err))
-		return err
-	}
-
-	ownerAnyIdentityStr := decodedSignKey.GetPublic().PeerId()
-	ownerAnyIdentity, err := crypto.DecodePeerId(ownerAnyIdentityStr)
-
-	if err != nil {
-		log.Error("failed to unmarshal public key", zap.Error(err))
-		return err
-	}
-
-	// 2 - verify signature
-	res, err := ownerAnyIdentity.Verify(payload, signature)
-	if err != nil || !res {
-		return errors.New("signature is different")
-	}
-
-	// success
-	return nil
-}
-
 // Admin sends transaction to mint tokens to the specified smart wallet
 func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress common.Address, namesCount *big.Int) (operationID string, err error) {
 	// settings from config:
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 
-	erc20tokenAddr := common.HexToAddress(aa.contractsConfig.AddrToken)
-	registrarController := common.HexToAddress(aa.contractsConfig.AddrRegistrar)
+	erc20tokenAddr := common.HexToAddress(aa.confContracts.AddrToken)
+	registrarController := common.HexToAddress(aa.confContracts.AddrRegistrar)
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
 	policyID := aa.aaConfig.GasPolicyId
 
-	adminAddress := common.HexToAddress(aa.contractsConfig.AddrAdmin)
-	adminPK := aa.contractsConfig.AdminPk
+	adminAddress := common.HexToAddress(aa.confContracts.AddrAdmin)
+	adminPK := aa.confContracts.AdminPk
 
 	var chainID int64 = int64(aa.aaConfig.ChainID)
 
@@ -318,7 +285,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	// 3 - create user operation
 	// N tokens per each name (was 10 during our tests)
 	tokensToMint := namesCount.Mul(namesCount, big.NewInt(int64(aa.aaConfig.NameTokensPerName)))
-	tokenDecimals := aa.contractsConfig.TokenDecimals
+	tokenDecimals := aa.confContracts.TokenDecimals
 
 	callDataOriginal, err := GetCallDataForMint(userScwAddress, tokensToMint, tokenDecimals)
 	if err != nil {
@@ -558,8 +525,8 @@ func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, own
 }
 
 func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool) ([]byte, error) {
-	registrarController := common.HexToAddress(aa.contractsConfig.AddrRegistrar)
-	resolverAddress := common.HexToAddress(aa.contractsConfig.AddrResolver)
+	registrarController := common.HexToAddress(aa.confContracts.AddrRegistrar)
+	resolverAddress := common.HexToAddress(aa.confContracts.AddrResolver)
 	registrantAccount := common.HexToAddress(ownerEthAddress)
 
 	var nameFirstPart string = contracts.RemoveTLD(fullName)
