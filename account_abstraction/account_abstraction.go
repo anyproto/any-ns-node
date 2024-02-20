@@ -528,10 +528,8 @@ func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, own
 }
 
 func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool) ([]byte, error) {
-	// TODO: just for debugging
-	//registrarController := common.HexToAddress(aa.confContracts.AddrPrivateController)
+	registrarPrivateController := common.HexToAddress(aa.confContracts.AddrRegistrarPrivateController)
 
-	registrarController := common.HexToAddress(aa.confContracts.AddrRegistrarConroller)
 	resolverAddress := common.HexToAddress(aa.confContracts.AddrResolver)
 	registrantAccount := common.HexToAddress(ownerEthAddress)
 
@@ -604,7 +602,7 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	}
 
 	// create array of call data
-	targets := []common.Address{registrarController, registrarController}
+	targets := []common.Address{registrarPrivateController, registrarPrivateController}
 	callDataOriginals := [][]byte{callDataOriginal1, callDataOriginal2}
 
 	// 4 - wrap it into "execute" call

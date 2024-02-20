@@ -41,7 +41,7 @@ contracts:
   registrarController: 0x6BA138bb7B1Bdea2B127D55D7C8F0DC9467b424E
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeRegistrarControllerPrivate.json
-  privateController: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732
+  registrarPrivateController: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeNameWrapper.json
   nameWrapper: 0xFe69BF9B3fD69d09977b37b5953C8B43687f3B23
