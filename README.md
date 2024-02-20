@@ -38,7 +38,7 @@ contracts:
   resolver: 0x34F9c5CB9b6dcc036e045a15af20CEdC0dE4dcB2
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeRegistrarImplementation.json
-  registrar: 0x6BA138bb7B1Bdea2B127D55D7C8F0DC9467b424E
+  registrarController: 0x6BA138bb7B1Bdea2B127D55D7C8F0DC9467b424E
 
   // https://github.com/anyproto/any-ns/blob/master/deployments/sepolia/AnytypeRegistrarControllerPrivate.json
   privateController: 0x45bA047AD44e35FbF5A1375F79ea3872ceDB1732

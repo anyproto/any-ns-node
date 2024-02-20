@@ -554,7 +554,7 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
 	nonce := queueItem.TxCurrentNonce
 
-	controller, err := aqueue.contracts.ConnectToController(conn)
+	controller, err := aqueue.contracts.ConnectToPrivateController(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return err
@@ -703,7 +703,7 @@ func (aqueue *anynsQueue) nameRegister_CommitSent(ctx context.Context, queueItem
 func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
 	nonce := queueItem.TxCurrentNonce
 
-	controller, err := aqueue.contracts.ConnectToController(conn)
+	controller, err := aqueue.contracts.ConnectToPrivateController(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return err
@@ -835,7 +835,7 @@ func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queu
 }
 
 func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (newState QueueItemStatus, err error) {
-	controller, err := aqueue.contracts.ConnectToController(conn)
+	controller, err := aqueue.contracts.ConnectToPrivateController(conn)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return OperationStatus_Error, err

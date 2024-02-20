@@ -1,14 +1,14 @@
 package config
 
 type Contracts struct {
-	GethUrl               string `yaml:"gethUrl"`
-	AddrRegistry          string `yaml:"registry"`
-	AddrResolver          string `yaml:"resolver"`
-	AddrRegistrar         string `yaml:"registrar"`
-	AddrToken             string `yaml:"token"`
-	TokenDecimals         uint8  `yaml:"tokenDecimals"`
-	AddrPrivateController string `yaml:"privateController"`
-	AddrNameWrapper       string `yaml:"nameWrapper"`
+	GethUrl                string `yaml:"gethUrl"`
+	AddrRegistry           string `yaml:"registry"`
+	AddrResolver           string `yaml:"resolver"`
+	AddrRegistrarConroller string `yaml:"registrarController"`
+	AddrToken              string `yaml:"token"`
+	TokenDecimals          uint8  `yaml:"tokenDecimals"`
+	AddrPrivateController  string `yaml:"privateController"`
+	AddrNameWrapper        string `yaml:"nameWrapper"`
 
 	AddrAdmin string `yaml:"admin"`
 	AdminPk   string `yaml:"adminPk"`

@@ -92,19 +92,19 @@ func (mr *MockContractsServiceMockRecorder) Commit(ctx, conn, opts, commitment, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockContractsService)(nil).Commit), ctx, conn, opts, commitment, controller)
 }
 
-// ConnectToController mocks base method.
-func (m *MockContractsService) ConnectToController(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarControllerPrivate, error) {
+// ConnectToPrivateController mocks base method.
+func (m *MockContractsService) ConnectToPrivateController(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarControllerPrivate, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConnectToController", conn)
+	ret := m.ctrl.Call(m, "ConnectToPrivateController", conn)
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeRegistrarControllerPrivate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ConnectToController indicates an expected call of ConnectToController.
-func (mr *MockContractsServiceMockRecorder) ConnectToController(conn any) *gomock.Call {
+// ConnectToPrivateController indicates an expected call of ConnectToPrivateController.
+func (mr *MockContractsServiceMockRecorder) ConnectToPrivateController(conn any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToController", reflect.TypeOf((*MockContractsService)(nil).ConnectToController), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToPrivateController", reflect.TypeOf((*MockContractsService)(nil).ConnectToPrivateController), conn)
 }
 
 // ConnectToNamewrapperContract mocks base method.

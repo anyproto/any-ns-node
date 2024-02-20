@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
+	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
@@ -36,6 +37,7 @@ type anynsRpc struct {
 	confAccount   accountservice.Config
 	contracts     contracts.ContractsService
 	queue         queue.QueueService
+	aa            accountabstraction.AccountAbstractionService
 
 	readFromCache bool
 }
@@ -47,6 +49,7 @@ func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.readFromCache = a.MustComponent(config.CName).(*config.Config).ReadFromCache
 	arpc.queue = a.MustComponent(queue.CName).(queue.QueueService)
+	arpc.aa = a.MustComponent(accountabstraction.CName).(accountabstraction.AccountAbstractionService)
 
 	return nsp.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
@@ -149,9 +152,20 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 		return nil, err
 	}
 
-	// 4 - add to queue
-	operationId, err := arpc.queue.AddNewRequest(ctx, &nrr)
-	resp.OperationId = fmt.Sprint(operationId)
-	resp.OperationState = nsp.OperationState_Pending
-	return &resp, err
+	// old version: process it manually in the queue
+	/*
+		// 4 - add to queue
+		operationId, err := arpc.queue.AddNewRequest(ctx, &nrr)
+		resp.OperationId = fmt.Sprint(operationId)
+		resp.OperationState = nsp.OperationState_Pending
+		return &resp, err
+	*/
+
+	// new version - use AA to process it
+	opID, err := arpc.aa.AdminNameRegister(ctx, &nrr)
+
+	var out nsp.OperationResponse
+	out.OperationId = fmt.Sprint(opID)
+	out.OperationState = nsp.OperationState_Pending
+	return &out, err
 }

@@ -58,6 +58,21 @@ func (mr *MockAccountAbstractionServiceMockRecorder) AdminMintAccessTokens(ctx, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminMintAccessTokens", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminMintAccessTokens), ctx, scw, amount)
 }
 
+// AdminNameRegister mocks base method.
+func (m *MockAccountAbstractionService) AdminNameRegister(ctx context.Context, in *nameserviceproto.NameRegisterRequest) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdminNameRegister", ctx, in)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdminNameRegister indicates an expected call of AdminNameRegister.
+func (mr *MockAccountAbstractionServiceMockRecorder) AdminNameRegister(ctx, in any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminNameRegister", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminNameRegister), ctx, in)
+}
+
 // GetDataNameRegister mocks base method.
 func (m *MockAccountAbstractionService) GetDataNameRegister(ctx context.Context, in *nameserviceproto.NameRegisterRequest) ([]byte, []byte, error) {
 	m.ctrl.T.Helper()

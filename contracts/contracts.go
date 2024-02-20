@@ -62,7 +62,7 @@ type ContractsService interface {
 	ConnectToNamewrapperContract(conn *ethclient.Client) (*ac.AnytypeNameWrapper, error)
 	ConnectToResolver(conn *ethclient.Client) (*ac.AnytypeResolver, error)
 	ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error)
-	ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
+	ConnectToPrivateController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error)
 
 	GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error)
 	CalculateTxParams(conn *ethclient.Client, address common.Address) (*big.Int, uint64, error)
@@ -394,7 +394,7 @@ func (acontracts *anynsContracts) ConnectToResolver(conn *ethclient.Client) (*ac
 
 func (acontracts *anynsContracts) ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error) {
 	// 1 - create new contract instance
-	contractAddr := acontracts.config.AddrRegistrar
+	contractAddr := acontracts.config.AddrRegistrarConroller
 
 	ar, err := ac.NewAnytypeRegistrarImplementation(common.HexToAddress(contractAddr), conn)
 	if err != nil || ar == nil {
@@ -405,7 +405,7 @@ func (acontracts *anynsContracts) ConnectToRegistrar(conn *ethclient.Client) (*a
 	return ar, err
 }
 
-func (acontracts *anynsContracts) ConnectToController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error) {
+func (acontracts *anynsContracts) ConnectToPrivateController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error) {
 	// 1 - create new contract instance
 	contractAddr := acontracts.config.AddrPrivateController
 

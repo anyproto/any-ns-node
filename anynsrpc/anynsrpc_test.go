@@ -20,6 +20,9 @@ import (
 	"github.com/anyproto/any-ns-node/queue"
 	mock_queue "github.com/anyproto/any-ns-node/queue/mock"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
+
+	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
+	mock_accountabstraction "github.com/anyproto/any-ns-node/account_abstraction/mock"
 )
 
 var ctx = context.Background()
@@ -32,6 +35,7 @@ type fixture struct {
 	contracts *mock_contracts.MockContractsService
 	cache     *mock_cache.MockCacheService
 	queue     *mock_queue.MockQueueService
+	aa        *mock_accountabstraction.MockAccountAbstractionService
 
 	*anynsRpc
 }
@@ -60,6 +64,10 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 	fx.queue.EXPECT().Run(gomock.Any()).AnyTimes()
 	fx.queue.EXPECT().Close(gomock.Any()).AnyTimes()
 
+	fx.aa = mock_accountabstraction.NewMockAccountAbstractionService(fx.ctrl)
+	fx.aa.EXPECT().Name().Return(accountabstraction.CName).AnyTimes()
+	fx.aa.EXPECT().Init(gomock.Any()).AnyTimes()
+
 	// read only from cache (mongo)
 	// by default should be true
 	fx.config.ReadFromCache = readFromCache
@@ -71,6 +79,7 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 		Register(fx.config).
 		Register(fx.cache).
 		Register(fx.queue).
+		Register(fx.aa).
 		Register(fx.anynsRpc)
 
 	require.NoError(t, fx.a.Start(ctx))
@@ -297,5 +306,3 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		assert.Equal(t, resp.Name, "")
 	})
 }
-
-//

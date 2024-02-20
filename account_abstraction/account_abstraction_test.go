@@ -65,7 +65,7 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 	fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
 	fx.contracts.EXPECT().CalculateTxParams(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().ConnectToController(gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().ConnectToPrivateController(gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
