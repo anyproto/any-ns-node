@@ -57,6 +57,7 @@ contracts:
   nameWrapper: 0xC68FC50baebA616916C390d035Cf485d8F039d21
   admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
   nameToken: 0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6
+  registrarImplementation: 0x42dEa7D082F38018bB3FAb9E4F9D822654f03b32
   tokenDecimals: 6
   adminPk: XXX
   waitMintingRetryCount: 15

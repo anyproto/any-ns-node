@@ -394,7 +394,7 @@ func (acontracts *anynsContracts) ConnectToResolver(conn *ethclient.Client) (*ac
 
 func (acontracts *anynsContracts) ConnectToRegistrar(conn *ethclient.Client) (*ac.AnytypeRegistrarImplementation, error) {
 	// 1 - create new contract instance
-	contractAddr := acontracts.config.AddrRegistrarConroller
+	contractAddr := acontracts.config.AddrRegistrarImplementation
 
 	ar, err := ac.NewAnytypeRegistrarImplementation(common.HexToAddress(contractAddr), conn)
 	if err != nil || ar == nil {
