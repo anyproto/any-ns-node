@@ -50,13 +50,13 @@ log:
   production: false
 contracts:
   gethUrl: https://sepolia.infura.io/v3/XXX
-  registry: 0xfDA2A52fB6407Ae5c35Dff96837c6d5768c76a79 
+  ensRegistry: 0xfDA2A52fB6407Ae5c35Dff96837c6d5768c76a79 
   resolver: 0x2E6B72443612bDDd668BB60b18a030cb6aE806CE 
   registrarController: 0xB6bF17cBe45CbC7609e4f8fA56154c9DeF8590CA 
-  privateController: 0x1120Ac6114CEc38Ccd66a45e0D612f159876980E 
+  registrarControllerPrivate: 0x1120Ac6114CEc38Ccd66a45e0D612f159876980E 
   nameWrapper: 0xC68FC50baebA616916C390d035Cf485d8F039d21
   admin: 0x61d1eeE7FBF652482DEa98A1Df591C626bA09a60
-  token: 0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6
+  nameToken: 0x8AE88b2b35F15D6320D77ab8EC7E3410F78376F6
   tokenDecimals: 6
   adminPk: XXX
   waitMintingRetryCount: 15

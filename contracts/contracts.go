@@ -407,7 +407,7 @@ func (acontracts *anynsContracts) ConnectToRegistrar(conn *ethclient.Client) (*a
 
 func (acontracts *anynsContracts) ConnectToPrivateController(conn *ethclient.Client) (*ac.AnytypeRegistrarControllerPrivate, error) {
 	// 1 - create new contract instance
-	contractAddr := acontracts.config.AddrPrivateController
+	contractAddr := acontracts.config.AddrRegistrarPrivateController
 
 	ac, err := ac.NewAnytypeRegistrarControllerPrivate(common.HexToAddress(contractAddr), conn)
 	if err != nil || ac == nil {
