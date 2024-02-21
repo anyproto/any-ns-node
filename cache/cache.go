@@ -121,6 +121,8 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 		return nil, err
 	}
 
+	log.Debug("found item in cache", zap.String("FullName", in.FullName))
+
 	// 2 - if found in the cache -> return false
 	return &nsp.NameAvailableResponse{
 		Available:          false,
@@ -176,6 +178,8 @@ func (cs *cacheService) setNameData(ctx context.Context, in *NameDataItem) (err 
 }
 
 func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error) {
+	log.Debug("reading data from smart contracts -> cache", zap.String("FullName", in.FullName))
+
 	// 0 - create connection
 	conn, err := cs.contracts.CreateEthConnection()
 	if err != nil {
@@ -218,20 +222,23 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 		return err
 	}
 
-	own, err := cs.contracts.GetOwnerOfSmartContractWallet(ctx, conn, common.HexToAddress(ea))
-	if err != nil {
-		log.Error("failed to get SCW -> owner", zap.Error(err))
-		return err
-	}
-
 	// 4 - update cache
 	var ndi NameDataItem
 	ndi.FullName = in.FullName
-	ndi.OwnerScwEthAddress = strings.ToLower(ea)
-	ndi.OwnerEthAddress = strings.ToLower(own.Hex())
 	ndi.OwnerAnyAddress = aa
 	ndi.SpaceId = si
 	ndi.NameExpires = exp.Int64()
+
+	own, err := cs.contracts.GetOwnerOfSmartContractWallet(ctx, conn, common.HexToAddress(ea))
+	if err != nil {
+		log.Warn("failed to get SCW -> owner", zap.Error(err))
+
+		ndi.OwnerScwEthAddress = ""
+		ndi.OwnerEthAddress = strings.ToLower(ea)
+	} else {
+		ndi.OwnerScwEthAddress = strings.ToLower(ea)
+		ndi.OwnerEthAddress = strings.ToLower(own.Hex())
+	}
 
 	// convert unixtime (big int) to string
 	//timestamp := time.Unix(exp.Int64(), 0)

@@ -782,6 +782,23 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 
 	var chainID int64 = int64(aa.aaConfig.ChainID)
 
+	// 0 - use SCW?
+	nameOwnerEthAddress := in.OwnerEthAddress
+
+	if in.RegisterToSmartContractWallet {
+		// get SCW of the in.OwnerEthAddress
+		addr, err := aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
+		if err != nil {
+			log.Error("failed to get smart wallet address", zap.Error(err))
+			return "", err
+		}
+		nameOwnerEthAddress = addr.String()
+		log.Info("RegisterToSmartContractWallet was true. Using SCW to register name",
+			zap.String("OwnerEthAddress", in.OwnerEthAddress),
+			zap.String("SCW", nameOwnerEthAddress),
+		)
+	}
+
 	// TODO: optimize, cache it or move to settings
 	// 1 - determine admin's SCW
 	adminScw, err := aa.GetSmartWalletAddress(ctx, adminAddress)
@@ -802,13 +819,13 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 	spaceID := ""
 	isReverseRecordUpdate := true
 
-	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, spaceID, isReverseRecordUpdate)
+	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, nameOwnerEthAddress, spaceID, isReverseRecordUpdate)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err
 	}
 
-	log.Info("prepared call data", zap.String("callData", hex.EncodeToString(callData)))
+	log.Debug("prepared call data", zap.String("callData", hex.EncodeToString(callData)))
 	id := aa.getNextAlchemyRequestID()
 
 	// only specify factoryAddr if you need to instanitate a new SCW
@@ -834,7 +851,7 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 		return "", err
 	}
 
-	log.Info("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
+	log.Debug("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
 
 	// 5 - send it
 	response, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATAPre)

@@ -61,6 +61,8 @@ github.com/anyproto/alchemy-aa-sdk v0.0.1 h1:IFsokM/ZHge/p4cbvh+7JFEDJxsObf0augy
 github.com/anyproto/alchemy-aa-sdk v0.0.1/go.mod h1:jDbif5vOi9jSlavoSLs9ssIutETHWP/YMY2I/Lh52Q4=
 github.com/anyproto/any-sync v0.3.21-0.20240219141748-b93dd3091322 h1:S44jvWI0JqSeD7f7WCt/ZRMzcZzPOi6/bya5OdBlTTM=
 github.com/anyproto/any-sync v0.3.21-0.20240219141748-b93dd3091322/go.mod h1:ViWsWYe+jDuYip9gdp89RqvTfgHzorGypZSn+Ae0WUU=
+github.com/anyproto/any-sync v0.3.21-0.20240221112948-f544d2d08b40 h1:AQSIqGyKjTTkZJMo/RfxUkNzVXKphzujJUES/SPG8Sk=
+github.com/anyproto/any-sync v0.3.21-0.20240221112948-f544d2d08b40/go.mod h1:ViWsWYe+jDuYip9gdp89RqvTfgHzorGypZSn+Ae0WUU=
 github.com/anyproto/go-chash v0.1.0 h1:I9meTPjXFRfXZHRJzjOHC/XF7Q5vzysKkiT/grsogXY=
 github.com/anyproto/go-chash v0.1.0/go.mod h1:0UjNQi3PDazP0fINpFYu6VKhuna+W/V+1vpXHAfNgLY=
 github.com/anyproto/go-slip10 v1.0.0 h1:uAEtSuudR3jJBOfkOXf3bErxVoxbuKwdoJN55M1i6IA=
