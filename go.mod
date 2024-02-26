@@ -8,7 +8,7 @@ require (
 	github.com/anyproto/any-sync v0.3.26-0.20240226151744-fad2e59f37d6
 	github.com/cheggaaa/mb/v3 v3.0.2
 	github.com/cockroachdb/errors v1.11.1
-	github.com/ethereum/go-ethereum v1.13.12
+	github.com/ethereum/go-ethereum v1.13.13
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/stretchr/testify v1.8.4
