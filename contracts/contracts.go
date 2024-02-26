@@ -559,7 +559,8 @@ func (acontracts *anynsContracts) TxByHash(ctx context.Context, client *ethclien
 func (acontracts *anynsContracts) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string, isReverseRecordUpdate bool, registerPeriodMonths uint32) ([32]byte, error) {
 	var adminAddr common.Address = common.HexToAddress(acontracts.config.AddrAdmin)
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
-	var regTime big.Int = *big.NewInt(int64(registerPeriodMonths * 30 * 24 * 60 * 60))
+
+	var regTime = PeriodMonthsToTimestamp(registerPeriodMonths)
 
 	callData, err := PrepareCallData_SetContentHashSpaceID(fullName, ownerAnyAddr, spaceId)
 	if err != nil {
@@ -610,7 +611,8 @@ func (acontracts *anynsContracts) Commit(ctx context.Context, conn *ethclient.Cl
 
 func (acontracts *anynsContracts) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *ac.AnytypeRegistrarControllerPrivate, fullName string, ownerAnyAddr string, spaceId string, isReverseRecord bool, registerPeriodMonths uint32) (*types.Transaction, error) {
 	var resolverAddr common.Address = common.HexToAddress(acontracts.config.AddrResolver)
-	var regTime big.Int = *big.NewInt(int64(registerPeriodMonths * 30 * 24 * 60 * 60))
+
+	var regTime = PeriodMonthsToTimestamp(registerPeriodMonths)
 
 	callData, err := PrepareCallData_SetContentHashSpaceID(fullName, ownerAnyAddr, spaceId)
 	if err != nil {

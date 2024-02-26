@@ -3,12 +3,30 @@ package contracts
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/sha3"
 )
+
+func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
+	// default value!!!
+	if registerPeriodMonths == 0 {
+		registerPeriodMonths = 12
+	}
+
+	// using time.Time convert number of months to seconds, but not starting from now
+	currentTime := time.Now().UTC()
+	newTime := currentTime.AddDate(0, int(registerPeriodMonths), 0)
+	duration := newTime.Sub(currentTime)
+	totalSeconds := int64(duration.Seconds())
+
+	var regTime big.Int = *big.NewInt(totalSeconds)
+	return regTime
+}
 
 func nameHashPart(prevHash [32]byte, name string) (hash [32]byte, err error) {
 	sha := sha3.NewLegacyKeccak256()

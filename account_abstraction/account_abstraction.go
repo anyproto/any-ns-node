@@ -534,9 +534,8 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	registrantAccount := common.HexToAddress(ownerEthAddress)
 
 	var nameFirstPart string = contracts.RemoveTLD(fullName)
+	var regTime = contracts.PeriodMonthsToTimestamp(registerPeriodMonths)
 
-	// use registerPeriodMonths
-	var regTime big.Int = *big.NewInt(int64(registerPeriodMonths * 30 * 24 * 60 * 60))
 	var ownerControlledFuses uint16 = 0
 
 	// 1 - get new random secret
