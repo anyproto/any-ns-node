@@ -67,7 +67,7 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().CalculateTxParams(gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().ConnectToPrivateController(gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -980,7 +980,7 @@ func TestAAS_GetCallDataForNameRegister(t *testing.T) {
 		spaceID := "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu"
 		isReverseRecordUpdate := true
 
-		_, err := fx.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID, isReverseRecordUpdate)
+		_, err := fx.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID, isReverseRecordUpdate, 100500)
 		assert.NoError(t, err)
 
 		// the result has some randomness in it (secret)

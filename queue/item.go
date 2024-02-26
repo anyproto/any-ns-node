@@ -57,14 +57,15 @@ type QueueItem struct {
 	OwnerEthAddress string        `bson:"ownerEthAddress"`
 	SpaceId         string        `bson:"spaceId"`
 	// aux fields
-	SecretBase64    string          `bson:"secretBase64"`
-	Status          QueueItemStatus `bson:"status"`
-	TxCommitHash    string          `bson:"txCommitHash"`
-	TxCommitNonce   uint64          `bson:"txCommitNonce"`
-	TxRegisterHash  string          `bson:"txRegisterHash"`
-	TxRegisterNonce uint64          `bson:"txRegisterNonce"`
-	DateCreated     int64           `bson:"dateCreated"`
-	DateModified    int64           `bson:"dateModified"`
+	SecretBase64         string          `bson:"secretBase64"`
+	Status               QueueItemStatus `bson:"status"`
+	TxCommitHash         string          `bson:"txCommitHash"`
+	TxCommitNonce        uint64          `bson:"txCommitNonce"`
+	TxRegisterHash       string          `bson:"txRegisterHash"`
+	TxRegisterNonce      uint64          `bson:"txRegisterNonce"`
+	DateCreated          int64           `bson:"dateCreated"`
+	DateModified         int64           `bson:"dateModified"`
+	RegisterPeriodMonths uint32          `bson:"registerPeriodMonths"`
 
 	// for ItemType_NameRenew
 	NameRenewDurationSec uint64 `bson:"nameRenewDurationSec"`
@@ -84,6 +85,8 @@ func queueItemFromNameRegisterRequest(req *nsp.NameRegisterRequest, count int64)
 		FullName:        req.FullName,
 		OwnerAnyAddress: req.OwnerAnyAddress,
 		OwnerEthAddress: req.OwnerEthAddress,
+
+		RegisterPeriodMonths: req.RegisterPeriodMonths,
 
 		// WARNING: current interface doesn't support/have SpaceId
 		SpaceId: "",
@@ -119,6 +122,8 @@ func nameRegisterRequestFromQueueItem(item QueueItem) *nsp.NameRegisterRequest {
 
 		// WARNING: current interface doesn't support/have SpaceId
 		//SpaceId:         item.SpaceId,
+
+		RegisterPeriodMonths: item.RegisterPeriodMonths,
 	}
 	return &req
 }

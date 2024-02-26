@@ -416,17 +416,17 @@ func (aa *anynsAA) GetDataNameRegister(ctx context.Context, in *nsp.NameRegister
 	// reverse resolve ANYID123123 will return xxxx.any
 	isReverseRecordUpdate := true
 
-	return aa.getDataNameRegister(ctx, in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, spaceID, isReverseRecordUpdate)
+	return aa.getDataNameRegister(ctx, in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, spaceID, isReverseRecordUpdate, in.RegisterPeriodMonths)
 }
 
 func (aa *anynsAA) GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (dataOut []byte, contextData []byte, err error) {
 	// Registering for space should not update reverse record for owner
 	isReverseRecordUpdate := false
 
-	return aa.getDataNameRegister(ctx, in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId, isReverseRecordUpdate)
+	return aa.getDataNameRegister(ctx, in.FullName, in.OwnerAnyAddress, in.OwnerEthAddress, in.SpaceId, isReverseRecordUpdate, in.RegisterPeriodMonths)
 }
 
-func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool) (dataOut []byte, contextData []byte, err error) {
+func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool, registerPeriodMonths uint32) (dataOut []byte, contextData []byte, err error) {
 	// settings from config:
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
 	alchemyApiKey := aa.aaConfig.AlchemyApiKey
@@ -464,7 +464,7 @@ func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, own
 	log.Info("got nonce", zap.String("scw", scw.String()), zap.Int64("nonce", nonce.Int64()))
 
 	// 2 - create user operation
-	callData, err := aa.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID, isReverseRecordUpdate)
+	callData, err := aa.getCallDataForNameRegister(fullName, ownerAnyAddress, ownerEthAddress, spaceID, isReverseRecordUpdate, registerPeriodMonths)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return nil, nil, err
@@ -527,14 +527,16 @@ func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, own
 	return jsonData, contextData, nil
 }
 
-func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool) ([]byte, error) {
+func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress string, ownerEthAddress string, spaceID string, isReverseRecordUpdate bool, registerPeriodMonths uint32) ([]byte, error) {
 	registrarControllerPrivate := common.HexToAddress(aa.confContracts.AddrRegistrarPrivateController)
 
 	resolverAddress := common.HexToAddress(aa.confContracts.AddrResolver)
 	registrantAccount := common.HexToAddress(ownerEthAddress)
 
 	var nameFirstPart string = contracts.RemoveTLD(fullName)
-	var REGISTRATION_TIME big.Int = *big.NewInt(365 * 24 * 60 * 60)
+
+	// use registerPeriodMonths
+	var regTime big.Int = *big.NewInt(int64(registerPeriodMonths * 30 * 24 * 60 * 60))
 	var ownerControlledFuses uint16 = 0
 
 	// 1 - get new random secret
@@ -565,7 +567,9 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 		fullName,
 		ownerAnyAddress,
 		spaceID,
-		isReverseRecordUpdate)
+		isReverseRecordUpdate,
+		registerPeriodMonths,
+	)
 
 	if err != nil {
 		log.Error("can not calculate a commitment", zap.Error(err))
@@ -589,7 +593,7 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	callDataOriginal2, err := GetCallDataForRegister(
 		nameFirstPart,
 		registrantAccount,
-		REGISTRATION_TIME,
+		regTime,
 		secret32,
 		resolverAddress,
 		callData,
@@ -794,6 +798,7 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 		}
 		nameOwnerEthAddress = addr.String()
 		log.Info("RegisterToSmartContractWallet was true. Using SCW to register name",
+			zap.String("FullName", in.FullName),
 			zap.String("OwnerEthAddress", in.OwnerEthAddress),
 			zap.String("SCW", nameOwnerEthAddress),
 		)
@@ -819,7 +824,7 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 	spaceID := ""
 	isReverseRecordUpdate := true
 
-	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, nameOwnerEthAddress, spaceID, isReverseRecordUpdate)
+	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, nameOwnerEthAddress, spaceID, isReverseRecordUpdate, in.RegisterPeriodMonths)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err

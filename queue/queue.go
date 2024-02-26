@@ -596,7 +596,9 @@ func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueIt
 		// WARNING: current interface doesn't support/have SpaceId
 		// in.GetSpaceId()
 		"",
-		isReverseRecordUpdate)
+		isReverseRecordUpdate,
+		in.RegisterPeriodMonths,
+	)
 
 	if err != nil {
 		log.Error("can not calculate a commitment", zap.Error(err))
@@ -754,6 +756,7 @@ func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem
 		//in.GetSpaceId(),
 		"",
 		isReverseRecordUpdate,
+		in.RegisterPeriodMonths,
 	)
 
 	// can return ErrNonceTooLow error

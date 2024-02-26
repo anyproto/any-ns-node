@@ -305,18 +305,18 @@ func (mr *MockContractsServiceMockRecorder) IsContractDeployed(ctx, client, addr
 }
 
 // MakeCommitment mocks base method.
-func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecordUpdate bool) ([32]byte, error) {
+func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecordUpdate bool, registerPeriodMonths uint32) ([32]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MakeCommitment", nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate)
+	ret := m.ctrl.Call(m, "MakeCommitment", nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate, registerPeriodMonths)
 	ret0, _ := ret[0].([32]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // MakeCommitment indicates an expected call of MakeCommitment.
-func (mr *MockContractsServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate, registerPeriodMonths any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate, registerPeriodMonths)
 }
 
 // Name mocks base method.
@@ -334,18 +334,18 @@ func (mr *MockContractsServiceMockRecorder) Name() *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockContractsService) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecord bool) (*types.Transaction, error) {
+func (m *MockContractsService) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecord bool, registerPeriodMonths uint32) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Register", ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord)
+	ret := m.ctrl.Call(m, "Register", ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord, registerPeriodMonths)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord, registerPeriodMonths any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord, registerPeriodMonths)
 }
 
 // RenewName mocks base method.
