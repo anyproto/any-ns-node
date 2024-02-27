@@ -12,11 +12,11 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/stretchr/testify v1.8.4
+	github.com/wealdtech/go-ens/v3 v3.6.0
 	github.com/zeebo/assert v1.3.1
 	go.mongodb.org/mongo-driver v1.13.1
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/crypto v0.19.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -93,6 +93,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
+	github.com/wealdtech/go-multicodec v1.4.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
@@ -100,6 +101,7 @@ require (
 	github.com/zeebo/errs v1.3.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3 // indirect
 	golang.org/x/mod v0.15.0 // indirect
 	golang.org/x/net v0.21.0 // indirect

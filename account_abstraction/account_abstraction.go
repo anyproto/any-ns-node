@@ -435,6 +435,13 @@ func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, own
 	var chainID int64 = int64(aa.aaConfig.ChainID)
 	var id int = aa.getNextAlchemyRequestID()
 
+	// overwrites fullName
+	fullName, err = contracts.Normalize(fullName)
+	if err != nil {
+		log.Error("failed to normalize name", zap.Error(err))
+		return nil, nil, err
+	}
+
 	// 0 - determine users's SCW
 	addr := common.HexToAddress(ownerEthAddress)
 	scw, err := aa.GetSmartWalletAddress(ctx, addr)
@@ -784,6 +791,13 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 	adminPK := aa.confContracts.AdminPk
 
 	var chainID int64 = int64(aa.aaConfig.ChainID)
+
+	// overwrites in.FullName!
+	in.FullName, err = contracts.Normalize(in.FullName)
+	if err != nil {
+		log.Error("failed to normalize name", zap.Error(err))
+		return "", err
+	}
 
 	// 0 - use SCW?
 	nameOwnerEthAddress := in.OwnerEthAddress

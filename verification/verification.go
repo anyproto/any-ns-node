@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/anyproto/any-ns-node/contracts"
 	"github.com/anyproto/any-sync/app/logger"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"github.com/anyproto/any-sync/util/crypto"
@@ -90,6 +91,15 @@ func CheckName(name string) bool {
 
 	// if it has slashes, then return false
 	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return false
+	}
+
+	// use the same rules as in ENS
+	// if can not normalize -> then we won't be able to calculate ens.NameHash() later
+	// because it uses the same normalization procedure
+	_, err := contracts.Normalize(name)
+	if err != nil {
+		log.Error("failed to normalize name", zap.String("Name", name), zap.Error(err))
 		return false
 	}
 

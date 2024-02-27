@@ -9,7 +9,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/sha3"
+
+	"github.com/wealdtech/go-ens/v3"
 )
 
 func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
@@ -28,38 +29,28 @@ func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
 	return regTime
 }
 
-func nameHashPart(prevHash [32]byte, name string) (hash [32]byte, err error) {
-	sha := sha3.NewLegacyKeccak256()
-	if _, err = sha.Write(prevHash[:]); err != nil {
-		return
-	}
-
-	nameSha := sha3.NewLegacyKeccak256()
-	if _, err = nameSha.Write([]byte(name)); err != nil {
-		return
-	}
-	nameHash := nameSha.Sum(nil)
-	if _, err = sha.Write(nameHash); err != nil {
-		return
-	}
-	sha.Sum(hash[:0])
-	return
+func Normalize(name string) (string, error) {
+	return ens.Normalize(name)
 }
 
 // NameHash generates a hash from a name that can be used to
 // look up the name in ENS
 func NameHash(name string) (hash [32]byte, err error) {
-	if name == "" {
-		return
-	}
+	// redirect to go-ens library
 
-	parts := strings.Split(name, ".")
-	for i := len(parts) - 1; i >= 0; i-- {
-		if hash, err = nameHashPart(hash, parts[i]); err != nil {
-			return
-		}
-	}
-	return
+	// 1. ENSIP1 standard: ens-go v3.6.0 is using it
+	// 2. ENSIP15 standard: that is an another standard for ENS namehashes
+	// that was accepted in June 2023.
+	//
+	// Current AnyNS (as of February 2024) implementation does not support it
+	//
+	// https://eips.ethereum.org/EIPS/eip-137 (ENSIP1) grammar:
+	//
+	// <domain> ::= <label> | <domain> "." <label>
+	// <label> ::= any valid string label per [UTS46](https://unicode.org/reports/tr46/)
+	//
+	// 	btw, this will also normailze name first
+	return ens.NameHash(name)
 }
 
 func RemoveTLD(str string) string {
