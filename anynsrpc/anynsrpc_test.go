@@ -306,3 +306,62 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		assert.Equal(t, resp.Name, "")
 	})
 }
+
+func TestAnynsRpc_GetNameByAnyId(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t, true)
+		defer fx.finish(t)
+
+		fx.cache.EXPECT().GetNameByAnyId(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (*nsp.NameByAddressResponse, error) {
+			return &nsp.NameByAddressResponse{
+				Found: true,
+				Name:  "hello.any",
+			}, nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.GetNameByAnyId(pctx, &nsp.NameByAnyIdRequest{
+			AnyAddress: "A5jC4SXWYEhdFswASPoMYAqWjZb9szm5EGXvS9CMyCE9JCD4",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.True(t, resp.Found)
+		assert.Equal(t, resp.Name, "hello.any")
+	})
+
+	t.Run("fail if DB call failed", func(t *testing.T) {
+		fx := newFixture(t, true)
+		defer fx.finish(t)
+
+		fx.cache.EXPECT().GetNameByAnyId(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (*nsp.NameByAddressResponse, error) {
+			return nil, errors.New("failed to get item from DB")
+		})
+
+		pctx := context.Background()
+		_, err := fx.GetNameByAnyId(pctx, &nsp.NameByAnyIdRequest{
+			AnyAddress: "A5jC4SXWYEhdFswASPoMYAqWjZb9szm5EGXvS9CMyCE9JCD4",
+		})
+
+		require.Error(t, err)
+	})
+
+	t.Run("return false if not in DB", func(t *testing.T) {
+		fx := newFixture(t, true)
+		defer fx.finish(t)
+
+		fx.cache.EXPECT().GetNameByAnyId(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (*nsp.NameByAddressResponse, error) {
+			return &nsp.NameByAddressResponse{Found: false}, nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.GetNameByAnyId(pctx, &nsp.NameByAnyIdRequest{
+			AnyAddress: "A5jC4SXWYEhdFswASPoMYAqWjZb9szm5EGXvS9CMyCE9JCD4",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.False(t, resp.Found)
+		assert.Equal(t, resp.Name, "")
+	})
+}

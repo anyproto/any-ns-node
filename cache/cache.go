@@ -40,6 +40,10 @@ type findNameDataByAddress struct {
 	OwnerScwEthAddress string `bson:"owner_scw_eth_address"`
 }
 
+type findNameDataByAnyAddress struct {
+	OwnerAnyAddress string `bson:"owner_any_address"`
+}
+
 func New() app.Component {
 	return &cacheService{}
 }
@@ -49,6 +53,7 @@ type CacheService interface {
 	// it will look up data in Mongo
 	IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error)
 	GetNameByAddress(ctx context.Context, in *nsp.NameByAddressRequest) (out *nsp.NameByAddressResponse, err error)
+	GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdRequest) (out *nsp.NameByAddressResponse, err error)
 
 	// call it when you need to read REAL data: smart contracts -> cache
 	// will return "not found" if can not find name
@@ -141,6 +146,29 @@ func (cs *cacheService) GetNameByAddress(ctx context.Context, in *nsp.NameByAddr
 	// WARNING: convert to lower!
 	inEthAddr := strings.ToLower(in.OwnerScwEthAddress)
 	err = cs.itemColl.FindOne(ctx, findNameDataByAddress{OwnerScwEthAddress: inEthAddr}).Decode(&item)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return &nsp.NameByAddressResponse{Found: false}, nil
+		}
+
+		log.Error("failed to get item from DB", zap.Error(err))
+		return nil, err
+	}
+
+	// 2 - if found in the cache -> return
+	return &nsp.NameByAddressResponse{
+		Found: true,
+		Name:  item.FullName,
+	}, nil
+}
+
+func (cs *cacheService) GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdRequest) (out *nsp.NameByAddressResponse, err error) {
+	// 1 - lookup in the cache
+	item := &NameDataItem{}
+
+	// WARNING: DO NOT convert to lower!
+	err = cs.itemColl.FindOne(ctx, findNameDataByAnyAddress{OwnerAnyAddress: in.AnyAddress}).Decode(&item)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {

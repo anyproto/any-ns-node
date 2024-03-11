@@ -55,6 +55,21 @@ func (mr *MockCacheServiceMockRecorder) GetNameByAddress(ctx, in any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameByAddress", reflect.TypeOf((*MockCacheService)(nil).GetNameByAddress), ctx, in)
 }
 
+// GetNameByAnyId mocks base method.
+func (m *MockCacheService) GetNameByAnyId(ctx context.Context, in *nameserviceproto.NameByAnyIdRequest) (*nameserviceproto.NameByAddressResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNameByAnyId", ctx, in)
+	ret0, _ := ret[0].(*nameserviceproto.NameByAddressResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNameByAnyId indicates an expected call of GetNameByAnyId.
+func (mr *MockCacheServiceMockRecorder) GetNameByAnyId(ctx, in any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameByAnyId", reflect.TypeOf((*MockCacheService)(nil).GetNameByAnyId), ctx, in)
+}
+
 // Init mocks base method.
 func (m *MockCacheService) Init(a *app.App) error {
 	m.ctrl.T.Helper()

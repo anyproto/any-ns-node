@@ -96,6 +96,13 @@ func (arpc *anynsRpc) GetNameByAddress(ctx context.Context, in *nsp.NameByAddres
 	return arpc.cache.GetNameByAddress(ctx, in)
 }
 
+func (arpc *anynsRpc) GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdRequest) (*nsp.NameByAddressResponse, error) {
+	// this method always reads from cache!
+	// there is no way to directly do reverse resolve using smart contracts
+	// (for now)
+	return arpc.cache.GetNameByAnyId(ctx, in)
+}
+
 func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.NameByAddressRequest) (*nsp.NameByAddressResponse, error) {
 	// 0 - check parameters
 	if !common.IsHexAddress(in.OwnerScwEthAddress) {
