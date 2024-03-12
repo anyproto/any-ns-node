@@ -183,3 +183,70 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 	out.OperationState = nsp.OperationState_Pending
 	return &out, err
 }
+
+// Batch methods
+func (arpc *anynsRpc) BatchIsNameAvailable(ctx context.Context, in *nsp.BatchNameAvailableRequest) (out *nsp.BatchNameAvailableResponse, err error) {
+	// for each string in in.FullNames call IsNameAvailable and collect results into out.NameAvailableResponse[]
+	out = &nsp.BatchNameAvailableResponse{
+		Results: make([]*nsp.NameAvailableResponse, len(in.FullNames)),
+	}
+
+	for i, fullName := range in.FullNames {
+		resp, err := arpc.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
+			FullName: fullName,
+		})
+
+		// do not ignore error here, stop the cycle!
+		if err != nil {
+			log.Error("failed to call IsNameAvailable", zap.Error(err))
+			return nil, err
+		}
+		out.Results[i] = resp
+	}
+
+	return out, nil
+}
+
+func (arpc *anynsRpc) BatchGetNameByAddress(ctx context.Context, in *nsp.BatchNameByAddressRequest) (*nsp.BatchNameByAddressResponse, error) {
+	// for each in.OwnerScwEthAddresses call GetNameByAddress and collect results into out.NameByAddressResponse[]
+	out := &nsp.BatchNameByAddressResponse{
+		Results: make([]*nsp.NameByAddressResponse, len(in.OwnerScwEthAddresses)),
+	}
+
+	for i, addr := range in.OwnerScwEthAddresses {
+		resp, err := arpc.GetNameByAddress(ctx, &nsp.NameByAddressRequest{
+			OwnerScwEthAddress: addr,
+		})
+
+		// do not ignore error here, stop the cycle!
+		if err != nil {
+			log.Error("failed to call GetNameByAddress", zap.Error(err))
+			return nil, err
+		}
+		out.Results[i] = resp
+	}
+
+	return out, nil
+}
+
+func (arpc *anynsRpc) BatchGetNameByAnyId(ctx context.Context, in *nsp.BatchNameByAnyIdRequest) (*nsp.BatchNameByAddressResponse, error) {
+	// for each in.AnyAddresses call GetNameByAnyId and collect results into out.NameByAddressResponse[]
+	out := &nsp.BatchNameByAddressResponse{
+		Results: make([]*nsp.NameByAddressResponse, len(in.AnyAddresses)),
+	}
+
+	for i, addr := range in.AnyAddresses {
+		resp, err := arpc.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{
+			AnyAddress: addr,
+		})
+
+		// do not ignore error here, stop the cycle!
+		if err != nil {
+			log.Error("failed to call GetNameByAnyId", zap.Error(err))
+			return nil, err
+		}
+		out.Results[i] = resp
+	}
+
+	return out, nil
+}

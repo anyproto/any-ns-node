@@ -5,7 +5,7 @@ go 1.21.3
 require (
 	github.com/ahmetb/govvv v0.3.0
 	github.com/anyproto/alchemy-aa-sdk v0.0.1
-	github.com/anyproto/any-sync v0.3.33-0.20240311170323-ef9e10749616
+	github.com/anyproto/any-sync v0.3.33-0.20240312143044-b387be4bd19d
 	github.com/cheggaaa/mb/v3 v3.0.2
 	github.com/cockroachdb/errors v1.11.1
 	github.com/ethereum/go-ethereum v1.13.12

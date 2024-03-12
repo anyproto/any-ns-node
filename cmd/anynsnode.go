@@ -59,7 +59,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run nsp client")
-	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-fund-user, is-name-available, name-by-address, get-operation]")
+	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-fund-user, is-name-available, name-by-address, get-operation, batch-is-name-available]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -146,6 +146,12 @@ func runAsClient(a *app.App, ctx context.Context) {
 		adminNameRegister(ctx, a, client)
 	case "is-name-available":
 		clientIsNameAvailable(ctx, client)
+	case "batch-is-name-available":
+		clientBatchIsNameAvailable(ctx, client)
+	// TODO:
+	//case "batch-name-by-address":
+	//case "name-by-any-id":
+	//case "batch-name-by-any-id":
 	case "name-by-address":
 		clientNameByAddress(ctx, client)
 	// hidden command
@@ -176,6 +182,22 @@ func clientIsNameAvailable(ctx context.Context, client nsclient.AnyNsClientServi
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.IsNameAvailable(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientBatchIsNameAvailable(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.BatchNameAvailableRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.BatchIsNameAvailable(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}
