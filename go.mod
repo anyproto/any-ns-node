@@ -11,7 +11,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.12
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/wealdtech/go-ens/v3 v3.6.0
 	github.com/zeebo/assert v1.3.1
 	go.mongodb.org/mongo-driver v1.13.1
