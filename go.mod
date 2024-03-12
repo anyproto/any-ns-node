@@ -14,7 +14,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/wealdtech/go-ens/v3 v3.6.0
 	github.com/zeebo/assert v1.3.1
-	go.mongodb.org/mongo-driver v1.13.1
+	go.mongodb.org/mongo-driver v1.14.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
