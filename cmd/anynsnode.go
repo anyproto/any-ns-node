@@ -59,7 +59,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run nsp client")
-	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-fund-user, is-name-available, name-by-address, get-operation, batch-is-name-available]")
+	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-fund-user, is-name-available, name-by-address, get-operation, batch-is-name-available, batch-name-by-anyid, name-by-anyid]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -150,10 +150,12 @@ func runAsClient(a *app.App, ctx context.Context) {
 		clientBatchIsNameAvailable(ctx, client)
 	// TODO:
 	//case "batch-name-by-address":
-	//case "name-by-any-id":
-	//case "batch-name-by-any-id":
+	case "batch-name-by-any-id":
+		clientBatchGetNameByAnyId(ctx, client)
 	case "name-by-address":
 		clientNameByAddress(ctx, client)
+	case "name-by-anyid":
+		clientNameByAnyid(ctx, client)
 	// hidden command
 	case "benchmark":
 		clientBenchmark(ctx, client)
@@ -198,6 +200,22 @@ func clientBatchIsNameAvailable(ctx context.Context, client nsclient.AnyNsClient
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.BatchIsNameAvailable(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientBatchGetNameByAnyId(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.BatchNameByAnyIdRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.BatchGetNameByAnyId(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}
@@ -288,6 +306,22 @@ func clientNameByAddress(ctx context.Context, client nsclient.AnyNsClientService
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.GetNameByAddress(ctx, req)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func clientNameByAnyid(ctx context.Context, client nsclient.AnyNsClientService) {
+	var req = &nsp.NameByAnyIdRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.GetNameByAnyId(ctx, req)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}

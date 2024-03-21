@@ -198,20 +198,21 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	out.OperationId = fmt.Sprint(in.OperationId)
 	out.OperationState = status.OperationState
 
-	// 2 - update cache (only once operation was completed and cache is empty)
+	// 2 - update cache (only once operation is completed)
 	if cacheOperationFound && (status.OperationState == nsp.OperationState_Completed) {
-		// is cache empty?
-		_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
-			FullName: op.FullName,
-		})
+		/*
+			// is cache empty?
+			_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
+				FullName: op.FullName,
+			})
 
-		if err == nil {
-			log.Debug("name is already in cache", zap.String("FullName", op.FullName))
-			return &out, nil
-		}
+			if err == nil {
+				log.Debug("name is already in cache", zap.String("FullName", op.FullName))
+				return &out, nil
+			}
+		*/
 
-		// yes, the cache is empty...
-		log.Debug("operation completed, updating cache", zap.String("FullName", op.FullName))
+		log.Info("operation completed, updating cache", zap.String("FullName", op.FullName))
 		err = arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
 			FullName: op.FullName,
 		})

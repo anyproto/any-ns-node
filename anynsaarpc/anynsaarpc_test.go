@@ -327,10 +327,14 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 			}, nil
 		})
 
-		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
-			// name already in cache!
-			return &nsp.NameAvailableResponse{}, nil
-		})
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).MinTimes(1)
+
+		/*
+			fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+				// name already in cache!
+				return &nsp.NameAvailableResponse{}, nil
+			})
+		*/
 
 		// create operation in Mongo first
 		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
@@ -369,11 +373,13 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 
 		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).MinTimes(1)
 
-		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
-			// name is not in cache!
-			// should call UpdateCache
-			return nil, errors.New("not found")
-		})
+		/*
+			fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+				// name is not in cache!
+				// should call UpdateCache
+				return nil, errors.New("not found")
+			})
+		*/
 
 		// create operation in Mongo first
 		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
@@ -414,11 +420,13 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 			return errors.New("failed to update in cache")
 		})
 
-		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
-			// name is not in cache!
-			// should call UpdateCache
-			return nil, errors.New("not found")
-		})
+		/*
+			fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+				// name is not in cache!
+				// should call UpdateCache
+				return nil, errors.New("not found")
+			})
+		*/
 
 		// create operation in Mongo first
 		err := fx.mongoSaveOperation(ctx, "123", nsp.CreateUserOperationRequest{
