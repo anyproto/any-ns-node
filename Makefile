@@ -51,8 +51,11 @@ nonce_manager/mock/nonce_manager_mock.go: nonce_manager/nonce_manager.go
 queue/mock/queue_mock.go: queue/queue.go
 	mockgen -source=queue/queue.go > queue/mock/queue_mock.go
 
+db/mock/db_mock.go: db/db.go
+	mockgen -source=db/db.go > db/mock/db_mock.go
+
 .PHONY: mocks
-mocks: contracts/mock/contracts_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go cache/mock/cache_mock.go nonce_manager/mock/nonce_manager_mock.go queue/mock/queue_mock.go
+mocks: contracts/mock/contracts_mock.go account_abstraction/mock/account_abstraction_mock.go alchemysdk/mock/alchemysdk_mock.go cache/mock/cache_mock.go nonce_manager/mock/nonce_manager_mock.go queue/mock/queue_mock.go db/mock/db_mock.go
 
 .PHONY: test
 test: mocks

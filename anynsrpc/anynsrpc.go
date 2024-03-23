@@ -3,7 +3,6 @@ package anynsrpc
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
@@ -20,6 +19,7 @@ import (
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	contracts "github.com/anyproto/any-ns-node/contracts"
+	dbservice "github.com/anyproto/any-ns-node/db"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
@@ -38,6 +38,7 @@ type anynsRpc struct {
 	contracts     contracts.ContractsService
 	queue         queue.QueueService
 	aa            accountabstraction.AccountAbstractionService
+	db            dbservice.DbService
 
 	readFromCache bool
 }
@@ -50,6 +51,7 @@ func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.readFromCache = a.MustComponent(config.CName).(*config.Config).ReadFromCache
 	arpc.queue = a.MustComponent(queue.CName).(queue.QueueService)
 	arpc.aa = a.MustComponent(accountabstraction.CName).(accountabstraction.AccountAbstractionService)
+	arpc.db = a.MustComponent(dbservice.CName).(dbservice.DbService)
 
 	return nsp.DRPCRegisterAnyns(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
@@ -175,12 +177,32 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 		return &resp, err
 	*/
 
-	// new version - use AA to process it
+	// 4 - new version - use AA to process it
 	opID, err := arpc.aa.AdminNameRegister(ctx, &nrr)
+	if err != nil {
+		log.Error("failed to process AdminNameRegister", zap.Error(err))
+		return nil, err
+	}
+
+	// 5 - save operation to mongo (can be used later)
+	cuor := nsp.CreateUserOperationRequest{
+		//Data: [],
+		//SignedData: [],
+		//Context: [],
+		OwnerAnyID:      nrr.OwnerAnyAddress,
+		FullName:        nrr.FullName,
+		OwnerEthAddress: nrr.OwnerEthAddress,
+	}
+	err = arpc.db.SaveOperation(ctx, opID, cuor)
+	if err != nil {
+		log.Error("failed to save operation to Mongo", zap.Error(err))
+		return nil, errors.New("failed to save operation")
+	}
 
 	var out nsp.OperationResponse
-	out.OperationId = fmt.Sprint(opID)
+	out.OperationId = opID
 	out.OperationState = nsp.OperationState_Pending
+
 	return &out, err
 }
 

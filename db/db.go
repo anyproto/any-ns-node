@@ -1,10 +1,13 @@
-package anynsaarpc
+package mongo
 
 import (
 	"context"
 	"errors"
 	"strings"
 
+	"github.com/anyproto/any-ns-node/config"
+	"github.com/anyproto/any-sync/app"
+	"github.com/anyproto/any-sync/app/logger"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 	"github.com/ethereum/go-ethereum/common"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -12,7 +15,104 @@ import (
 	"go.uber.org/zap"
 )
 
-func (arpc *anynsAARpc) mongoAddUserToTheWhitelist(ctx context.Context, owner common.Address, ownerAnyID string, newOperations uint64) (err error) {
+const CName = "any-ns.db"
+
+var log = logger.NewNamed(CName)
+
+// TODO: index it
+type AAUser struct {
+	Address         string `bson:"address"`
+	AnyID           string `bson:"any_id"`
+	OperationsCount uint64 `bson:"operations"`
+}
+
+type findAAUserByAddress struct {
+	Address string `bson:"address"`
+}
+
+// see nameserviceprotoюCreateUserOperationRequest
+type AAUserOperation struct {
+	OperationID string `bson:"operation_id"`
+
+	Data       []byte `bson:"data"`
+	SignedData []byte `bson:"signed_data"`
+	Context    []byte `bson:"context"`
+
+	OwnerEthAddress string `bson:"owner_eth_address"`
+	OwnerAnyID      string `bson:"owner_any_id"`
+	FullName        string `bson:"full_name"`
+}
+
+type findUserOperationByID struct {
+	OperationID string `bson:"operation_id"`
+}
+
+func New() app.Component {
+	return &anynsDb{}
+}
+
+type DbService interface {
+	AddUserToTheWhitelist(ctx context.Context, owner common.Address, ownerAnyID string, newOperations uint64) (err error)
+
+	GetUserOperationsCount(ctx context.Context, owner common.Address, ownerAnyID string) (operations uint64, err error)
+	DecreaseUserOperationsCount(ctx context.Context, owner common.Address) (err error)
+
+	SaveOperation(ctx context.Context, opID string, cuor nsp.CreateUserOperationRequest) error
+	GetOperation(ctx context.Context, opID string) (op AAUserOperation, err error)
+
+	app.Component
+}
+
+type anynsDb struct {
+	confMongo config.Mongo
+
+	usersColl *mongo.Collection
+	opColl    *mongo.Collection
+}
+
+func (arpc *anynsDb) Name() (name string) {
+	return CName
+}
+
+func (arpc *anynsDb) Init(a *app.App) (err error) {
+	arpc.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
+
+	// connect to mongo
+	uri := arpc.confMongo.Connect
+	dbName := arpc.confMongo.Database
+
+	// 1 - connect to DB
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+	if err != nil {
+		return err
+	}
+
+	arpc.usersColl = client.Database(dbName).Collection("aa-users")
+	if arpc.usersColl == nil {
+		return errors.New("failed to connect to MongoDB")
+	}
+	arpc.opColl = client.Database(dbName).Collection("aa-operations")
+	if arpc.opColl == nil {
+		return errors.New("failed to connect to MongoDB")
+	}
+
+	log.Info("mongo connected!")
+	return nil
+}
+
+func (arpc *anynsDb) Close(ctx context.Context) (err error) {
+	if arpc.usersColl != nil {
+		err = arpc.usersColl.Database().Client().Disconnect(ctx)
+		arpc.usersColl = nil
+	}
+	if arpc.opColl != nil {
+		err = arpc.opColl.Database().Client().Disconnect(ctx)
+		arpc.opColl = nil
+	}
+	return
+}
+
+func (arpc *anynsDb) AddUserToTheWhitelist(ctx context.Context, owner common.Address, ownerAnyID string, newOperations uint64) (err error) {
 	// TODO: rewrite atomically
 
 	// 1 - verify parameters
@@ -69,7 +169,7 @@ func (arpc *anynsAARpc) mongoAddUserToTheWhitelist(ctx context.Context, owner co
 
 // will check if ownerAnyID matches AnyID in the DB (was set by Admin before)
 // if ownerAnyID is empty -> do not check it
-func (arpc *anynsAARpc) mongoGetUserOperationsCount(ctx context.Context, owner common.Address, ownerAnyID string) (operations uint64, err error) {
+func (arpc *anynsDb) GetUserOperationsCount(ctx context.Context, owner common.Address, ownerAnyID string) (operations uint64, err error) {
 	item := &AAUser{}
 	err = arpc.usersColl.FindOne(ctx, findAAUserByAddress{Address: owner.Hex()}).Decode(&item)
 
@@ -88,7 +188,7 @@ func (arpc *anynsAARpc) mongoGetUserOperationsCount(ctx context.Context, owner c
 	return item.OperationsCount, nil
 }
 
-func (arpc *anynsAARpc) mongoDecreaseUserOperationsCount(ctx context.Context, owner common.Address) (err error) {
+func (arpc *anynsDb) DecreaseUserOperationsCount(ctx context.Context, owner common.Address) (err error) {
 	// TODO: rewrite atomically
 
 	// 1 - get item from mongo
@@ -121,9 +221,9 @@ func (arpc *anynsAARpc) mongoDecreaseUserOperationsCount(ctx context.Context, ow
 	return nil
 }
 
-func (arpc *anynsAARpc) mongoSaveOperation(ctx context.Context, opID string, cuor nsp.CreateUserOperationRequest) error {
+func (arpc *anynsDb) SaveOperation(ctx context.Context, opID string, cuor nsp.CreateUserOperationRequest) error {
 	// 1 - check if operation with this ID already exists
-	_, err := arpc.mongoGetOperation(ctx, opID)
+	_, err := arpc.GetOperation(ctx, opID)
 	if err == nil {
 		log.Error("operation with this ID already exists", zap.String("opID", opID))
 		return errors.New("operation with this ID already exists")
@@ -151,11 +251,11 @@ func (arpc *anynsAARpc) mongoSaveOperation(ctx context.Context, opID string, cuo
 	return nil
 }
 
-func (arpc *anynsAARpc) mongoGetOperation(ctx context.Context, opID string) (op AAUserOperation, err error) {
+func (arpc *anynsDb) GetOperation(ctx context.Context, opID string) (op AAUserOperation, err error) {
 	err = arpc.opColl.FindOne(ctx, findUserOperationByID{OperationID: opID}).Decode(&op)
 
 	if err != nil {
-		log.Error("failed to get operation from DB", zap.String("opID", opID), zap.Error(err))
+		log.Debug("failed to get operation from DB", zap.String("opID", opID), zap.Error(err))
 		return AAUserOperation{}, err
 	}
 

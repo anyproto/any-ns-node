@@ -13,6 +13,7 @@ import (
 	"github.com/anyproto/any-ns-node/anynsaarpc"
 	"github.com/anyproto/any-ns-node/anynsrpc"
 	"github.com/anyproto/any-ns-node/cache"
+	mongo "github.com/anyproto/any-ns-node/db"
 	"github.com/anyproto/any-ns-node/nonce_manager"
 	"github.com/anyproto/any-ns-node/queue"
 
@@ -438,5 +439,6 @@ func BootstrapServer(a *app.App) {
 		Register(anynsrpc.New()).
 		Register(anynsaarpc.New()).
 		Register(queue.New()).
+		Register(mongo.New()).
 		Register(nonce_manager.New())
 }

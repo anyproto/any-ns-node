@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
+	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
 	"go.uber.org/mock/gomock"
@@ -17,6 +19,8 @@ import (
 	"github.com/anyproto/any-ns-node/config"
 	contracts "github.com/anyproto/any-ns-node/contracts"
 	mock_contracts "github.com/anyproto/any-ns-node/contracts/mock"
+	db_service "github.com/anyproto/any-ns-node/db"
+	mock_db "github.com/anyproto/any-ns-node/db/mock"
 	"github.com/anyproto/any-ns-node/queue"
 	mock_queue "github.com/anyproto/any-ns-node/queue/mock"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
@@ -36,6 +40,7 @@ type fixture struct {
 	cache     *mock_cache.MockCacheService
 	queue     *mock_queue.MockQueueService
 	aa        *mock_accountabstraction.MockAccountAbstractionService
+	db        *mock_db.MockDbService
 
 	*anynsRpc
 }
@@ -68,9 +73,20 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 	fx.aa.EXPECT().Name().Return(accountabstraction.CName).AnyTimes()
 	fx.aa.EXPECT().Init(gomock.Any()).AnyTimes()
 
+	fx.db = mock_db.NewMockDbService(fx.ctrl)
+	fx.db.EXPECT().Name().Return(db_service.CName).AnyTimes()
+	fx.db.EXPECT().Init(gomock.Any()).AnyTimes()
+
 	// read only from cache (mongo)
 	// by default should be true
 	fx.config.ReadFromCache = readFromCache
+
+	adminSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+
+	fx.config.Account = accountservice.Config{
+		SigningKey: adminSignKey,
+		PeerKey:    "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+	}
 
 	fx.a.Register(fx.ts).
 		// this generates new random account every Init
@@ -80,6 +96,7 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 		Register(fx.cache).
 		Register(fx.queue).
 		Register(fx.aa).
+		Register(fx.db).
 		Register(fx.anynsRpc)
 
 	require.NoError(t, fx.a.Start(ctx))
@@ -363,5 +380,53 @@ func TestAnynsRpc_GetNameByAnyId(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.False(t, resp.Found)
 		assert.Equal(t, resp.Name, "")
+	})
+}
+
+func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		fx := newFixture(t, true)
+		defer fx.finish(t)
+
+		pctx := context.Background()
+
+		fx.aa.EXPECT().AdminNameRegister(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (string, error) {
+			return "operation-id", nil
+		}).MinTimes(1)
+
+		fx.db.EXPECT().SaveOperation(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, operationID string, operation nsp.CreateUserOperationRequest) error {
+			return nil
+		}).MinTimes(1)
+
+		// OwnerAnyID
+		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		//PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+		realSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+
+		decodedPeerKey, err := crypto.DecodeKeyFromString(
+			realSignKey,
+			crypto.UnmarshalEd25519PrivateKey,
+			nil)
+		assert.NoError(t, err)
+
+		// OwnerAnyID in string format
+		req := nsp.NameRegisterRequest{}
+		req.OwnerAnyAddress = AnytypeID
+		req.FullName = "hello.any"
+		req.OwnerEthAddress = "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"
+
+		nrrs := nsp.NameRegisterRequestSigned{}
+		nrrs.Payload, err = req.Marshal()
+		require.NoError(t, err)
+
+		nrrs.Signature, err = decodedPeerKey.Sign(nrrs.Payload)
+		assert.NoError(t, err)
+
+		// call it
+		resp, err := fx.AdminNameRegisterSigned(pctx, &nrrs)
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, "operation-id", resp.OperationId)
 	})
 }

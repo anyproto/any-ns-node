@@ -8,6 +8,7 @@ import (
 
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
+	dbservice "github.com/anyproto/any-ns-node/db"
 	"github.com/anyproto/any-ns-node/verification"
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
@@ -16,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
@@ -34,74 +34,22 @@ func New() app.Component {
 
 type anynsAARpc struct {
 	confContracts config.Contracts
-	confMongo     config.Mongo
 	confAccount   accountservice.Config
-
-	usersColl *mongo.Collection
-	opColl    *mongo.Collection
+	db            dbservice.DbService
 
 	contracts contracts.ContractsService
 	aa        accountabstraction.AccountAbstractionService
 	cache     cache.CacheService
 }
 
-// TODO: index it
-type AAUser struct {
-	Address         string `bson:"address"`
-	AnyID           string `bson:"any_id"`
-	OperationsCount uint64 `bson:"operations"`
-}
-
-type findAAUserByAddress struct {
-	Address string `bson:"address"`
-}
-
-// see nameserviceprotoюCreateUserOperationRequest
-type AAUserOperation struct {
-	OperationID string `bson:"operation_id"`
-
-	Data       []byte `bson:"data"`
-	SignedData []byte `bson:"signed_data"`
-	Context    []byte `bson:"context"`
-
-	OwnerEthAddress string `bson:"owner_eth_address"`
-	OwnerAnyID      string `bson:"owner_any_id"`
-	FullName        string `bson:"full_name"`
-}
-
-type findUserOperationByID struct {
-	OperationID string `bson:"operation_id"`
-}
-
 func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
-	arpc.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
+	arpc.db = a.MustComponent(dbservice.CName).(dbservice.DbService)
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
 
 	arpc.aa = a.MustComponent(accountabstraction.CName).(accountabstraction.AccountAbstractionService)
 	arpc.cache = a.MustComponent(cache.CName).(cache.CacheService)
-
-	// connect to mongo
-	uri := arpc.confMongo.Connect
-	dbName := arpc.confMongo.Database
-
-	// 1 - connect to DB
-	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
-	if err != nil {
-		return err
-	}
-
-	arpc.usersColl = client.Database(dbName).Collection("aa-users")
-	if arpc.usersColl == nil {
-		return errors.New("failed to connect to MongoDB")
-	}
-	arpc.opColl = client.Database(dbName).Collection("aa-operations")
-	if arpc.opColl == nil {
-		return errors.New("failed to connect to MongoDB")
-	}
-
-	log.Info("mongo connected!")
 
 	return nsp.DRPCRegisterAnynsAccountAbstraction(a.MustComponent(server.CName).(server.DRPCServer), arpc)
 }
@@ -109,15 +57,7 @@ func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 // TODO: check if it is even called, this is not a app.ComponentRunnable instance
 // so maybe it won't be called
 func (arpc *anynsAARpc) Close(ctx context.Context) (err error) {
-	if arpc.usersColl != nil {
-		err = arpc.usersColl.Database().Client().Disconnect(ctx)
-		arpc.usersColl = nil
-	}
-	if arpc.opColl != nil {
-		err = arpc.opColl.Database().Client().Disconnect(ctx)
-		arpc.opColl = nil
-	}
-	return
+	return nil
 }
 
 func (arpc *anynsAARpc) Name() (name string) {
@@ -158,7 +98,7 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccou
 		return nil, errors.New("failed to get names count left")
 	}
 
-	res.OperationsCountLeft, err = arpc.mongoGetUserOperationsCount(
+	res.OperationsCountLeft, err = arpc.db.GetUserOperationsCount(
 		ctx,
 		common.HexToAddress(in.OwnerEthAddress),
 		// becuase AnyID is empty -> it will not check it
@@ -179,11 +119,11 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 
 	// 0 - get operation from Mongo first (we will need it later to update cache)
 	// some operation has not been saved to Mongo (like AdminFundUserAccount)
-	op, err := arpc.mongoGetOperation(ctx, in.OperationId)
-	cacheOperationFound := (err != mongo.ErrNoDocuments)
+	op, err := arpc.db.GetOperation(ctx, in.OperationId)
+	operationFound := (err != mongo.ErrNoDocuments)
 
 	// trigger error only in case Mongo returns something bad (not found is ok)
-	if err != nil && cacheOperationFound {
+	if err != nil && operationFound {
 		log.Error("failed to get operation from Mongo", zap.Error(err))
 		return nil, errors.New("failed to get cache")
 	}
@@ -199,19 +139,17 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	out.OperationState = status.OperationState
 
 	// 2 - update cache (only once operation is completed)
-	if cacheOperationFound && (status.OperationState == nsp.OperationState_Completed) {
-		/*
-			// is cache empty?
-			_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
-				FullName: op.FullName,
-			})
+	if operationFound && status.OperationState == nsp.OperationState_Completed {
+		// 2.1 - is info already is in the cache?
+		_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
+			FullName: op.FullName,
+		})
+		if err == nil {
+			log.Info("name is already in cache", zap.String("FullName", op.FullName))
+			return &out, nil
+		}
 
-			if err == nil {
-				log.Debug("name is already in cache", zap.String("FullName", op.FullName))
-				return &out, nil
-			}
-		*/
-
+		// 2.2 - if not -> read from smart contracts
 		log.Info("operation completed, updating cache", zap.String("FullName", op.FullName))
 		err = arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
 			FullName: op.FullName,
@@ -261,7 +199,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 
 	/*
 		// 5 - save operation to mongo
-		err = arpc.mongoSaveOperation(ctx, opID, cuor)
+		err = arpc.db.SaveOperation(ctx, opID, cuor)
 		if err != nil {
 			log.Error("failed to save operation to Mongo", zap.Error(err))
 			return nil, err
@@ -307,7 +245,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 	}
 
 	var out nsp.OperationResponse
-	err = arpc.mongoAddUserToTheWhitelist(ctx, common.HexToAddress(afgor.OwnerEthAddress), afgor.OwnerAnyID, afgor.OperationsCount)
+	err = arpc.db.AddUserToTheWhitelist(ctx, common.HexToAddress(afgor.OwnerEthAddress), afgor.OwnerAnyID, afgor.OperationsCount)
 	if err != nil {
 		log.Error("failed to add user to the whitelist", zap.Error(err))
 		return nil, errors.New("failed to add user to the whitelist")
@@ -383,7 +321,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 
 	// 3 - check if user has enough operations left
 	// will fail if AnyID was different
-	ops, err := arpc.mongoGetUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress), cuor.OwnerAnyID)
+	ops, err := arpc.db.GetUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress), cuor.OwnerAnyID)
 	if err != nil {
 		log.Error("failed to get operations count", zap.Error(err))
 		return nil, errors.New("failed to get operations count")
@@ -403,14 +341,14 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 	}
 
 	// 5 - decrease operations count for that user
-	err = arpc.mongoDecreaseUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress))
+	err = arpc.db.DecreaseUserOperationsCount(ctx, common.HexToAddress(cuor.OwnerEthAddress))
 	if err != nil {
 		log.Error("failed to decrease operations count", zap.Error(err))
 		return nil, errors.New("failed to decrease operations count")
 	}
 
 	// 6 - save operation to mongo (can be used later)
-	err = arpc.mongoSaveOperation(ctx, opID, cuor)
+	err = arpc.db.SaveOperation(ctx, opID, cuor)
 	if err != nil {
 		log.Error("failed to save operation to Mongo", zap.Error(err))
 		return nil, errors.New("failed to save operation")
