@@ -141,10 +141,10 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	// 2 - update cache (only once operation is completed)
 	if operationFound && status.OperationState == nsp.OperationState_Completed {
 		// 2.1 - is info already is in the cache?
-		_, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
+		cacheRes, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
 			FullName: op.FullName,
 		})
-		if err == nil {
+		if err == nil && !cacheRes.Available {
 			log.Info("name is already in cache", zap.String("FullName", op.FullName))
 			return &out, nil
 		}
