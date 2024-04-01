@@ -79,6 +79,12 @@ func TestNameHash1_ENSIP1(t *testing.T) {
 	assert.NoError(t, err)
 	hexOut = "0x" + hex.EncodeToString(out[:])
 	assert.Equal(t, "0x67c15275f31d2da214a5d84deec25f4af9848b2fd0631f891a0093f404f225df", hexOut)
+
+	// 8 - spaces
+	out, err = NameHash("hello world")
+	assert.NoError(t, err)
+	hexOut = "0x" + hex.EncodeToString(out[:])
+	assert.Equal(t, "0xad4f933a04969d30ef4d7caa6ff10c8af110b25045454179e01999cc69cc34c8", hexOut)
 }
 
 /*
