@@ -68,12 +68,14 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailable
 		return nil, err
 	}
 
+	in.FullName = fullName
+
 	// 1 - if ReadFromCache is false -> always first read from smart contracts
 	// if not, then always just read quickly from cache
 	if !arpc.readFromCache {
-		log.Debug("EXCPLICIT: read data from smart contracts -> cache", zap.String("FullName", fullName))
+		log.Debug("EXCPLICIT: read data from smart contracts -> cache", zap.String("FullName", in.FullName))
 		err := arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
-			FullName: fullName,
+			FullName: in.FullName,
 		})
 
 		if err != nil {

@@ -87,6 +87,32 @@ func TestNameHash1_ENSIP1(t *testing.T) {
 	assert.Equal(t, "0xad4f933a04969d30ef4d7caa6ff10c8af110b25045454179e01999cc69cc34c8", hexOut)
 }
 
+func TestNormalize(t *testing.T) {
+	// 1
+	out, err := Normalize("")
+	assert.NoError(t, err)
+	assert.Equal(t, "", out)
+
+	// 2
+	out, err = Normalize("Foo.any")
+	assert.NoError(t, err)
+	assert.Equal(t, "foo.any", out)
+
+	// 3
+	out, err = Normalize("❶❷❸❹❺❻❼❽❾❿")
+	assert.NoError(t, err)
+	assert.Equal(t, "❶❷❸❹❺❻❼❽❾❿", out)
+
+	// 4
+	out, err = Normalize("fоо.eth")
+	assert.NoError(t, err)
+	assert.Equal(t, "fоо.eth", out)
+
+	// 5
+	_, err = Normalize("hello world")
+	assert.Error(t, err)
+}
+
 /*
 // This is the new standard for ENS namehashes
 // that was accepted in June 2023

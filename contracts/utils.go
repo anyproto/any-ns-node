@@ -8,10 +8,34 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/net/idna"
 
 	"github.com/wealdtech/go-ens/v3"
 )
+
+var (
+	// p       = idna.New(idna.MapForLookup(), idna.ValidateLabels(false), idna.CheckHyphens(false), idna.StrictDomainName(false), idna.Transitional(false))
+	pStrict = idna.New(idna.MapForLookup(), idna.ValidateLabels(false), idna.CheckHyphens(false), idna.StrictDomainName(true), idna.Transitional(false))
+)
+
+func normalize(input string) (string, error) {
+	// output, err := p.ToUnicode(input)
+
+	// somehow "github.com/wealdtech/go-ens/v3" used non-strict version of idna
+	// let's use pStrict instead of p
+	output, err := pStrict.ToUnicode(input)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to convert to standard unicode")
+	}
+	// If the name started with a period then ToUnicode() removes it, but we want to keep it.
+	if strings.HasPrefix(input, ".") && !strings.HasPrefix(output, ".") {
+		output = "." + output
+	}
+
+	return output, nil
+}
 
 func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
 	// default value!!!
@@ -30,7 +54,9 @@ func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
 }
 
 func Normalize(name string) (string, error) {
-	return ens.Normalize(name)
+	//return ens.Normalize(name)
+
+	return normalize(name)
 }
 
 // NameHash generates a hash from a name that can be used to
