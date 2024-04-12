@@ -89,27 +89,26 @@ func TestNameHash1_ENSIP1(t *testing.T) {
 
 func TestNormalize(t *testing.T) {
 	// 1
-	out, err := Normalize("")
-	assert.NoError(t, err)
-	assert.Equal(t, "", out)
+	_, err := Normalize("")
+	assert.Error(t, err)
 
 	// 2
-	out, err = Normalize("Foo.any")
+	out, err := Normalize("Foo.any")
 	assert.NoError(t, err)
 	assert.Equal(t, "foo.any", out)
 
 	// 3
-	out, err = Normalize("❶❷❸❹❺❻❼❽❾❿")
+	out, err = Normalize("❶❷❸❹❺❻❼❽❾❿.any")
 	assert.NoError(t, err)
-	assert.Equal(t, "❶❷❸❹❺❻❼❽❾❿", out)
+	assert.Equal(t, "❶❷❸❹❺❻❼❽❾❿.any", out)
 
 	// 4
-	out, err = Normalize("fоо.eth")
+	out, err = Normalize("fоо.any")
 	assert.NoError(t, err)
-	assert.Equal(t, "fоо.eth", out)
+	assert.Equal(t, "fоо.any", out)
 
 	// 5
-	_, err = Normalize("hello world")
+	_, err = Normalize("hello world.any")
 	assert.Error(t, err)
 }
 

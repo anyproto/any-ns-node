@@ -61,7 +61,7 @@ func (arpc *anynsRpc) Name() (name string) {
 }
 
 func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (*nsp.NameAvailableResponse, error) {
-	// 0 - normalize name
+	// 0 - normalize name (including .any suffix)
 	fullName, err := contracts.Normalize(in.FullName)
 	if err != nil {
 		log.Error("failed to normalize name", zap.Error(err))
