@@ -46,6 +46,7 @@ type Config struct {
 	Nonce            Nonce                  `yaml:"nonce"`
 	Queue            Queue                  `yaml:"queue"`
 	Limiter          limiter.Config         `yaml:"limiter"`
+	Sentry           Sentry                 `yaml:"sentry"`
 	// use mongo cache to read data from
 	ReadFromCache bool `yaml:"readFromCache"`
 }
@@ -104,4 +105,8 @@ func (c *Config) GetQueue() Queue {
 
 func (c *Config) GetLimiterConf() limiter.Config {
 	return c.Limiter
+}
+
+func (c *Config) GetSentry() Sentry {
+	return c.Sentry
 }

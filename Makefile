@@ -29,8 +29,8 @@ deps:
 
 .PHONY: build
 build:
-	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/any-ns-node/app))
-	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build $(TAGS) -v -o bin/any-ns-node -ldflags "$(FLAGS) -X github.com/anyproto/any-ns-node/app.AppName=any-ns-node" github.com/anyproto/any-ns-node/cmd
+	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/any-sync/app))
+	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build $(TAGS) -v -o bin/any-ns-node -ldflags "$(FLAGS) -X github.com/anyproto/any-sync/app.AppName=any-ns-node" github.com/anyproto/any-ns-node/cmd
 
 contracts/mock/contracts_mock.go: contracts/contracts.go
 	# go install go.uber.org/mock/mockgen@latest

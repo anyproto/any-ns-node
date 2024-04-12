@@ -73,3 +73,6 @@ limiter:
   default:
     rps: 10
     burst: 10
+sentry:
+   dsn: 0
+   environment: staging

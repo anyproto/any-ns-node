@@ -11,6 +11,7 @@ require (
 	github.com/cheggaaa/mb/v3 v3.0.2
 	github.com/cockroachdb/errors v1.11.1
 	github.com/ethereum/go-ethereum v1.13.12
+	github.com/getsentry/sentry-go v0.27.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/pkg/errors v0.9.1
@@ -50,7 +51,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/getsentry/sentry-go v0.18.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect

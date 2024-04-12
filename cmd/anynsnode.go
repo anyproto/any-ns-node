@@ -16,6 +16,7 @@ import (
 	mongo "github.com/anyproto/any-ns-node/db"
 	"github.com/anyproto/any-ns-node/nonce_manager"
 	"github.com/anyproto/any-ns-node/queue"
+	"github.com/getsentry/sentry-go"
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
@@ -95,6 +96,23 @@ func main() {
 		log.Fatal("can't open config file", zap.Error(err))
 	}
 	conf.Log.ApplyGlobal()
+
+	// init Sentry
+	if conf.Sentry.Dsn != "" {
+		err = sentry.Init(sentry.ClientOptions{
+			Dsn:   conf.Sentry.Dsn,
+			Debug: true,
+			// capture 100% of messages
+			TracesSampleRate: 1.0,
+			Release:          app.Version(),
+			Environment:      conf.Sentry.Environment,
+		})
+		if err != nil {
+			log.Fatal("sentry.Init", zap.Error(err))
+		}
+
+		sentry.CaptureMessage("It works!")
+	}
 
 	// bootstrap components
 	a.Register(conf)
