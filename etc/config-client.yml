@@ -24,3 +24,8 @@ network:
 networkStorePath: .
 log:
   production: false
+limiter:
+  default:
+    rps: 10
+    burst: 10
+

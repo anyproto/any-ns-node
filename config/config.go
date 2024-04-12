@@ -6,6 +6,7 @@ import (
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/metric"
 	"github.com/anyproto/any-sync/net/rpc"
+	"github.com/anyproto/any-sync/net/rpc/limiter"
 	"github.com/anyproto/any-sync/net/transport/quic"
 	"github.com/anyproto/any-sync/net/transport/yamux"
 
@@ -44,6 +45,7 @@ type Config struct {
 	Metric           metric.Config          `yaml:"metric"`
 	Nonce            Nonce                  `yaml:"nonce"`
 	Queue            Queue                  `yaml:"queue"`
+	Limiter          limiter.Config         `yaml:"limiter"`
 	// use mongo cache to read data from
 	ReadFromCache bool `yaml:"readFromCache"`
 }
@@ -98,4 +100,8 @@ func (c *Config) GetNonce() Nonce {
 
 func (c *Config) GetQueue() Queue {
 	return c.Queue
+}
+
+func (c *Config) GetLimiterConf() limiter.Config {
+	return c.Limiter
 }

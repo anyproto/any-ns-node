@@ -35,6 +35,7 @@ import (
 
 	"github.com/anyproto/any-sync/net/peerservice"
 	"github.com/anyproto/any-sync/net/pool"
+	"github.com/anyproto/any-sync/net/rpc/limiter"
 	"github.com/anyproto/any-sync/net/rpc/server"
 	"github.com/anyproto/any-sync/net/secureservice"
 	"github.com/anyproto/any-sync/net/transport/quic"
@@ -428,11 +429,10 @@ func BootstrapServer(a *app.App) {
 		Register(nodeconfsource.New()).
 		Register(coordinatorclient.New()).
 		Register(alchemysdk.New()).
+		Register(limiter.New()).
 		Register(cache.New()).
 		Register(pool.New()).
 		Register(peerservice.New()).
-		Register(yamux.New()).
-		Register(quic.New()).
 		Register(secureservice.New()).
 		Register(server.New()).
 		Register(accountabstraction.New()).
@@ -440,5 +440,7 @@ func BootstrapServer(a *app.App) {
 		Register(anynsaarpc.New()).
 		Register(queue.New()).
 		Register(mongo.New()).
-		Register(nonce_manager.New())
+		Register(nonce_manager.New()).
+		Register(yamux.New()).
+		Register(quic.New())
 }

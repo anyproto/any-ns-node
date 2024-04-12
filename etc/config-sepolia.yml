@@ -69,3 +69,7 @@ accountAbstraction:
   alchemyApiKey: xYZ_aBC
   chainID: 11155111
   nameTokensPerName: 10
+limiter:
+  default:
+    rps: 10
+    burst: 10
