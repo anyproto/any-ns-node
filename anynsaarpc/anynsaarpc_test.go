@@ -10,6 +10,7 @@ import (
 
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
+	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
@@ -84,7 +85,7 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 
 	fx.config.Account = accountservice.Config{
 		SigningKey: adminSignKey,
-		PeerKey:    "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+		PeerKey:    "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q==",
 	}
 
 	// drop everything
@@ -202,6 +203,7 @@ func TestAnynsRpc_GetUserAccount(t *testing.T) {
 func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 
 	t.Run("success when asked to add 0 additional name requests", func(t *testing.T) {
+		PeerID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		realSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
 		fx := newFixture(t, realSignKey)
@@ -240,7 +242,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 		in.Signature, err = signKey.Sign(in.Payload)
 		require.NoError(t, err)
 
-		pctx := context.Background()
+		pctx := peer.CtxWithPeerId(context.Background(), PeerID)
 		resp, err := fx.AdminFundUserAccount(pctx, &in)
 
 		// should return "pending" operation

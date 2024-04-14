@@ -147,11 +147,11 @@ func VerifyAnyIdentity(ownerIdStr string, payload []byte, signature []byte) (err
 	return nil
 }
 
-func VerifyAdminIdentity(adminSignKey string, payload []byte, signature []byte) (err error) {
+func VerifyAdminIdentity(adminPeerKey string, adminPeerId string) (err error) {
 	// 1 - load public key of admin
-	// (should be account.signingKey in config)
+	// (should be account.peerKey in config)
 	decodedSignKey, err := crypto.DecodeKeyFromString(
-		adminSignKey,
+		adminPeerKey,
 		crypto.UnmarshalEd25519PrivateKey,
 		nil)
 	if err != nil {
@@ -159,18 +159,13 @@ func VerifyAdminIdentity(adminSignKey string, payload []byte, signature []byte) 
 		return err
 	}
 
-	ownerAnyIdentityStr := decodedSignKey.GetPublic().PeerId()
-	ownerAnyIdentity, err := crypto.DecodePeerId(ownerAnyIdentityStr)
+	ownerPeerId := decodedSignKey.GetPublic().PeerId()
+	if ownerPeerId != adminPeerId {
+		log.Debug("admin identity is different",
+			zap.String("adminPeerId", adminPeerId),
+			zap.String("ownerPeerId", ownerPeerId))
 
-	if err != nil {
-		log.Error("failed to unmarshal public key", zap.Error(err))
-		return err
-	}
-
-	// 2 - verify signature
-	res, err := ownerAnyIdentity.Verify(payload, signature)
-	if err != nil || !res {
-		return errors.New("signature is different")
+		return errors.New("admin identity is different")
 	}
 
 	// success

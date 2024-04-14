@@ -13,6 +13,7 @@ import (
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
+	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/server"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
@@ -168,16 +169,21 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 // we trust user! If he passed wrong AnyID - it is his problem
 // and then Admin just passes those values to current method
 func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminFundUserAccountRequestSigned) (*nsp.OperationResponse, error) {
+	peerId, err := peer.CtxPeerId(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1 - unmarshal the signed request
 	var afuar nsp.AdminFundUserAccountRequest
-	err := proto.Unmarshal(in.Payload, &afuar)
+	err = proto.Unmarshal(in.Payload, &afuar)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundUserAccount", zap.Error(err))
 		return nil, errors.New("can not unmarshal AdminFundUserAccount")
 	}
 
 	// 2 - check signature
-	err = verification.VerifyAdminIdentity(arpc.confAccount.SigningKey, in.Payload, in.Signature)
+	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, errors.New("not an Admin!!!")
@@ -214,16 +220,21 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 }
 
 func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.AdminFundGasOperationsRequestSigned) (*nsp.OperationResponse, error) {
+	peerId, err := peer.CtxPeerId(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1 - unmarshal the signed request
 	var afgor nsp.AdminFundGasOperationsRequest
-	err := proto.Unmarshal(in.Payload, &afgor)
+	err = proto.Unmarshal(in.Payload, &afgor)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundGasOperationsRequest", zap.Error(err))
 		return nil, errors.New("can not unmarshal AdminFundGasOperationsRequest")
 	}
 
 	// 2 - check signature
-	err = verification.VerifyAdminIdentity(arpc.confAccount.SigningKey, in.Payload, in.Signature)
+	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
 	if err != nil {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, errors.New("not an Admin!!!")
