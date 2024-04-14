@@ -81,13 +81,7 @@ func (arpc *anynsAARpc) GetUserAccount(ctx context.Context, in *nsp.GetUserAccou
 	res.OwnerSmartContracWalletAddress = scwa.Hex()
 
 	// 2 - check if SCW is deployed
-	client, err := arpc.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to create eth connection", zap.Error(err))
-		return nil, errors.New("failed to create eth connection")
-	}
-
-	res.OwnerSmartContracWalletDeployed, err = arpc.contracts.IsContractDeployed(ctx, client, scwa)
+	res.OwnerSmartContracWalletDeployed, err = arpc.contracts.IsContractDeployed(ctx, scwa)
 	if err != nil {
 		log.Error("failed to check if contract is deployed", zap.Error(err))
 		return nil, errors.New("failed to get smart wallet")

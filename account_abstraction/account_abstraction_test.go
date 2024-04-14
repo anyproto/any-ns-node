@@ -63,13 +63,13 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
 	fx.contracts.EXPECT().Init(gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-	fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
+	fx.contracts.EXPECT().GenerateAuthOptsForAdmin().MaxTimes(2)
 	fx.contracts.EXPECT().CalculateTxParams(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().ConnectToPrivateController(gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().ConnectToPrivateController().AnyTimes()
+	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().MakeCommitment(gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.alchemy = mock_alchemysdk.NewMockAlchemyAAService(fx.ctrl)
 	fx.alchemy.EXPECT().Name().Return(alchemysdk.CName).AnyTimes()
@@ -169,7 +169,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
+		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, scw interface{}, x interface{}) (*big.Int, error) {
 			return big.NewInt(0), errors.New("failed to get balance")
 		})
 
@@ -183,7 +183,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
+		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, scw interface{}, x interface{}) (*big.Int, error) {
 			return big.NewInt(0), nil
 		})
 
@@ -197,7 +197,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
+		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, scw interface{}, x interface{}) (*big.Int, error) {
 			// 10 tokens per name (current testnet settings)
 			// 6 decimals
 			oneNamePriceWei := big.NewInt(10 * 1000000)
@@ -217,7 +217,7 @@ func TestAAS_GetNamesCountLeft(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, tokenAddress interface{}, scw interface{}, x interface{}) (*big.Int, error) {
+		fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, scw interface{}, x interface{}) (*big.Int, error) {
 			oneNamePriceWei := big.NewInt(10 * 1000000)
 
 			// multiply by 12
@@ -257,7 +257,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, scw interface{}) (bool, error) {
+		fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, scw interface{}) (bool, error) {
 			// deployed!!!
 			return true, nil
 		}).AnyTimes()
@@ -326,7 +326,7 @@ func TestAAS_MintAccessTokens(t *testing.T) {
 			return byteArr, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, scw interface{}) (bool, error) {
+		fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, scw interface{}) (bool, error) {
 			// not deployed!
 			return false, nil
 		}).AnyTimes()

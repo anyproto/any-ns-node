@@ -109,23 +109,16 @@ func (arpc *anynsRpc) GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdReq
 }
 
 func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.NameByAddressRequest) (*nsp.NameByAddressResponse, error) {
-	// 0 - check parameters
+	// 1 - check parameters
 	if !common.IsHexAddress(in.OwnerScwEthAddress) {
 		log.Error("invalid ETH address", zap.String("ETH address", in.OwnerScwEthAddress))
 		return nil, errors.New("invalid ETH address")
 	}
 
-	// 1 - create connection
-	conn, err := arpc.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to connect to geth", zap.Error(err))
-		return nil, errors.New("failed to connect to geth")
-	}
-
 	// convert in.OwnerScwEthAddress to common.Address
 	var addr = common.HexToAddress(in.OwnerScwEthAddress)
 
-	name, err := arpc.contracts.GetNameByAddress(conn, addr)
+	name, err := arpc.contracts.GetNameByAddress(addr)
 	if err != nil {
 		log.Error("failed to get name by address", zap.Error(err))
 		return nil, errors.New("failed to get name by address")

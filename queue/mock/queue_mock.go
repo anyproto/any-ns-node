@@ -5,6 +5,7 @@
 //
 //	mockgen -source=queue/queue.go
 //
+
 // Package mock_queue is a generated GoMock package.
 package mock_queue
 
@@ -15,7 +16,6 @@ import (
 	queue "github.com/anyproto/any-ns-node/queue"
 	app "github.com/anyproto/any-sync/app"
 	nameserviceproto "github.com/anyproto/any-sync/nameservice/nameserviceproto"
-	ethclient "github.com/ethereum/go-ethereum/ethclient"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -139,18 +139,18 @@ func (mr *MockQueueServiceMockRecorder) Name() *gomock.Call {
 }
 
 // NameRegisterMoveStateNext mocks base method.
-func (m *MockQueueService) NameRegisterMoveStateNext(ctx context.Context, queueItem *queue.QueueItem, conn *ethclient.Client) (queue.QueueItemStatus, error) {
+func (m *MockQueueService) NameRegisterMoveStateNext(ctx context.Context, queueItem *queue.QueueItem) (queue.QueueItemStatus, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NameRegisterMoveStateNext", ctx, queueItem, conn)
+	ret := m.ctrl.Call(m, "NameRegisterMoveStateNext", ctx, queueItem)
 	ret0, _ := ret[0].(queue.QueueItemStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NameRegisterMoveStateNext indicates an expected call of NameRegisterMoveStateNext.
-func (mr *MockQueueServiceMockRecorder) NameRegisterMoveStateNext(ctx, queueItem, conn any) *gomock.Call {
+func (mr *MockQueueServiceMockRecorder) NameRegisterMoveStateNext(ctx, queueItem any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegisterMoveStateNext", reflect.TypeOf((*MockQueueService)(nil).NameRegisterMoveStateNext), ctx, queueItem, conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NameRegisterMoveStateNext", reflect.TypeOf((*MockQueueService)(nil).NameRegisterMoveStateNext), ctx, queueItem)
 }
 
 // ProcessItem mocks base method.

@@ -15,6 +15,7 @@ import (
 	reflect "reflect"
 
 	anytype_crypto "github.com/anyproto/any-ns-node/anytype_crypto"
+	contracts "github.com/anyproto/any-ns-node/contracts"
 	app "github.com/anyproto/any-sync/app"
 	ethereum "github.com/ethereum/go-ethereum"
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -79,93 +80,93 @@ func (mr *MockContractsServiceMockRecorder) CallContract(ctx, msg any) *gomock.C
 }
 
 // Commit mocks base method.
-func (m *MockContractsService) Commit(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, commitment [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+func (m *MockContractsService) Commit(ctx context.Context, params *contracts.CommitParams) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commit", ctx, conn, opts, commitment, controller)
+	ret := m.ctrl.Call(m, "Commit", ctx, params)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Commit indicates an expected call of Commit.
-func (mr *MockContractsServiceMockRecorder) Commit(ctx, conn, opts, commitment, controller any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Commit(ctx, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockContractsService)(nil).Commit), ctx, conn, opts, commitment, controller)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockContractsService)(nil).Commit), ctx, params)
 }
 
 // ConnectToNamewrapperContract mocks base method.
-func (m *MockContractsService) ConnectToNamewrapperContract(conn *ethclient.Client) (*anytype_crypto.AnytypeNameWrapper, error) {
+func (m *MockContractsService) ConnectToNamewrapperContract() (*anytype_crypto.AnytypeNameWrapper, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConnectToNamewrapperContract", conn)
+	ret := m.ctrl.Call(m, "ConnectToNamewrapperContract")
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeNameWrapper)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConnectToNamewrapperContract indicates an expected call of ConnectToNamewrapperContract.
-func (mr *MockContractsServiceMockRecorder) ConnectToNamewrapperContract(conn any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToNamewrapperContract() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToNamewrapperContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToNamewrapperContract), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToNamewrapperContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToNamewrapperContract))
 }
 
 // ConnectToPrivateController mocks base method.
-func (m *MockContractsService) ConnectToPrivateController(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarControllerPrivate, error) {
+func (m *MockContractsService) ConnectToPrivateController() (*anytype_crypto.AnytypeRegistrarControllerPrivate, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConnectToPrivateController", conn)
+	ret := m.ctrl.Call(m, "ConnectToPrivateController")
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeRegistrarControllerPrivate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConnectToPrivateController indicates an expected call of ConnectToPrivateController.
-func (mr *MockContractsServiceMockRecorder) ConnectToPrivateController(conn any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToPrivateController() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToPrivateController", reflect.TypeOf((*MockContractsService)(nil).ConnectToPrivateController), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToPrivateController", reflect.TypeOf((*MockContractsService)(nil).ConnectToPrivateController))
 }
 
 // ConnectToRegistrar mocks base method.
-func (m *MockContractsService) ConnectToRegistrar(conn *ethclient.Client) (*anytype_crypto.AnytypeRegistrarImplementation, error) {
+func (m *MockContractsService) ConnectToRegistrar() (*anytype_crypto.AnytypeRegistrarImplementation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConnectToRegistrar", conn)
+	ret := m.ctrl.Call(m, "ConnectToRegistrar")
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeRegistrarImplementation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConnectToRegistrar indicates an expected call of ConnectToRegistrar.
-func (mr *MockContractsServiceMockRecorder) ConnectToRegistrar(conn any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToRegistrar() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistrar", reflect.TypeOf((*MockContractsService)(nil).ConnectToRegistrar), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistrar", reflect.TypeOf((*MockContractsService)(nil).ConnectToRegistrar))
 }
 
 // ConnectToRegistryContract mocks base method.
-func (m *MockContractsService) ConnectToRegistryContract(conn *ethclient.Client) (*anytype_crypto.ENSRegistry, error) {
+func (m *MockContractsService) ConnectToRegistryContract() (*anytype_crypto.ENSRegistry, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConnectToRegistryContract", conn)
+	ret := m.ctrl.Call(m, "ConnectToRegistryContract")
 	ret0, _ := ret[0].(*anytype_crypto.ENSRegistry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConnectToRegistryContract indicates an expected call of ConnectToRegistryContract.
-func (mr *MockContractsServiceMockRecorder) ConnectToRegistryContract(conn any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToRegistryContract() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistryContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToRegistryContract), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToRegistryContract", reflect.TypeOf((*MockContractsService)(nil).ConnectToRegistryContract))
 }
 
 // ConnectToResolver mocks base method.
-func (m *MockContractsService) ConnectToResolver(conn *ethclient.Client) (*anytype_crypto.AnytypeResolver, error) {
+func (m *MockContractsService) ConnectToResolver() (*anytype_crypto.AnytypeResolver, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConnectToResolver", conn)
+	ret := m.ctrl.Call(m, "ConnectToResolver")
 	ret0, _ := ret[0].(*anytype_crypto.AnytypeResolver)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConnectToResolver indicates an expected call of ConnectToResolver.
-func (mr *MockContractsServiceMockRecorder) ConnectToResolver(conn any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) ConnectToResolver() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToResolver", reflect.TypeOf((*MockContractsService)(nil).ConnectToResolver), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectToResolver", reflect.TypeOf((*MockContractsService)(nil).ConnectToResolver))
 }
 
 // CreateEthConnection mocks base method.
@@ -184,24 +185,24 @@ func (mr *MockContractsServiceMockRecorder) CreateEthConnection() *gomock.Call {
 }
 
 // GenerateAuthOptsForAdmin mocks base method.
-func (m *MockContractsService) GenerateAuthOptsForAdmin(conn *ethclient.Client) (*bind.TransactOpts, error) {
+func (m *MockContractsService) GenerateAuthOptsForAdmin() (*bind.TransactOpts, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateAuthOptsForAdmin", conn)
+	ret := m.ctrl.Call(m, "GenerateAuthOptsForAdmin")
 	ret0, _ := ret[0].(*bind.TransactOpts)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateAuthOptsForAdmin indicates an expected call of GenerateAuthOptsForAdmin.
-func (mr *MockContractsServiceMockRecorder) GenerateAuthOptsForAdmin(conn any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GenerateAuthOptsForAdmin() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthOptsForAdmin", reflect.TypeOf((*MockContractsService)(nil).GenerateAuthOptsForAdmin), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthOptsForAdmin", reflect.TypeOf((*MockContractsService)(nil).GenerateAuthOptsForAdmin))
 }
 
 // GetAdditionalNameInfo mocks base method.
-func (m *MockContractsService) GetAdditionalNameInfo(ctx context.Context, conn *ethclient.Client, currentOwner common.Address, fullName string) (string, string, string, *big.Int, error) {
+func (m *MockContractsService) GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string) (string, string, string, *big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", ctx, conn, currentOwner, fullName)
+	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", ctx, currentOwner, fullName)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(string)
@@ -211,69 +212,69 @@ func (m *MockContractsService) GetAdditionalNameInfo(ctx context.Context, conn *
 }
 
 // GetAdditionalNameInfo indicates an expected call of GetAdditionalNameInfo.
-func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(ctx, conn, currentOwner, fullName any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(ctx, currentOwner, fullName any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), ctx, conn, currentOwner, fullName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), ctx, currentOwner, fullName)
 }
 
 // GetBalanceOf mocks base method.
-func (m *MockContractsService) GetBalanceOf(ctx context.Context, client *ethclient.Client, tokenAddress, address common.Address) (*big.Int, error) {
+func (m *MockContractsService) GetBalanceOf(ctx context.Context, tokenAddress, address common.Address) (*big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBalanceOf", ctx, client, tokenAddress, address)
+	ret := m.ctrl.Call(m, "GetBalanceOf", ctx, tokenAddress, address)
 	ret0, _ := ret[0].(*big.Int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBalanceOf indicates an expected call of GetBalanceOf.
-func (mr *MockContractsServiceMockRecorder) GetBalanceOf(ctx, client, tokenAddress, address any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetBalanceOf(ctx, tokenAddress, address any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalanceOf", reflect.TypeOf((*MockContractsService)(nil).GetBalanceOf), ctx, client, tokenAddress, address)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalanceOf", reflect.TypeOf((*MockContractsService)(nil).GetBalanceOf), ctx, tokenAddress, address)
 }
 
 // GetNameByAddress mocks base method.
-func (m *MockContractsService) GetNameByAddress(conn *ethclient.Client, address common.Address) (string, error) {
+func (m *MockContractsService) GetNameByAddress(address common.Address) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNameByAddress", conn, address)
+	ret := m.ctrl.Call(m, "GetNameByAddress", address)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetNameByAddress indicates an expected call of GetNameByAddress.
-func (mr *MockContractsServiceMockRecorder) GetNameByAddress(conn, address any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetNameByAddress(address any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameByAddress", reflect.TypeOf((*MockContractsService)(nil).GetNameByAddress), conn, address)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameByAddress", reflect.TypeOf((*MockContractsService)(nil).GetNameByAddress), address)
 }
 
 // GetOwnerForNamehash mocks base method.
-func (m *MockContractsService) GetOwnerForNamehash(ctx context.Context, client *ethclient.Client, namehash [32]byte) (common.Address, error) {
+func (m *MockContractsService) GetOwnerForNamehash(ctx context.Context, namehash [32]byte) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOwnerForNamehash", ctx, client, namehash)
+	ret := m.ctrl.Call(m, "GetOwnerForNamehash", ctx, namehash)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOwnerForNamehash indicates an expected call of GetOwnerForNamehash.
-func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(ctx, client, namehash any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(ctx, namehash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), ctx, client, namehash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), ctx, namehash)
 }
 
-// GetOwnerOfSmartContractWallet mocks base method.
-func (m *MockContractsService) GetOwnerOfSmartContractWallet(ctx context.Context, client *ethclient.Client, address common.Address) (common.Address, error) {
+// GetScwOwner mocks base method.
+func (m *MockContractsService) GetScwOwner(ctx context.Context, address common.Address) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOwnerOfSmartContractWallet", ctx, client, address)
+	ret := m.ctrl.Call(m, "GetScwOwner", ctx, address)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOwnerOfSmartContractWallet indicates an expected call of GetOwnerOfSmartContractWallet.
-func (mr *MockContractsServiceMockRecorder) GetOwnerOfSmartContractWallet(ctx, client, address any) *gomock.Call {
+// GetScwOwner indicates an expected call of GetScwOwner.
+func (mr *MockContractsServiceMockRecorder) GetScwOwner(ctx, address any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerOfSmartContractWallet", reflect.TypeOf((*MockContractsService)(nil).GetOwnerOfSmartContractWallet), ctx, client, address)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScwOwner", reflect.TypeOf((*MockContractsService)(nil).GetScwOwner), ctx, address)
 }
 
 // Init mocks base method.
@@ -291,33 +292,33 @@ func (mr *MockContractsServiceMockRecorder) Init(a any) *gomock.Call {
 }
 
 // IsContractDeployed mocks base method.
-func (m *MockContractsService) IsContractDeployed(ctx context.Context, client *ethclient.Client, address common.Address) (bool, error) {
+func (m *MockContractsService) IsContractDeployed(ctx context.Context, address common.Address) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsContractDeployed", ctx, client, address)
+	ret := m.ctrl.Call(m, "IsContractDeployed", ctx, address)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsContractDeployed indicates an expected call of IsContractDeployed.
-func (mr *MockContractsServiceMockRecorder) IsContractDeployed(ctx, client, address any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) IsContractDeployed(ctx, address any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsContractDeployed", reflect.TypeOf((*MockContractsService)(nil).IsContractDeployed), ctx, client, address)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsContractDeployed", reflect.TypeOf((*MockContractsService)(nil).IsContractDeployed), ctx, address)
 }
 
 // MakeCommitment mocks base method.
-func (m *MockContractsService) MakeCommitment(nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecordUpdate bool, registerPeriodMonths uint32) ([32]byte, error) {
+func (m *MockContractsService) MakeCommitment(params *contracts.MakeCommitmentParams) ([32]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MakeCommitment", nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate, registerPeriodMonths)
+	ret := m.ctrl.Call(m, "MakeCommitment", params)
 	ret0, _ := ret[0].([32]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // MakeCommitment indicates an expected call of MakeCommitment.
-func (mr *MockContractsServiceMockRecorder) MakeCommitment(nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate, registerPeriodMonths any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) MakeCommitment(params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecordUpdate, registerPeriodMonths)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeCommitment", reflect.TypeOf((*MockContractsService)(nil).MakeCommitment), params)
 }
 
 // Name mocks base method.
@@ -335,75 +336,75 @@ func (mr *MockContractsServiceMockRecorder) Name() *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockContractsService) Register(ctx context.Context, conn *ethclient.Client, authOpts *bind.TransactOpts, nameFirstPart string, registrantAccount common.Address, secret [32]byte, controller *anytype_crypto.AnytypeRegistrarControllerPrivate, fullName, ownerAnyAddr, spaceId string, isReverseRecord bool, registerPeriodMonths uint32) (*types.Transaction, error) {
+func (m *MockContractsService) Register(ctx context.Context, params *contracts.RegisterParams) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Register", ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord, registerPeriodMonths)
+	ret := m.ctrl.Call(m, "Register", ctx, params)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockContractsServiceMockRecorder) Register(ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord, registerPeriodMonths any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) Register(ctx, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, conn, authOpts, nameFirstPart, registrantAccount, secret, controller, fullName, ownerAnyAddr, spaceId, isReverseRecord, registerPeriodMonths)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockContractsService)(nil).Register), ctx, params)
 }
 
-// RenewName mocks base method.
-func (m *MockContractsService) RenewName(ctx context.Context, conn *ethclient.Client, opts *bind.TransactOpts, fullName string, durationSec uint64, controller *anytype_crypto.AnytypeRegistrarControllerPrivate) (*types.Transaction, error) {
+// Renew mocks base method.
+func (m *MockContractsService) Renew(ctx context.Context, params *contracts.RenewParams) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RenewName", ctx, conn, opts, fullName, durationSec, controller)
+	ret := m.ctrl.Call(m, "Renew", ctx, params)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// RenewName indicates an expected call of RenewName.
-func (mr *MockContractsServiceMockRecorder) RenewName(ctx, conn, opts, fullName, durationSec, controller any) *gomock.Call {
+// Renew indicates an expected call of Renew.
+func (mr *MockContractsServiceMockRecorder) Renew(ctx, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenewName", reflect.TypeOf((*MockContractsService)(nil).RenewName), ctx, conn, opts, fullName, durationSec, controller)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Renew", reflect.TypeOf((*MockContractsService)(nil).Renew), ctx, params)
 }
 
 // TxByHash mocks base method.
-func (m *MockContractsService) TxByHash(ctx context.Context, client *ethclient.Client, txHash common.Hash) (*types.Transaction, error) {
+func (m *MockContractsService) TxByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TxByHash", ctx, client, txHash)
+	ret := m.ctrl.Call(m, "TxByHash", ctx, txHash)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // TxByHash indicates an expected call of TxByHash.
-func (mr *MockContractsServiceMockRecorder) TxByHash(ctx, client, txHash any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) TxByHash(ctx, txHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TxByHash", reflect.TypeOf((*MockContractsService)(nil).TxByHash), ctx, client, txHash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TxByHash", reflect.TypeOf((*MockContractsService)(nil).TxByHash), ctx, txHash)
 }
 
 // WaitForTxToStartMining mocks base method.
-func (m *MockContractsService) WaitForTxToStartMining(ctx context.Context, conn *ethclient.Client, txHash common.Hash) error {
+func (m *MockContractsService) WaitForTxToStartMining(ctx context.Context, txHash common.Hash) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForTxToStartMining", ctx, conn, txHash)
+	ret := m.ctrl.Call(m, "WaitForTxToStartMining", ctx, txHash)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForTxToStartMining indicates an expected call of WaitForTxToStartMining.
-func (mr *MockContractsServiceMockRecorder) WaitForTxToStartMining(ctx, conn, txHash any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) WaitForTxToStartMining(ctx, txHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForTxToStartMining", reflect.TypeOf((*MockContractsService)(nil).WaitForTxToStartMining), ctx, conn, txHash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForTxToStartMining", reflect.TypeOf((*MockContractsService)(nil).WaitForTxToStartMining), ctx, txHash)
 }
 
 // WaitMined mocks base method.
-func (m *MockContractsService) WaitMined(ctx context.Context, client *ethclient.Client, tx *types.Transaction) (bool, error) {
+func (m *MockContractsService) WaitMined(ctx context.Context, tx *types.Transaction) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitMined", ctx, client, tx)
+	ret := m.ctrl.Call(m, "WaitMined", ctx, tx)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // WaitMined indicates an expected call of WaitMined.
-func (mr *MockContractsServiceMockRecorder) WaitMined(ctx, client, tx any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) WaitMined(ctx, tx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitMined", reflect.TypeOf((*MockContractsService)(nil).WaitMined), ctx, client, tx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitMined", reflect.TypeOf((*MockContractsService)(nil).WaitMined), ctx, tx)
 }

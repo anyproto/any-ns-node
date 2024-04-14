@@ -46,13 +46,13 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts = mock_contracts.NewMockContractsService(fx.ctrl)
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
 	fx.contracts.EXPECT().Init(gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
+	fx.contracts.EXPECT().GenerateAuthOptsForAdmin().MaxTimes(2)
 	fx.contracts.EXPECT().CalculateTxParams(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().ConnectToPrivateController(gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().ConnectToPrivateController().AnyTimes()
+	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().MakeCommitment(gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.config.Mongo = config.Mongo{
 		Connect:  "mongodb://localhost:27017",
@@ -276,26 +276,12 @@ func TestCacheService_setNameData(t *testing.T) {
 }
 
 func TestCacheService_UpdateInCache(t *testing.T) {
-
-	t.Run("return error if CreateEthConnection fails", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-
-		fx.contracts.EXPECT().CreateEthConnection().Return(nil, errors.New("failed to connect"))
-
-		// call it
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{
-			FullName: "test.any",
-		})
-		require.Error(t, err)
-	})
-
 	t.Run("return error if GetOwnerForNamehash fails", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}) (common.Address, error) {
 			return common.Address{}, errors.New("SOME BIG ERROR")
 		})
 
@@ -312,11 +298,11 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}) (common.Address, error) {
 			notEmptyAddr := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 			return notEmptyAddr, nil
 		})
-		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
+		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
 			return "", "", "", big.NewInt(0), errors.New("SOME BIG ERROR")
 		})
 
@@ -334,7 +320,7 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 
 		// if this returns some address -> it means name is taken
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}) (common.Address, error) {
 			return common.Address{}, errors.New("not found")
 		})
 
@@ -359,17 +345,17 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 
 		// if this returns some address -> it means name is taken
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}) (common.Address, error) {
 			notEmptyAddr := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 			return notEmptyAddr, nil
 		})
 
-		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
+		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
 			return "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", big.NewInt(12390243), nil
 		})
 
 		// >>> see this:
-		fx.contracts.EXPECT().GetOwnerOfSmartContractWallet(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, addr interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetScwOwner(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, addr interface{}) (common.Address, error) {
 			return common.HexToAddress("0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5"), nil
 		})
 
@@ -409,18 +395,18 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
 
 		// if this returns some address -> it means name is taken
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}) (common.Address, error) {
 			// this was changed!
 			anotherAddr := common.HexToAddress("0xAAB27b150451726EC7738aa1d0A94505c8729bd1")
 			return anotherAddr, nil
 		})
 
-		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
+		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}, owner interface{}) (string, string, string, *big.Int, error) {
 			return "0xAAB27b150451726EC7738aa1d0A94505c8729bd1", "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", "", big.NewInt(12390243), nil
 		})
 
 		// >>> see this:
-		fx.contracts.EXPECT().GetOwnerOfSmartContractWallet(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, client interface{}, addr interface{}) (common.Address, error) {
+		fx.contracts.EXPECT().GetScwOwner(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, addr interface{}) (common.Address, error) {
 			return common.HexToAddress("0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5"), nil
 		})
 

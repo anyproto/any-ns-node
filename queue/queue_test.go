@@ -32,7 +32,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			var tx = types.NewTransaction(
 				0,
 				common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
@@ -53,7 +53,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				OwnerAnyAddress: "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS",
 				Status:          OperationStatus_Initial,
 			},
-			nil,
 		)
 		require.NoError(t, err)
 		require.Equal(t, OperationStatus_CommitSent, newState)
@@ -64,7 +63,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			return false, nil
 		}).AnyTimes()
 
@@ -79,7 +78,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				// should just wait for tx
 				Status: OperationStatus_CommitSent,
 			},
-			nil,
 		)
 		require.Error(t, err)
 		require.Equal(t, OperationStatus_CommitError, newState)
@@ -89,7 +87,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// error
 			return nil, errors.New("error")
 		})
@@ -105,7 +103,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				// should send register tx
 				Status: OperationStatus_CommitDone,
 			},
-			nil,
 		)
 
 		require.Error(t, err)
@@ -116,7 +113,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			return true, nil
 		}).AnyTimes()
 
@@ -133,7 +130,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				// wait for register tx
 				Status: OperationStatus_RegisterSent,
 			},
-			nil,
 		)
 
 		require.NoError(t, err)
@@ -144,7 +140,7 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			return true, nil
 		}).AnyTimes()
 
@@ -163,7 +159,6 @@ func TestAnynsQueue_NameRegisterMoveStateNext(t *testing.T) {
 				// also, SpaceID is attached to
 				SpaceId: "bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze",
 			},
-			nil,
 		)
 
 		require.NoError(t, err)
@@ -224,7 +219,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// error
 			var tx = types.NewTransaction(
 				0,
@@ -235,7 +230,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			return false, nil
 		}).AnyTimes()
 
@@ -278,7 +273,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -289,12 +284,12 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// error
 			return nil, errors.New("error")
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			// good
 			return true, nil
 		}).AnyTimes()
@@ -338,7 +333,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -349,7 +344,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -360,7 +355,7 @@ func TestAnynsQueue_NameRegister(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			// good
 			return true, nil
 		}).AnyTimes()
@@ -408,7 +403,7 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 
 		pctx := context.Background()
 
-		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Commit(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			// no error
 			var tx = types.NewTransaction(
 				0,
@@ -419,11 +414,11 @@ func TestAnynsQueue_FindAndProcessAllItemsInDb(t *testing.T) {
 			return tx, nil
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}, interface{}) (*types.Transaction, error) {
+		fx.contracts.EXPECT().Register(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (*types.Transaction, error) {
 			return nil, errors.New("some error")
 		}).AnyTimes()
 
-		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}, interface{}) (bool, error) {
+		fx.contracts.EXPECT().WaitMined(gomock.Any(), gomock.Any()).DoAndReturn(func(interface{}, interface{}) (bool, error) {
 			// fail
 			return false, nil
 		}).AnyTimes()
@@ -582,12 +577,12 @@ func newFixture(t *testing.T) *fixture {
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
 	fx.contracts.EXPECT().Init(gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-	fx.contracts.EXPECT().GenerateAuthOptsForAdmin(gomock.Any()).MaxTimes(2)
+	fx.contracts.EXPECT().GenerateAuthOptsForAdmin().MaxTimes(2)
 	fx.contracts.EXPECT().CalculateTxParams(gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().ConnectToPrivateController(gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().MakeCommitment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().ConnectToPrivateController().AnyTimes()
+	fx.contracts.EXPECT().TxByHash(gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().MakeCommitment(gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().WaitForTxToStartMining(gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.nonceManager = mock_nonce_manager.NewMockNonceService(fx.ctrl)
 	fx.nonceManager.EXPECT().Init(gomock.Any()).AnyTimes()

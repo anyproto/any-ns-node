@@ -122,13 +122,7 @@ func (aa *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Address
 }
 
 func (aa *anynsAA) IsScwDeployed(ctx context.Context, scwa common.Address) (bool, error) {
-	client, err := aa.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to create eth connection", zap.Error(err))
-		return false, err
-	}
-
-	return aa.contracts.IsContractDeployed(ctx, client, scwa)
+	return aa.contracts.IsContractDeployed(ctx, scwa)
 }
 
 func (aa *anynsAA) getNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error) {
@@ -162,13 +156,7 @@ func (aa *anynsAA) getNonceForSmartWalletAddress(ctx context.Context, scw common
 func (aa *anynsAA) GetNamesCountLeft(ctx context.Context, scw common.Address) (count uint64, err error) {
 	tokenAddress := common.HexToAddress(aa.confContracts.AddrToken)
 
-	client, err := aa.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to create eth connection", zap.Error(err))
-		return 0, err
-	}
-
-	balance, err := aa.contracts.GetBalanceOf(ctx, client, tokenAddress, scw)
+	balance, err := aa.contracts.GetBalanceOf(ctx, tokenAddress, scw)
 	if err != nil {
 		log.Error("failed to get balance of", zap.Error(err), zap.String("scw", scw.String()), zap.String("tokenAddress", tokenAddress.String()))
 		return 0, err
@@ -493,29 +481,22 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	}
 
 	// 2 - create a commitment
-	conn, err := aa.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to connect to geth", zap.Error(err))
-		return nil, err
-	}
-
-	controller, err := aa.contracts.ConnectToPrivateController(conn)
+	controller, err := aa.contracts.ConnectToPrivateController()
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return nil, err
 	}
 
-	commitment, err := aa.contracts.MakeCommitment(
-		nameFirstPart,
-		registrantAccount,
-		secret32,
-		controller,
-		fullName,
-		ownerAnyAddress,
-		spaceID,
-		isReverseRecordUpdate,
-		registerPeriodMonths,
-	)
+	commitment, err := aa.contracts.MakeCommitment(&contracts.MakeCommitmentParams{
+		NameFirstPart:         nameFirstPart,
+		RegistrantAccount:     registrantAccount,
+		Secret:                secret32,
+		Controller:            controller,
+		FullName:              fullName,
+		OwnerAnyAddr:          ownerAnyAddress,
+		SpaceId:               spaceID,
+		IsReverseRecordUpdate: isReverseRecordUpdate,
+		RegisterPeriodMonths:  registerPeriodMonths})
 
 	if err != nil {
 		log.Error("can not calculate a commitment", zap.Error(err))

@@ -261,7 +261,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GetNameByAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, owner interface{}) (string, error) {
+		fx.contracts.EXPECT().GetNameByAddress(gomock.Any()).DoAndReturn(func(owner interface{}) (string, error) {
 			return "hello.any", nil
 		})
 
@@ -284,7 +284,7 @@ func TestAnynsRpc_GetNameByAddress(t *testing.T) {
 		defer fx.finish(t)
 
 		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-		fx.contracts.EXPECT().GetNameByAddress(gomock.Any(), gomock.Any()).DoAndReturn(func(client interface{}, owner interface{}) (string, error) {
+		fx.contracts.EXPECT().GetNameByAddress(gomock.Any()).DoAndReturn(func(owner interface{}) (string, error) {
 			return "", errors.New("failed to get name by address")
 		})
 

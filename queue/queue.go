@@ -11,7 +11,6 @@ import (
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/cockroachdb/errors"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"go.uber.org/zap"
 
 	"github.com/anyproto/any-ns-node/config"
@@ -53,7 +52,7 @@ type QueueService interface {
 
 	// NameRegister functions and states:
 	// TODO: refactor - move to separate file
-	NameRegisterMoveStateNext(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (newState QueueItemStatus, err error)
+	NameRegisterMoveStateNext(ctx context.Context, queueItem *QueueItem) (newState QueueItemStatus, err error)
 
 	app.ComponentRunnable
 }
@@ -270,12 +269,6 @@ func (aqueue *anynsQueue) ProcessItem(ctx context.Context, queueItem *QueueItem)
 		return err
 	}
 
-	conn, err := aqueue.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to connect to geth", zap.Error(err))
-		return err
-	}
-
 	// 2 - move states
 	for {
 		prevState := queueItem.Status
@@ -293,13 +286,13 @@ func (aqueue *anynsQueue) ProcessItem(ctx context.Context, queueItem *QueueItem)
 		// 	OperationStatus_Initial ->OperationStatus_Completed
 		switch queueItem.ItemType {
 		case ItemType_NameRegister:
-			newState, err = aqueue.NameRegisterMoveStateNext(ctx, queueItem, conn)
+			newState, err = aqueue.NameRegisterMoveStateNext(ctx, queueItem)
 		case ItemType_NameRenew:
-			newState, err = aqueue.nameRenewMoveStateNext(ctx, queueItem, conn)
+			newState, err = aqueue.nameRenewMoveStateNext(ctx, queueItem)
 		}
 
 		// 3 - handle nonce errors
-		newState, err = aqueue.handleNonceErrors(ctx, err, prevState, newState, queueItem, conn)
+		newState, err = aqueue.handleNonceErrors(ctx, err, prevState, newState, queueItem)
 
 		// 4 - update state in DB
 		if newState != prevState {
@@ -359,7 +352,7 @@ func (aqueue *anynsQueue) updateItemStatus(ctx context.Context, itemIndex int64,
 	return aqueue.SaveItemToDb(ctx, &queueItem)
 }
 
-func (aqueue *anynsQueue) recoverLowNonce(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) recoverLowNonce(ctx context.Context, queueItem *QueueItem) error {
 	retryCount := queueItem.TxCurrentRetry
 	nonce := queueItem.TxCurrentNonce
 
@@ -391,7 +384,7 @@ func (aqueue *anynsQueue) recoverLowNonce(ctx context.Context, queueItem *QueueI
 	return nil
 }
 
-func (aqueue *anynsQueue) recoverHighNonce(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) recoverHighNonce(ctx context.Context, queueItem *QueueItem) error {
 	retryCount := queueItem.TxCurrentRetry
 
 	// do not give more than N tries
@@ -449,14 +442,14 @@ func (aqueue *anynsQueue) initNonce(ctx context.Context, queueItem *QueueItem) e
 	return nil
 }
 
-func (aqueue *anynsQueue) handleNonceErrors(ctx context.Context, err error, prevState QueueItemStatus, newState QueueItemStatus, queueItem *QueueItem, conn *ethclient.Client) (newStatusOut QueueItemStatus, errOut error) {
+func (aqueue *anynsQueue) handleNonceErrors(ctx context.Context, err error, prevState QueueItemStatus, newState QueueItemStatus, queueItem *QueueItem) (newStatusOut QueueItemStatus, errOut error) {
 	// try to recover from nonoce errors
 	if err != nil {
 		if err == contracts.ErrNonceTooLow {
 			// if we got "nonce too low" error the tx is immediately rejected. to fix it:
 			// - get nonce from network
 			// - send this tx again with +1 nonce
-			aqueue.recoverLowNonce(ctx, queueItem, conn)
+			aqueue.recoverLowNonce(ctx, queueItem)
 
 			newState = prevState // try again with the same state
 			err = nil
@@ -466,7 +459,7 @@ func (aqueue *anynsQueue) handleNonceErrors(ctx context.Context, err error, prev
 			// - wait for N minutes for all TXs to settle
 			// - get new nonce from network
 			// - retry sending this tx with new nonce
-			aqueue.recoverHighNonce(ctx, queueItem, conn)
+			aqueue.recoverHighNonce(ctx, queueItem)
 
 			newState = prevState // try again with the same state
 			err = nil
@@ -497,12 +490,12 @@ func (aqueue *anynsQueue) isStopProcessing(err error, prevState QueueItemStatus,
 	return true
 }
 
-func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (QueueItemStatus, error) {
+func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueItem *QueueItem) (QueueItemStatus, error) {
 	currentStatus := queueItem.Status
 
 	switch currentStatus {
 	case OperationStatus_Initial:
-		err := aqueue.nameRegister_InitialState(ctx, queueItem, conn)
+		err := aqueue.nameRegister_InitialState(ctx, queueItem)
 		// TODO: assert that item.TxCommitHash should not be null here
 
 		// in case of failed tx -> save error to DB and stop processing it next time
@@ -513,7 +506,7 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 
 		return OperationStatus_CommitSent, err
 	case OperationStatus_CommitSent:
-		err := aqueue.nameRegister_CommitSent(ctx, queueItem, conn)
+		err := aqueue.nameRegister_CommitSent(ctx, queueItem)
 
 		// in case of failed tx -> save error to DB and stop processing it next time
 		if err != nil {
@@ -522,7 +515,7 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 		}
 		return OperationStatus_CommitDone, err
 	case OperationStatus_CommitDone:
-		err := aqueue.nameRegister_CommitDone(ctx, queueItem, conn)
+		err := aqueue.nameRegister_CommitDone(ctx, queueItem)
 
 		// in case of failed tx -> save error to DB and stop processing it next time
 		if err != nil {
@@ -531,7 +524,7 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 		}
 		return OperationStatus_RegisterSent, err
 	case OperationStatus_RegisterSent:
-		err := aqueue.nameRegister_RegisterWaiting(ctx, queueItem, conn)
+		err := aqueue.nameRegister_RegisterWaiting(ctx, queueItem)
 
 		// in case of failed tx -> save error to DB and stop processing it next time
 		if err != nil {
@@ -551,10 +544,10 @@ func (aqueue *anynsQueue) NameRegisterMoveStateNext(ctx context.Context, queueIt
 	return queueItem.Status, nil
 }
 
-func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueItem *QueueItem) error {
 	nonce := queueItem.TxCurrentNonce
 
-	controller, err := aqueue.contracts.ConnectToPrivateController(conn)
+	controller, err := aqueue.contracts.ConnectToPrivateController()
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return err
@@ -586,26 +579,26 @@ func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueIt
 	isReverseRecordUpdate := true
 
 	// 1 - make a commitment
-	commitment, err := aqueue.contracts.MakeCommitment(
-		nameFirstPart,
-		registrantAccount,
-		secret32,
-		controller,
-		in.GetFullName(),
-		in.GetOwnerAnyAddress(),
+	commitment, err := aqueue.contracts.MakeCommitment(&contracts.MakeCommitmentParams{
+		NameFirstPart:     nameFirstPart,
+		RegistrantAccount: registrantAccount,
+		Secret:            secret32,
+		Controller:        controller,
+		OwnerAnyAddr:      in.GetOwnerAnyAddress(),
+		FullName:          in.GetFullName(),
 		// WARNING: current interface doesn't support/have SpaceId
 		// in.GetSpaceId()
-		"",
-		isReverseRecordUpdate,
-		in.RegisterPeriodMonths,
-	)
+		SpaceId:               "",
+		IsReverseRecordUpdate: isReverseRecordUpdate,
+		RegisterPeriodMonths:  in.RegisterPeriodMonths,
+	})
 
 	if err != nil {
 		log.Error("can not calculate a commitment", zap.Error(err))
 		return err
 	}
 
-	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin(conn)
+	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin()
 	if err != nil {
 		log.Error("can not get auth params for admin", zap.Error(err))
 		return err
@@ -616,12 +609,11 @@ func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueIt
 	log.Info("Nonce is", zap.Any("Nonce", nonce))
 
 	// 2 - commit
-	tx, err := aqueue.contracts.Commit(
-		ctx,
-		conn,
-		authOpts,
-		commitment,
-		controller)
+	tx, err := aqueue.contracts.Commit(ctx, &contracts.CommitParams{
+		Opts:       authOpts,
+		Commitment: commitment,
+		Controller: controller,
+	})
 
 	// can return ErrNonceTooLow error
 	// can return ErrNonceTooHigh error
@@ -653,7 +645,7 @@ func (aqueue *anynsQueue) nameRegister_InitialState(ctx context.Context, queueIt
 }
 
 // wait for commit tx
-func (aqueue *anynsQueue) nameRegister_CommitSent(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) nameRegister_CommitSent(ctx context.Context, queueItem *QueueItem) error {
 	if len(queueItem.TxCommitHash) == 0 {
 		return errors.New("tx hash is empty")
 	}
@@ -664,21 +656,21 @@ func (aqueue *anynsQueue) nameRegister_CommitSent(ctx context.Context, queueItem
 	// 0 - try to wait for TX first and handle "nonce too high" error
 	// wait until TX is "seen" by the network (N times)
 	// can return ErrNonceTooHigh or just error
-	err := aqueue.contracts.WaitForTxToStartMining(ctx, conn, txHash)
+	err := aqueue.contracts.WaitForTxToStartMining(ctx, txHash)
 	if err != nil {
 		log.Error("can not wait for Commit tx, can not start", zap.Error(err))
 		return err
 	}
 
 	// 1
-	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
+	tx, err := aqueue.contracts.TxByHash(ctx, txHash)
 	if err != nil {
 		// TODO: handle it and retry
 		log.Error("failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxCommitHash))
 		return err
 	}
 
-	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
+	txRes, err := aqueue.contracts.WaitMined(ctx, tx)
 	if err != nil {
 		log.Error("can not wait for commit tx", zap.Error(err))
 		return err
@@ -702,17 +694,17 @@ func (aqueue *anynsQueue) nameRegister_CommitSent(ctx context.Context, queueItem
 }
 
 // generate new register tx
-func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem *QueueItem) error {
 	nonce := queueItem.TxCurrentNonce
 
-	controller, err := aqueue.contracts.ConnectToPrivateController(conn)
+	controller, err := aqueue.contracts.ConnectToPrivateController()
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return err
 	}
 
 	// get new nonce
-	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin(conn)
+	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin()
 	if err != nil {
 		log.Error("can not get auth params for admin", zap.Error(err))
 		return err
@@ -742,22 +734,20 @@ func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem
 	// NameRegisterRequest has no field for this
 	isReverseRecordUpdate := true
 
-	tx, err := aqueue.contracts.Register(
-		ctx,
-		conn,
-		authOpts,
-		nameFirstPart,
-		registrantAccount,
-		secret32,
-		controller,
-		in.GetFullName(),
-		in.GetOwnerAnyAddress(),
+	tx, err := aqueue.contracts.Register(ctx, &contracts.RegisterParams{
+		AuthOpts:          authOpts,
+		NameFirstPart:     nameFirstPart,
+		RegistrantAccount: registrantAccount,
+		Secret:            secret32,
+		Controller:        controller,
+		FullName:          in.GetFullName(),
+		OwnerAnyAddr:      in.GetOwnerAnyAddress(),
 		// WARNING: current interface doesn't support/have SpaceId
 		//in.GetSpaceId(),
-		"",
-		isReverseRecordUpdate,
-		in.RegisterPeriodMonths,
-	)
+		SpaceId:              "",
+		IsReverseRecord:      isReverseRecordUpdate,
+		RegisterPeriodMonths: in.RegisterPeriodMonths,
+	})
 
 	// can return ErrNonceTooLow error
 	// can return ErrNonceTooHigh error
@@ -790,7 +780,7 @@ func (aqueue *anynsQueue) nameRegister_CommitDone(ctx context.Context, queueItem
 }
 
 // wait for register tx
-func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) error {
+func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queueItem *QueueItem) error {
 	if len(queueItem.TxRegisterHash) == 0 {
 		return errors.New("tx hash is empty")
 	}
@@ -801,13 +791,13 @@ func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queu
 	// 0 - try to wait for TX first and handle "nonce too high" error
 	// wait until TX is "seen" by the network (N times)
 	// can return ErrNonceTooHigh or just error
-	err := aqueue.contracts.WaitForTxToStartMining(ctx, conn, txHash)
+	err := aqueue.contracts.WaitForTxToStartMining(ctx, txHash)
 	if err != nil {
 		log.Error("can not wait for Register tx, can not start", zap.Error(err))
 		return err
 	}
 
-	tx, err := aqueue.contracts.TxByHash(ctx, conn, txHash)
+	tx, err := aqueue.contracts.TxByHash(ctx, txHash)
 	if err != nil {
 		// TODO: handle it and retry
 		log.Error("failed to fetch transaction details:", zap.Error(err), zap.String("tx hash", queueItem.TxRegisterHash))
@@ -815,7 +805,7 @@ func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queu
 	}
 
 	// wait for tx to be mined
-	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
+	txRes, err := aqueue.contracts.WaitMined(ctx, tx)
 	if err != nil {
 		log.Error("can not wait for register tx", zap.Error(err))
 		return err
@@ -837,8 +827,8 @@ func (aqueue *anynsQueue) nameRegister_RegisterWaiting(ctx context.Context, queu
 	return nil
 }
 
-func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem *QueueItem, conn *ethclient.Client) (newState QueueItemStatus, err error) {
-	controller, err := aqueue.contracts.ConnectToPrivateController(conn)
+func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem *QueueItem) (newState QueueItemStatus, err error) {
+	controller, err := aqueue.contracts.ConnectToPrivateController()
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return OperationStatus_Error, err
@@ -851,7 +841,7 @@ func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem 
 		return OperationStatus_Error, err
 	}
 
-	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin(conn)
+	authOpts, err := aqueue.contracts.GenerateAuthOptsForAdmin()
 	if err != nil {
 		log.Error("can not get auth params for admin", zap.Error(err))
 		return OperationStatus_Error, err
@@ -869,13 +859,11 @@ func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem 
 	firstPart := parts[0]
 
 	// 2 - send tx to the network
-	tx, err := aqueue.contracts.RenewName(
-		ctx,
-		conn,
-		authOpts,
-		firstPart,
-		queueItem.NameRenewDurationSec,
-		controller)
+	tx, err := aqueue.contracts.Renew(ctx, &contracts.RenewParams{
+		TxOpts:      authOpts,
+		FullName:    firstPart,
+		DurationSec: queueItem.NameRenewDurationSec,
+		Controller:  controller})
 
 	// can return ErrNonceTooLow error
 	// can return ErrNonceTooHigh error
@@ -892,7 +880,7 @@ func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem 
 	}
 
 	// wait for tx to be mined
-	txRes, err := aqueue.contracts.WaitMined(ctx, conn, tx)
+	txRes, err := aqueue.contracts.WaitMined(ctx, tx)
 	if err != nil {
 		log.Error("can not wait for register tx", zap.Error(err))
 		return OperationStatus_Error, err

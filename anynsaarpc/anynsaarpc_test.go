@@ -61,9 +61,9 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 	fx.contracts = mock_contracts.NewMockContractsService(fx.ctrl)
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
 	fx.contracts.EXPECT().Init(gomock.Any()).AnyTimes()
-	fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().GetBalanceOf(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
-	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	fx.contracts.EXPECT().IsContractDeployed(gomock.Any(), gomock.Any()).AnyTimes()
 
 	fx.cache = mock_cache.NewMockCacheService(fx.ctrl)
 	fx.cache.EXPECT().Name().Return(cache.CName).AnyTimes()

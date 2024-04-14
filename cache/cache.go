@@ -208,13 +208,6 @@ func (cs *cacheService) setNameData(ctx context.Context, in *NameDataItem) (err 
 func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error) {
 	log.Debug("reading data from smart contracts -> cache", zap.String("FullName", in.FullName))
 
-	// 0 - create connection
-	conn, err := cs.contracts.CreateEthConnection()
-	if err != nil {
-		log.Error("failed to connect to geth", zap.Error(err))
-		return err
-	}
-
 	// 1 - convert to name hash
 	nh, err := contracts.NameHash(in.FullName)
 	if err != nil {
@@ -224,7 +217,7 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 
 	// 2 - call contract's method
 	log.Info("getting owner for name", zap.String("FullName", in.GetFullName()))
-	addr, err := cs.contracts.GetOwnerForNamehash(ctx, conn, nh)
+	addr, err := cs.contracts.GetOwnerForNamehash(ctx, nh)
 	if err != nil {
 		if err.Error() == "not found" {
 			log.Info("name is not registered yet...")
@@ -244,7 +237,7 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 
 	// 3 - if name is already registered, then get additional info
 	log.Info("name is already registered...Getting additional info")
-	ea, aa, si, exp, err := cs.contracts.GetAdditionalNameInfo(ctx, conn, addr, in.GetFullName())
+	ea, aa, si, exp, err := cs.contracts.GetAdditionalNameInfo(ctx, addr, in.GetFullName())
 	if err != nil {
 		log.Error("failed to get additional info", zap.Error(err))
 		return err
@@ -257,7 +250,7 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 	ndi.SpaceId = si
 	ndi.NameExpires = exp.Int64()
 
-	own, err := cs.contracts.GetOwnerOfSmartContractWallet(ctx, conn, common.HexToAddress(ea))
+	own, err := cs.contracts.GetScwOwner(ctx, common.HexToAddress(ea))
 	if err != nil {
 		log.Warn("failed to get SCW -> owner", zap.Error(err))
 
