@@ -13,6 +13,7 @@ import (
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
+	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/server"
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
@@ -144,11 +145,16 @@ func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.Name
 }
 
 func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameRegisterRequestSigned) (*nsp.OperationResponse, error) {
+	peerId, err := peer.CtxPeerId(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var resp nsp.OperationResponse
 
 	// 1 - unmarshal the signed request
 	var nrr nsp.NameRegisterRequest
-	err := proto.Unmarshal(in.Payload, &nrr)
+	err = proto.Unmarshal(in.Payload, &nrr)
 	if err != nil {
 		resp.OperationState = nsp.OperationState_Error
 		log.Error("can not unmarshal NameRegisterRequest", zap.Error(err))
@@ -156,7 +162,7 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 	}
 
 	// 2 - check signature
-	err = verification.VerifyAdminIdentity(arpc.confAccount.SigningKey, in.Payload, in.Signature)
+	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
 	if err != nil {
 		resp.OperationState = nsp.OperationState_Error
 		log.Error("identity is different", zap.Error(err))

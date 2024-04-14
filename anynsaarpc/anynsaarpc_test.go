@@ -651,7 +651,6 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		defer fx.finish(t)
 
 		// 1 - enable user
-		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
 		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
@@ -690,6 +689,11 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		assert.NoError(t, err)
 
 		// let's go
+		identityStr := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		identityBytes, err := crypto.DecodeBytesFromString(identityStr)
+		assert.NoError(t, err)
+		pctx := peer.CtxWithIdentity(context.Background(), identityBytes)
+
 		_, err = fx.CreateUserOperation(pctx, &cuor_signed)
 		assert.Error(t, err)
 	})
@@ -699,7 +703,6 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		defer fx.finish(t)
 
 		// 1 - enable user
-		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
 		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
@@ -747,6 +750,12 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		})
 
 		// let's go
+		// let's go
+		identityStr := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		identityBytes, err := crypto.DecodeBytesFromString(identityStr)
+		assert.NoError(t, err)
+		pctx := peer.CtxWithIdentity(context.Background(), identityBytes)
+
 		_, err = fx.CreateUserOperation(pctx, &cuor_signed)
 		assert.Error(t, err)
 	})
@@ -756,7 +765,6 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		defer fx.finish(t)
 
 		// 1 - enable user
-		pctx := context.Background()
 		owner := common.HexToAddress("0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51")
 
 		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
@@ -818,6 +826,11 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		})
 
 		// let's go
+		identityStr := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+		identityBytes, err := crypto.DecodeBytesFromString(identityStr)
+		assert.NoError(t, err)
+		pctx := peer.CtxWithIdentity(context.Background(), identityBytes)
+
 		_, err = fx.CreateUserOperation(pctx, &cuor_signed)
 		assert.NoError(t, err)
 	})

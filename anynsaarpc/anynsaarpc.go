@@ -15,6 +15,7 @@ import (
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/server"
+	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -315,16 +316,21 @@ func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp
 
 // once user got data by using method like GetDataNameRegister, and signed it, now he can create a new operation
 func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateUserOperationRequestSigned) (*nsp.OperationResponse, error) {
+	userAnyID, err := peer.CtxIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1 - unmarshal the signed request
 	var cuor nsp.CreateUserOperationRequest
-	err := proto.Unmarshal(in.Payload, &cuor)
+	err = proto.Unmarshal(in.Payload, &cuor)
 	if err != nil {
 		log.Error("can not unmarshal CreateUserOperationRequest", zap.Error(err))
 		return nil, errors.New("can not unmarshal CreateUserOperationRequest")
 	}
 
 	// 2 - check users's signature
-	err = verification.VerifyAnyIdentity(cuor.OwnerAnyID, in.Payload, in.Signature)
+	err = verification.VerifyAnyIdentity(crypto.EncodeBytesToString(userAnyID), in.Payload, in.Signature)
 	if err != nil {
 		log.Error("wrong Anytype signature", zap.Error(err))
 		return nil, errors.New("wrong Anytype signature")

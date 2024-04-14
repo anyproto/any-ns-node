@@ -8,6 +8,7 @@ import (
 
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
+	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/stretchr/testify/require"
@@ -85,7 +86,7 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 
 	fx.config.Account = accountservice.Config{
 		SigningKey: adminSignKey,
-		PeerKey:    "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
+		PeerKey:    "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q==",
 	}
 
 	fx.a.Register(fx.ts).
@@ -388,8 +389,6 @@ func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
 		fx := newFixture(t, true)
 		defer fx.finish(t)
 
-		pctx := context.Background()
-
 		fx.aa.EXPECT().AdminNameRegister(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (string, error) {
 			return "operation-id", nil
 		}).MinTimes(1)
@@ -400,7 +399,7 @@ func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
 
 		// OwnerAnyID
 		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
-		//PeerKey := "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q=="
+		PeerID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
 		realSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
 
 		decodedPeerKey, err := crypto.DecodeKeyFromString(
@@ -423,6 +422,7 @@ func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
 		assert.NoError(t, err)
 
 		// call it
+		pctx := peer.CtxWithPeerId(context.Background(), PeerID)
 		resp, err := fx.AdminNameRegisterSigned(pctx, &nrrs)
 
 		require.NoError(t, err)
