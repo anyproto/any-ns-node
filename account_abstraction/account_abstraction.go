@@ -55,7 +55,6 @@ type AccountAbstractionService interface {
 
 	// will mint + approve tokens to the specified smart wallet
 	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (operationID string, err error)
-
 	// use it to register a name on behalf of a user
 	AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (operationID string, err error)
 
@@ -90,35 +89,6 @@ func (aa *anynsAA) getNextAlchemyRequestID() int {
 }
 
 func (aa *anynsAA) GetSmartWalletAddress(ctx context.Context, eoa common.Address) (address common.Address, err error) {
-	factoryContractABI := `
-		[
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "owner",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "salt",
-						"type": "uint256"
-					}
-				],
-				"name": "getAddress",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			}
-		]
-	`
-
 	parsedABI, err := abi.JSON(strings.NewReader(factoryContractABI))
 	if err != nil {
 		return common.Address{}, err
@@ -162,36 +132,6 @@ func (aa *anynsAA) IsScwDeployed(ctx context.Context, scwa common.Address) (bool
 }
 
 func (aa *anynsAA) getNonceForSmartWalletAddress(ctx context.Context, scw common.Address) (*big.Int, error) {
-
-	entryPointJSON := `
-		[
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "sender",
-						"type": "address"
-					},
-					{
-						"internalType": "uint192",
-						"name": "key",
-						"type": "uint192"
-					}
-				],
-				"name": "getNonce",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "nonce",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			}
-		]
-		`
-
 	parsedABI, err := abi.JSON(strings.NewReader(entryPointJSON))
 	if err != nil {
 		return nil, err
@@ -290,14 +230,14 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	tokensToMint := namesCount.Mul(namesCount, big.NewInt(int64(aa.aaConfig.NameTokensPerName)))
 	tokenDecimals := aa.confContracts.TokenDecimals
 
-	callDataOriginal, err := GetCallDataForMint(userScwAddress, tokensToMint, tokenDecimals)
+	callDataOriginal, err := getCallDataForMint(userScwAddress, tokensToMint, tokenDecimals)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err
 	}
 	log.Debug("prepared original call data", zap.String("callDataOriginal", hex.EncodeToString(callDataOriginal)))
 
-	callDataOriginal2, err := GetCallDataForAprove(userScwAddress, registrarController, tokensToMint, tokenDecimals)
+	callDataOriginal2, err := getCallDataForAprove(userScwAddress, registrarController, tokensToMint, tokenDecimals)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err
@@ -309,7 +249,7 @@ func (aa *anynsAA) AdminMintAccessTokens(ctx context.Context, userScwAddress com
 	callDataOriginals := [][]byte{callDataOriginal, callDataOriginal2}
 
 	// 4 - wrap it into "execute" call
-	callData, err := GetCallDataForBatchExecute(targets, callDataOriginals)
+	callData, err := getCallDataForBatchExecute(targets, callDataOriginals)
 	if err != nil {
 		log.Error("failed to get call data", zap.Error(err))
 		return "", err
@@ -590,13 +530,13 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	}
 
 	// 4 - now prepare 2 operations
-	callDataOriginal1, err := GetCallDataForCommit(commitment)
+	callDataOriginal1, err := getCallDataForCommit(commitment)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return nil, err
 	}
 
-	callDataOriginal2, err := GetCallDataForRegister(
+	callDataOriginal2, err := getCallDataForRegister(
 		nameFirstPart,
 		registrantAccount,
 		regTime,
@@ -616,7 +556,7 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	callDataOriginals := [][]byte{callDataOriginal1, callDataOriginal2}
 
 	// 4 - wrap it into "execute" call
-	executeCallDataOut, err := GetCallDataForBatchExecute(targets, callDataOriginals)
+	executeCallDataOut, err := getCallDataForBatchExecute(targets, callDataOriginals)
 	if err != nil {
 		log.Error("failed to get call data", zap.Error(err))
 		return nil, err

@@ -5,6 +5,7 @@
 //
 //	mockgen -source=contracts/contracts.go
 //
+
 // Package mock_contracts is a generated GoMock package.
 package mock_contracts
 
