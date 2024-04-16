@@ -12,6 +12,7 @@ import (
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
+	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -19,6 +20,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/mock/gomock"
+
+	"github.com/anyproto/any-sync/nodeconf/mock_nodeconf"
 
 	accountabstraction "github.com/anyproto/any-ns-node/account_abstraction"
 	mock_accountabstraction "github.com/anyproto/any-ns-node/account_abstraction/mock"
@@ -40,6 +43,7 @@ type fixture struct {
 	ctrl      *gomock.Controller
 	ts        *rpctest.TestServer
 	config    *config.Config
+	nodeConf  *mock_nodeconf.MockService
 	contracts *mock_contracts.MockContractsService
 	aa        *mock_accountabstraction.MockAccountAbstractionService
 	cache     *mock_cache.MockCacheService
@@ -57,6 +61,15 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 
 		anynsAARpc: New().(*anynsAARpc),
 	}
+
+	fx.nodeConf = mock_nodeconf.NewMockService(fx.ctrl)
+	fx.nodeConf.EXPECT().Name().Return(nodeconf.CName).AnyTimes()
+	fx.nodeConf.EXPECT().Init(gomock.Any()).AnyTimes()
+	fx.nodeConf.EXPECT().Run(gomock.Any()).AnyTimes()
+	fx.nodeConf.EXPECT().Close(gomock.Any()).AnyTimes()
+
+	// NodeTypes(nodeId string) []NodeType
+	fx.nodeConf.EXPECT().NodeTypes(gomock.Any()).Return([]nodeconf.NodeType{nodeconf.NodeTypeConsensus}).AnyTimes()
 
 	fx.contracts = mock_contracts.NewMockContractsService(fx.ctrl)
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
@@ -106,6 +119,7 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 		Register(fx.contracts).
 		Register(fx.aa).
 		Register(fx.cache).
+		Register(fx.nodeConf).
 		Register(fx.db).
 		Register(fx.anynsAARpc)
 

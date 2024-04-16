@@ -10,10 +10,13 @@ import (
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
+	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/anyproto/any-sync/nodeconf/mock_nodeconf"
 
 	"github.com/anyproto/any-ns-node/cache"
 	mock_cache "github.com/anyproto/any-ns-node/cache/mock"
@@ -37,6 +40,7 @@ type fixture struct {
 	ctrl      *gomock.Controller
 	ts        *rpctest.TestServer
 	config    *config.Config
+	nodeConf  *mock_nodeconf.MockService
 	contracts *mock_contracts.MockContractsService
 	cache     *mock_cache.MockCacheService
 	queue     *mock_queue.MockQueueService
@@ -55,6 +59,13 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 
 		anynsRpc: New().(*anynsRpc),
 	}
+
+	fx.nodeConf = mock_nodeconf.NewMockService(fx.ctrl)
+	fx.nodeConf.EXPECT().Name().Return(nodeconf.CName).AnyTimes()
+	fx.nodeConf.EXPECT().Init(gomock.Any()).AnyTimes()
+	fx.nodeConf.EXPECT().Run(gomock.Any()).AnyTimes()
+	fx.nodeConf.EXPECT().Close(gomock.Any()).AnyTimes()
+	fx.nodeConf.EXPECT().NodeTypes(gomock.Any()).Return([]nodeconf.NodeType{nodeconf.NodeTypeConsensus}).AnyTimes()
 
 	fx.contracts = mock_contracts.NewMockContractsService(fx.ctrl)
 	fx.contracts.EXPECT().Name().Return(contracts.CName).AnyTimes()
@@ -96,6 +107,7 @@ func newFixture(t *testing.T, readFromCache bool) *fixture {
 		Register(fx.config).
 		Register(fx.cache).
 		Register(fx.queue).
+		Register(fx.nodeConf).
 		Register(fx.aa).
 		Register(fx.db).
 		Register(fx.anynsRpc)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/server"
+	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
@@ -38,6 +40,7 @@ type anynsAARpc struct {
 	confContracts config.Contracts
 	confAccount   accountservice.Config
 	db            dbservice.DbService
+	nodeConf      nodeconf.Service
 
 	contracts contracts.ContractsService
 	aa        accountabstraction.AccountAbstractionService
@@ -47,6 +50,7 @@ type anynsAARpc struct {
 func (arpc *anynsAARpc) Init(a *app.App) (err error) {
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.db = a.MustComponent(dbservice.CName).(dbservice.DbService)
+	arpc.nodeConf = a.MustComponent(nodeconf.CName).(nodeconf.Service)
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
 
@@ -160,6 +164,17 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	return &out, nil
 }
 
+func (arpc *anynsAARpc) isAdmin(peerId string) bool {
+	// 1 - check if peer is a payment node!
+	if slices.Contains(arpc.nodeConf.NodeTypes(peerId), nodeconf.NodeTypePaymentProcessingNode) {
+		return true
+	}
+
+	// 2 - admin
+	err := verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
+	return (err == nil)
+}
+
 // WARNING: There is no way here to check that EthAddress of user matches AnyID
 // we trust user! If he passed wrong AnyID - it is his problem
 // and then Admin just passes those values to current method
@@ -178,8 +193,8 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 	}
 
 	// 2 - check signature
-	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
-	if err != nil {
+	isAllow := arpc.isAdmin(peerId)
+	if !isAllow {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, errors.New("not an Admin!!!")
 	}
@@ -229,8 +244,8 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 	}
 
 	// 2 - check signature
-	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
-	if err != nil {
+	isAllow := arpc.isAdmin(peerId)
+	if !isAllow {
 		log.Error("not an Admin!!!", zap.Error(err))
 		return nil, errors.New("not an Admin!!!")
 	}

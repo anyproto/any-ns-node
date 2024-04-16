@@ -3,6 +3,7 @@ package anynsrpc
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/anyproto/any-sync/app/logger"
 	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/server"
+	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
@@ -36,6 +38,7 @@ type anynsRpc struct {
 	cache         cache.CacheService
 	confContracts config.Contracts
 	confAccount   accountservice.Config
+	nodeConf      nodeconf.NodeConf
 	contracts     contracts.ContractsService
 	queue         queue.QueueService
 	aa            accountabstraction.AccountAbstractionService
@@ -48,6 +51,7 @@ func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.cache = a.MustComponent(cache.CName).(cache.CacheService)
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
+	arpc.nodeConf = a.MustComponent(nodeconf.CName).(nodeconf.NodeConf)
 	arpc.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	arpc.readFromCache = a.MustComponent(config.CName).(*config.Config).ReadFromCache
 	arpc.queue = a.MustComponent(queue.CName).(queue.QueueService)
@@ -137,6 +141,17 @@ func (arpc *anynsRpc) getNameByAddressDirectly(ctx context.Context, in *nsp.Name
 	return &res, nil
 }
 
+func (arpc *anynsRpc) isAdmin(peerId string) bool {
+	// 1 - check if peer is a payment node!
+	if slices.Contains(arpc.nodeConf.NodeTypes(peerId), nodeconf.NodeTypePaymentProcessingNode) {
+		return true
+	}
+
+	// 2 - admin
+	err := verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
+	return (err == nil)
+}
+
 func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameRegisterRequestSigned) (*nsp.OperationResponse, error) {
 	peerId, err := peer.CtxPeerId(ctx)
 	if err != nil {
@@ -156,10 +171,10 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 
 	// 2 - check signature
 	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
-	if err != nil {
-		resp.OperationState = nsp.OperationState_Error
-		log.Error("identity is different", zap.Error(err))
-		return &resp, err
+	isAllow := arpc.isAdmin(peerId)
+	if !isAllow {
+		log.Error("not an Admin!!!", zap.Error(err))
+		return nil, errors.New("not an Admin!!!")
 	}
 
 	// 3 - check all parameters
