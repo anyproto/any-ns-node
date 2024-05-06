@@ -10,7 +10,7 @@ require (
 	github.com/anyproto/any-sync v0.4.3
 	github.com/cheggaaa/mb/v3 v3.0.2
 	github.com/cockroachdb/errors v1.11.1
-	github.com/ethereum/go-ethereum v1.13.12
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cid v0.4.1
