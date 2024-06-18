@@ -36,6 +36,7 @@ func New() app.Component {
 
 type anynsRpc struct {
 	cache         cache.CacheService
+	conf          *config.Config
 	confContracts config.Contracts
 	confAccount   accountservice.Config
 	nodeConf      nodeconf.NodeConf
@@ -49,6 +50,7 @@ type anynsRpc struct {
 
 func (arpc *anynsRpc) Init(a *app.App) (err error) {
 	arpc.cache = a.MustComponent(cache.CName).(cache.CacheService)
+	arpc.conf = a.MustComponent(config.CName).(*config.Config)
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
 	arpc.nodeConf = a.MustComponent(nodeconf.CName).(nodeconf.NodeConf)
@@ -67,7 +69,8 @@ func (arpc *anynsRpc) Name() (name string) {
 
 func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (*nsp.NameAvailableResponse, error) {
 	// 0 - normalize name (including .any suffix)
-	fullName, err := contracts.Normalize(in.FullName)
+	useEnsip15 := arpc.conf.Ensip15Validation
+	fullName, err := contracts.NormalizeAnyName(in.FullName, useEnsip15)
 	if err != nil {
 		log.Error("failed to normalize name", zap.Error(err))
 		return nil, err
@@ -178,7 +181,8 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 	}
 
 	// 3 - check all parameters
-	err = verification.CheckRegisterParams(&nrr)
+	useEnsip15 := arpc.conf.Ensip15Validation
+	err = verification.CheckRegisterParams(&nrr, useEnsip15)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, err

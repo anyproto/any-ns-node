@@ -37,6 +37,7 @@ func New() app.Component {
 }
 
 type anynsAARpc struct {
+	conf          *config.Config
 	confContracts config.Contracts
 	confAccount   accountservice.Config
 	db            dbservice.DbService
@@ -48,6 +49,7 @@ type anynsAARpc struct {
 }
 
 func (arpc *anynsAARpc) Init(a *app.App) (err error) {
+	arpc.conf = a.MustComponent(config.CName).(*config.Config)
 	arpc.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	arpc.db = a.MustComponent(dbservice.CName).(dbservice.DbService)
 	arpc.nodeConf = a.MustComponent(nodeconf.CName).(nodeconf.Service)
@@ -277,7 +279,9 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 
 func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
-	err := verification.CheckRegisterParams(in)
+	useEnsip15 := arpc.conf.Ensip15Validation
+
+	err := verification.CheckRegisterParams(in, useEnsip15)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, errors.New("invalid parameters")
@@ -301,7 +305,9 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameReg
 
 func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp.NameRegisterForSpaceRequest) (*nsp.GetDataNameRegisterResponse, error) {
 	// 1 - check params
-	err := verification.CheckRegisterForSpaceParams(in)
+	useEnsip15 := arpc.conf.Ensip15Validation
+
+	err := verification.CheckRegisterForSpaceParams(in, useEnsip15)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, errors.New("invalid parameters")

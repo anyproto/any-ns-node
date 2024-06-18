@@ -13,6 +13,8 @@ import (
 	"golang.org/x/net/idna"
 
 	"github.com/wealdtech/go-ens/v3"
+
+	"github.com/adraffy/ENSNormalize.go/ensip15"
 )
 
 var (
@@ -45,6 +47,29 @@ func normalize(input string) (string, error) {
 	return output, nil
 }
 
+func normalize15(input string) (string, error) {
+	// output, err := p.ToUnicode(input)
+	// if name has no .any suffix -> error
+	if len(input) < 4 || input[len(input)-4:] != ".any" {
+		return "", errors.New("name must have .any suffix")
+	}
+	// remove .any suffix
+	input = input[:len(input)-4]
+
+	// TODO: not a standard approach
+	ens := ensip15.New() // or ensip15.Shared()
+	output, err := ens.Normalize(input)
+
+	if err != nil {
+		return "", err
+	}
+
+	// add .any suffix
+	output += ".any"
+
+	return output, nil
+}
+
 func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
 	// default value!!!
 	if registerPeriodMonths == 0 {
@@ -61,10 +86,13 @@ func PeriodMonthsToTimestamp(registerPeriodMonths uint32) big.Int {
 	return regTime
 }
 
-func Normalize(name string) (string, error) {
-	//return ens.Normalize(name)
-
-	return normalize(name)
+func NormalizeAnyName(name string, useEnsip15 bool) (string, error) {
+	if useEnsip15 {
+		return normalize15(name)
+	} else {
+		//return ens.Normalize(name)
+		return normalize(name)
+	}
 }
 
 // NameHash generates a hash from a name that can be used to
@@ -72,12 +100,11 @@ func Normalize(name string) (string, error) {
 func NameHash(name string) (hash [32]byte, err error) {
 	// redirect to go-ens library
 
-	// 1. ENSIP1 standard: ens-go v3.6.0 is using it
+	// 1. ENSIP1 standard: ens-go v3.6.0 (current) is using it
 	// 2. ENSIP15 standard: that is an another standard for ENS namehashes
 	// that was accepted in June 2023.
 	//
-	// Current AnyNS (as of February 2024) implementation does not support it
-	//
+	// Current AnyNS (as of June 2024) implementation supports ENSIP1, ENSIP15
 	// https://eips.ethereum.org/EIPS/eip-137 (ENSIP1) grammar:
 	//
 	// <domain> ::= <label> | <domain> "." <label>

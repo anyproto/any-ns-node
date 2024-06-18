@@ -87,28 +87,55 @@ func TestNameHash1_ENSIP1(t *testing.T) {
 	assert.Equal(t, "0xad4f933a04969d30ef4d7caa6ff10c8af110b25045454179e01999cc69cc34c8", hexOut)
 }
 
-func TestNormalize(t *testing.T) {
+func TestNormalizeEnsip1(t *testing.T) {
+	useEnsip15 := false
+
 	// 1
-	_, err := Normalize("")
+	_, err := NormalizeAnyName("", useEnsip15)
 	assert.Error(t, err)
 
 	// 2
-	out, err := Normalize("Foo.any")
+	out, err := NormalizeAnyName("Foo.any", useEnsip15)
 	assert.NoError(t, err)
 	assert.Equal(t, "foo.any", out)
 
 	// 3
-	out, err = Normalize("❶❷❸❹❺❻❼❽❾❿.any")
+	out, err = NormalizeAnyName("❶❷❸❹❺❻❼❽❾❿.any", useEnsip15)
 	assert.NoError(t, err)
 	assert.Equal(t, "❶❷❸❹❺❻❼❽❾❿.any", out)
 
 	// 4
-	out, err = Normalize("fоо.any")
+	out, err = NormalizeAnyName("fоо.any", useEnsip15)
 	assert.NoError(t, err)
 	assert.Equal(t, "fоо.any", out)
 
 	// 5
-	_, err = Normalize("hello world.any")
+	_, err = NormalizeAnyName("hello world.any", useEnsip15)
+	assert.Error(t, err)
+}
+
+func TestNormalizeEnsip15(t *testing.T) {
+	useEnsip15 := true
+
+	// 1
+	_, err := NormalizeAnyName("", useEnsip15)
+	assert.Error(t, err)
+
+	// 2
+	out, err := NormalizeAnyName("Foo.any", useEnsip15)
+	assert.NoError(t, err)
+	assert.Equal(t, "foo.any", out)
+
+	// 3 - HERE!
+	_, err = NormalizeAnyName("❶❷❸❹❺❻❼❽❾❿.any", useEnsip15)
+	assert.Error(t, err)
+
+	// 4
+	_, err = NormalizeAnyName("fоо.any", useEnsip15)
+	assert.Error(t, err)
+
+	// 5
+	out, err = NormalizeAnyName("hello world.any", useEnsip15)
 	assert.Error(t, err)
 }
 

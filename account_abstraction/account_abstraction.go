@@ -33,6 +33,7 @@ func New() app.Component {
 }
 
 type anynsAA struct {
+	conf          *config.Config
 	confAccount   accountservice.Config
 	aaConfig      config.AA
 	confContracts config.Contracts
@@ -70,6 +71,7 @@ type AccountAbstractionService interface {
 }
 
 func (aa *anynsAA) Init(a *app.App) (err error) {
+	aa.conf = a.MustComponent(config.CName).(*config.Config)
 	aa.confAccount = a.MustComponent(config.CName).(*config.Config).GetAccount()
 	aa.aaConfig = a.MustComponent(config.CName).(*config.Config).GetAA()
 	aa.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
@@ -364,7 +366,8 @@ func (aa *anynsAA) getDataNameRegister(ctx context.Context, fullName string, own
 	var id int = aa.getNextAlchemyRequestID()
 
 	// overwrites fullName
-	fullName, err = contracts.Normalize(fullName)
+	useEnsip15 := aa.conf.Ensip15Validation
+	fullName, err = contracts.NormalizeAnyName(fullName, useEnsip15)
 	if err != nil {
 		log.Error("failed to normalize name", zap.Error(err))
 		return nil, nil, err
@@ -714,7 +717,8 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 	var chainID int64 = int64(aa.aaConfig.ChainID)
 
 	// overwrites in.FullName!
-	in.FullName, err = contracts.Normalize(in.FullName)
+	useEnsip15 := aa.conf.Ensip15Validation
+	in.FullName, err = contracts.NormalizeAnyName(in.FullName, useEnsip15)
 	if err != nil {
 		log.Error("failed to normalize name", zap.Error(err))
 		return "", err

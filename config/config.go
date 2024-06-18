@@ -49,6 +49,15 @@ type Config struct {
 	Sentry           Sentry                 `yaml:"sentry"`
 	// use mongo cache to read data from
 	ReadFromCache bool `yaml:"readFromCache"`
+
+	// if false -> will use old-school ENSIP1
+	//
+	// 1. ENSIP1 standard: ens-go v3.6.0 (current) is using it
+	// 2. ENSIP15 standard: that is an another standard for ENS namehashes
+	// that was accepted in June 2023.
+	//
+	// Current AnyNS (as of June 2024) implementation supports ENSIP1, ENSIP15
+	Ensip15Validation bool `yaml:"ensip15validation"`
 }
 
 func (c *Config) Init(a *app.App) (err error) {

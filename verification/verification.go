@@ -16,9 +16,9 @@ import (
 
 var log = logger.NewNamed("verification")
 
-func CheckRegisterParams(in *nsp.NameRegisterRequest) error {
+func CheckRegisterParams(in *nsp.NameRegisterRequest, useEnsip15 bool) error {
 	// 1 - check name
-	if !CheckName(in.FullName) {
+	if !CheckName(in.FullName, useEnsip15) {
 		log.Error("invalid name", zap.String("name", in.FullName))
 		return errors.New("invalid name")
 	}
@@ -39,9 +39,9 @@ func CheckRegisterParams(in *nsp.NameRegisterRequest) error {
 	return nil
 }
 
-func CheckRegisterForSpaceParams(in *nsp.NameRegisterForSpaceRequest) error {
+func CheckRegisterForSpaceParams(in *nsp.NameRegisterForSpaceRequest, useEnsip15 bool) error {
 	// 1 - check name
-	if !CheckName(in.FullName) {
+	if !CheckName(in.FullName, useEnsip15) {
 		log.Error("invalid name", zap.String("name", in.FullName))
 		return errors.New("invalid name")
 	}
@@ -72,7 +72,7 @@ func CheckRegisterForSpaceParams(in *nsp.NameRegisterForSpaceRequest) error {
 	return nil
 }
 
-func CheckName(name string) bool {
+func CheckName(name string, useEnsip15 bool) bool {
 	// get name parts
 	parts := strings.Split(name, ".")
 	if len(parts) != 2 {
@@ -97,7 +97,7 @@ func CheckName(name string) bool {
 	// use the same rules as in ENS
 	// if can not normalize -> then we won't be able to calculate ens.NameHash() later
 	// because it uses the same normalization procedure
-	_, err := contracts.Normalize(name)
+	_, err := contracts.NormalizeAnyName(name, useEnsip15)
 	if err != nil {
 		log.Error("failed to normalize name", zap.String("Name", name), zap.Error(err))
 		return false

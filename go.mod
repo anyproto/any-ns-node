@@ -1,10 +1,9 @@
 module github.com/anyproto/any-ns-node
 
-go 1.22
-
-toolchain go1.22.1
+go 1.22.4
 
 require (
+	github.com/adraffy/ENSNormalize.go v0.0.1
 	github.com/ahmetb/govvv v0.3.0
 	github.com/anyproto/alchemy-aa-sdk v0.0.1
 	github.com/anyproto/any-sync v0.4.3
