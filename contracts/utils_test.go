@@ -3,8 +3,10 @@ package contracts
 import (
 	"encoding/hex"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/zeebo/assert"
+	"golang.org/x/net/idna"
 )
 
 func checksum(out [32]byte) int {
@@ -111,6 +113,20 @@ func TestNormalizeEnsip1(t *testing.T) {
 
 	// 5
 	_, err = NormalizeAnyName("hello world.any", useEnsip15)
+	assert.Error(t, err)
+
+	// 6 - too long
+	s := "😚😉😉☺😊😉😚😚😙☺😗☺😙😙☺☺😚☺☺😚👱‍♂🙍🙍‍♀👩‍🦲👱‍♂🙎‍♂🙍‍♀🧑‍🦲🙎‍♂🙎‍♂💁‍♂🧏‍♀🧏‍♀🧏‍♂🙋🧏‍♂🤷‍♂🧏‍♂🧏‍♂🤷‍♂"
+	count := utf8.RuneCountInString(s)
+	assert.Equal(t, 76, count)
+
+	// punycode it please
+	punycode, err := idna.ToASCII(s)
+	assert.NoError(t, err)
+	len := uint32(utf8.RuneCountInString(punycode))
+	assert.Equal(t, 124, len)
+
+	_, err = NormalizeAnyName(s+".any", useEnsip15)
 	assert.Error(t, err)
 }
 

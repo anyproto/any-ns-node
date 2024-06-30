@@ -22,6 +22,7 @@ network:
             - coordinator
     creationTime: 2023-07-21T11:51:12.970882+01:00
 networkStorePath: .
+ensip15validation: false
 log:
   production: false
 limiter:

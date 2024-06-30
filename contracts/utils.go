@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/pkg/errors"
@@ -21,6 +22,8 @@ var (
 	// p       = idna.New(idna.MapForLookup(), idna.ValidateLabels(false), idna.CheckHyphens(false), idna.StrictDomainName(false), idna.Transitional(false))
 	pStrict = idna.New(idna.MapForLookup(), idna.ValidateLabels(false), idna.CheckHyphens(false), idna.StrictDomainName(true), idna.Transitional(false))
 )
+
+const MAX_NAME_LENGTH = 100
 
 func normalize(input string) (string, error) {
 	// output, err := p.ToUnicode(input)
@@ -39,6 +42,16 @@ func normalize(input string) (string, error) {
 	}
 	if strings.Contains(input, ".") {
 		return "", errors.New("name cannot contain a period")
+	}
+
+	// now check the punycode length of the name
+	punycode, err := idna.ToASCII(input)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to convert to punycode")
+	}
+	len := uint32(utf8.RuneCountInString(punycode))
+	if len > MAX_NAME_LENGTH {
+		return "", errors.New("name too long")
 	}
 
 	// add .any suffix
