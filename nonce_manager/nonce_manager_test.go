@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
@@ -185,6 +186,8 @@ func newFixture(t *testing.T, nonceOverride uint64) *fixture {
 	// drop database any-ns
 	err = client.Database("any-ns").Drop(ctx)
 	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
 
 	return fx
 }

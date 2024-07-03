@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
@@ -107,6 +108,8 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 
 	err = client.Database(fx.config.Mongo.Database).Drop(ctx)
 	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
 
 	fx.aa = mock_accountabstraction.NewMockAccountAbstractionService(fx.ctrl)
 	fx.aa.EXPECT().Name().Return(accountabstraction.CName).AnyTimes()

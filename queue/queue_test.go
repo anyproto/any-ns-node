@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
@@ -629,6 +630,8 @@ func newFixture(t *testing.T) *fixture {
 	// drop database any-ns
 	err = client.Database("any-ns").Drop(ctx)
 	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
 
 	return fx
 }
