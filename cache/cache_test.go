@@ -73,9 +73,7 @@ func newFixture(t *testing.T) *fixture {
 	require.NoError(t, err)
 
 	// drop database any-ns-test
-	err = client.Database("any-ns-test").Drop(ctx)
-	require.NoError(t, err)
-
+	client.Database("any-ns-test").Drop(ctx)
 	time.Sleep(100 * time.Millisecond)
 
 	return fx

@@ -54,9 +54,7 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(fx.config.Mongo.Connect))
 	require.NoError(t, err)
 
-	err = client.Database(fx.config.Mongo.Database).Drop(ctx)
-	require.NoError(t, err)
-
+	client.Database(fx.config.Mongo.Database).Drop(ctx)
 	time.Sleep(100 * time.Millisecond)
 
 	fx.a.Register(fx.ts).

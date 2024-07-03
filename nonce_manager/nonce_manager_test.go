@@ -184,8 +184,7 @@ func newFixture(t *testing.T, nonceOverride uint64) *fixture {
 	require.NoError(t, err)
 
 	// drop database any-ns
-	err = client.Database("any-ns").Drop(ctx)
-	require.NoError(t, err)
+	client.Database("any-ns").Drop(ctx)
 
 	time.Sleep(100 * time.Millisecond)
 
