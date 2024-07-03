@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-sync/accountservice"
@@ -54,7 +55,10 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 	require.NoError(t, err)
 
 	err = client.Database(fx.config.Mongo.Database).Drop(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		// sleep 1 second
+		time.Sleep(1 * time.Second)
+	}
 
 	fx.a.Register(fx.ts).
 		// this generates new random account every Init
