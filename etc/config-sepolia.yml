@@ -33,14 +33,14 @@ network:
           addresses:
               - stage1-any-sync-nsnode1.toolpad.org:443
               - stage1-any-sync-nsnode1.toolpad.org:1443
-              - stage1-any-sync-nsnode1.toolpad.org:5430
+              - quic://stage1-any-sync-nsnode1.toolpad.org:5430
           types:
              - namingNode
         - peerId: 12D3KooWEvKan54MNnyVsNpTjcYnGzi9M18Bsas2ByxvZVJ3FrwA
           addresses:
           - stage1-any-sync-ppnode1.toolpad.org:443
           - stage1-any-sync-ppnode1.toolpad.org:1443
-          - stage1-any-sync-ppnode1.toolpad.org:5430
+          - quic://stage1-any-sync-ppnode1.toolpad.org:5430
         types:
             - paymentProcessingNode
     creationTime: 2023-07-21T11:51:12.970882+01:00
