@@ -68,8 +68,7 @@ type QueueItem struct {
 	RegisterPeriodMonths uint32          `bson:"registerPeriodMonths"`
 
 	// for ItemType_NameRenew
-	NameRenewDurationSec uint64 `bson:"nameRenewDurationSec"`
-	TxRenewCommitHash    string `bson:"txRenewCommitHash"`
+	TxRenewCommitHash string `bson:"txRenewCommitHash"`
 
 	TxCurrentNonce uint64 `bson:"currentTxNonce"`
 	TxCurrentRetry uint   `bson:"currentTxRetry"`
@@ -103,15 +102,20 @@ func queueItemFromNameRenewRequest(req *nsp.NameRenewRequest, count int64) Queue
 	currTime := time.Now().Unix()
 
 	return QueueItem{
-		Index:                count,
-		ItemType:             ItemType_NameRenew,
-		FullName:             req.FullName,
-		NameRenewDurationSec: req.DurationSeconds,
-		Status:               OperationStatus_Initial,
-		DateCreated:          currTime,
-		DateModified:         currTime,
+		Index:           count,
+		ItemType:        ItemType_NameRenew,
+		FullName:        req.FullName,
+		OwnerAnyAddress: req.OwnerAnyAddress,
+		OwnerEthAddress: req.OwnerEthAddress,
+
+		RegisterPeriodMonths: req.RenewPeriodMonths,
+
+		Status:       OperationStatus_Initial,
+		DateCreated:  currTime,
+		DateModified: currTime,
 	}
-}*/
+}
+*/
 
 // TODO: remove this
 func nameRegisterRequestFromQueueItem(item QueueItem) *nsp.NameRegisterRequest {

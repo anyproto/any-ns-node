@@ -58,6 +58,7 @@ type AccountAbstractionService interface {
 	AdminMintAccessTokens(ctx context.Context, scw common.Address, amount *big.Int) (operationID string, err error)
 	// use it to register a name on behalf of a user
 	AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (operationID string, err error)
+	AdminNameRenew(ctx context.Context, in *nsp.NameRenewRequest) (operationID string, err error)
 
 	// get data to sign with your PK:
 	GetDataNameRegister(ctx context.Context, in *nsp.NameRegisterRequest) (dataOut []byte, contextData []byte, err error)
@@ -549,6 +550,41 @@ func (aa *anynsAA) getCallDataForNameRegister(fullName string, ownerAnyAddress s
 	return executeCallDataOut, nil
 }
 
+func (aa *anynsAA) getCallDataForNameRenewal(fullName string, registerPeriodMonths uint32) ([]byte, error) {
+	registrarControllerPrivate := common.HexToAddress(aa.confContracts.AddrRegistrarPrivateController)
+
+	parsedABI, err := abi.JSON(strings.NewReader(renewABI))
+	if err != nil {
+		log.Fatal("failed to parse ABI", zap.Error(err))
+		return nil, err
+	}
+
+	parts := strings.Split(fullName, ".")
+	if len(parts) != 2 {
+		return nil, errors.New("invalid name")
+	}
+	firstPart := parts[0]
+	durSeconds := uint64(registerPeriodMonths) * (31 * 24 * 60 * 60)
+
+	callDataOriginal1, err := parsedABI.Pack("renew", firstPart, durSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	// create array of call data
+	targets := []common.Address{registrarControllerPrivate}
+	callDataOriginals := [][]byte{callDataOriginal1}
+
+	// 4 - wrap it into "execute" call
+	executeCallDataOut, err := getCallDataForBatchExecute(targets, callDataOriginals)
+	if err != nil {
+		log.Error("failed to get call data", zap.Error(err))
+		return nil, err
+	}
+
+	return executeCallDataOut, nil
+}
+
 // after data is signed - now you are ready to send it
 func (aa *anynsAA) SendUserOperation(ctx context.Context, contextData []byte, signedByUserData []byte) (operationID string, err error) {
 	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
@@ -763,6 +799,153 @@ func (aa *anynsAA) AdminNameRegister(ctx context.Context, in *nsp.NameRegisterRe
 	isReverseRecordUpdate := true
 
 	callData, err := aa.getCallDataForNameRegister(in.FullName, in.OwnerAnyAddress, nameOwnerEthAddress, spaceID, isReverseRecordUpdate, in.RegisterPeriodMonths)
+	if err != nil {
+		log.Error("failed to get original call data", zap.Error(err))
+		return "", err
+	}
+
+	log.Debug("prepared call data", zap.String("callData", hex.EncodeToString(callData)))
+	id := aa.getNextAlchemyRequestID()
+
+	// only specify factoryAddr if you need to instanitate a new SCW
+	factoryAddr := common.Address{}
+	deployed, err := aa.IsScwDeployed(ctx, adminScw)
+	if err != nil {
+		log.Error("failed to check if SCW is deployed", zap.Error(err))
+		return "", err
+	}
+	if !deployed {
+		factoryAddr = common.HexToAddress(aa.aaConfig.AccountFactory)
+	}
+
+	rgapd, err := aa.alchemy.CreateRequestGasAndPaymasterData(callData, adminAddress, adminScw, uint64(nonce.Int64()), policyID, entryPointAddr, factoryAddr, id)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return "", err
+	}
+
+	jsonDATAPre, err := json.Marshal(rgapd)
+	if err != nil {
+		log.Error("can not marshal JSON", zap.Error(err))
+		return "", err
+	}
+
+	log.Debug("jsonDataPre is ready", zap.String("jsonDataPre", string(jsonDATAPre)))
+
+	// 5 - send it
+	response, err := aa.alchemy.SendRequest(alchemyApiKey, jsonDATAPre)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return "", err
+	}
+
+	// parse response
+	responseStruct := asdk.JSONRPCResponseGasAndPaymaster{}
+	err = json.Unmarshal(response, &responseStruct)
+	if err != nil {
+		log.Error("failed to unmarshal response", zap.Error(err))
+		return "", err
+	}
+	// TODO: handle "Error code": -32500  "AA25 invalid account nonce" error
+	// TODO: handle "Error code": -32500, "AA20 account not deployed"
+	// TODO: handle "Error code": -32500,	"AA10 sender already constructed"
+	if responseStruct.Error.Code != 0 {
+		log.Error("GasAndPaymaster call failed",
+			zap.Int("Error code", responseStruct.Error.Code),
+			zap.String("Error message", responseStruct.Error.Message),
+		)
+		return "", errors.New(responseStruct.Error.Message)
+	}
+
+	log.Info("alchemy_requestGasAndPaymasterAndData got response", zap.Any("responseStruct", responseStruct))
+
+	// 6 - now create new transaction
+	appendEntryPoint := true
+	jsonDATA, err := aa.alchemy.CreateRequestAndSign(callData, responseStruct, chainID, entryPointAddr, adminAddress, adminScw, uint64(nonce.Int64()), id+1, adminPK, factoryAddr, appendEntryPoint)
+	if err != nil {
+		log.Error("failed to create request", zap.Error(err))
+		return "", err
+	}
+
+	log.Info("created eth_sendUserOperation request", zap.String("jsonDATA", string(jsonDATA)))
+
+	// send it
+	response, err = aa.alchemy.SendRequest(alchemyApiKey, jsonDATA)
+	if err != nil {
+		log.Error("failed to send request", zap.Error(err))
+		return "", err
+	}
+
+	log.Info("eth_sendUserOperation got response", zap.Any("response", response))
+
+	// 7 - get op hash
+	// returns err if error is in the response
+	opHash, err := aa.alchemy.DecodeResponseSendRequest(response)
+	if err != nil {
+		log.Error("failed to decode response or error", zap.Error(err))
+		return "", err
+	}
+	log.Info("decoded response", zap.String("opHash", opHash))
+
+	// TODO: loop
+	// GetOperation()
+	log.Info("eth_getUserOperationReceipt got response", zap.Any("r", response), zap.String("opHash", opHash))
+	return opHash, nil
+}
+
+func (aa *anynsAA) AdminNameRenew(ctx context.Context, in *nsp.NameRenewRequest) (operationID string, err error) {
+	// settings from config:
+	entryPointAddr := common.HexToAddress(aa.aaConfig.EntryPoint)
+
+	alchemyApiKey := aa.aaConfig.AlchemyApiKey
+	policyID := aa.aaConfig.GasPolicyId
+
+	adminAddress := common.HexToAddress(aa.confContracts.AddrAdmin)
+	adminPK := aa.confContracts.AdminPk
+
+	var chainID int64 = int64(aa.aaConfig.ChainID)
+
+	// do additional check (for extra safety)
+	// overwrites in.FullName!
+	useEnsip15 := aa.conf.Ensip15Validation
+	in.FullName, err = contracts.NormalizeAnyName(in.FullName, useEnsip15)
+	if err != nil {
+		log.Error("failed to normalize name", zap.Error(err))
+		return "", err
+	}
+
+	// 0 - use SCW! this method DOES NOT SUPPORT renewal to the original owner
+	// see "in.RegisterToSmartContractWallet" above
+	addr, err := aa.GetSmartWalletAddress(ctx, common.HexToAddress(in.OwnerEthAddress))
+	if err != nil {
+		log.Error("failed to get smart wallet address", zap.Error(err))
+		return "", err
+	}
+	nameOwnerEthAddress := addr.String()
+	log.Info("RegisterToSmartContractWallet was true. Using SCW to register name",
+		zap.String("FullName", in.FullName),
+		zap.String("OwnerEthAddress", in.OwnerEthAddress),
+		zap.String("SCW", nameOwnerEthAddress),
+	)
+
+	// TODO: optimize, cache it or move to settings
+	// 1 - determine admin's SCW
+	adminScw, err := aa.GetSmartWalletAddress(ctx, adminAddress)
+	if err != nil {
+		log.Error("failed to get smart wallet address for admin", zap.Error(err))
+		return "", err
+	}
+
+	// 2 - get nonce (from admin's SCW)
+	nonce, err := aa.getNonceForSmartWalletAddress(ctx, adminScw)
+	if err != nil {
+		log.Error("failed to get nonce", zap.Error(err))
+		return "", err
+	}
+	log.Info("got nonce for admin", zap.String("adminScw", adminScw.String()), zap.Int64("nonce", nonce.Int64()))
+
+	// 3 - create user operation
+	callData, err := aa.getCallDataForNameRenewal(in.FullName, in.RenewPeriodMonths)
 	if err != nil {
 		log.Error("failed to get original call data", zap.Error(err))
 		return "", err

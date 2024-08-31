@@ -70,6 +70,29 @@ const commitABI = `
 		]
 	`
 
+const renewABI = `
+		[
+			{
+				"inputs": [
+				  {
+					"internalType": "string",
+					"name": "name",
+					"type": "string"
+				  },
+				  {
+					"internalType": "uint256",
+					"name": "duration",
+					"type": "uint256"
+				  }
+				],
+				"name": "renew",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			  }
+		]
+	`
+
 const executeABI = `
 	[
 		{

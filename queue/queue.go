@@ -858,11 +858,14 @@ func (aqueue *anynsQueue) nameRenewMoveStateNext(ctx context.Context, queueItem 
 	}
 	firstPart := parts[0]
 
+	// get duration in seconds
+	durSeconds := uint64(queueItem.RegisterPeriodMonths) * (31 * 24 * 60 * 60)
+
 	// 2 - send tx to the network
 	tx, err := aqueue.contracts.Renew(ctx, &contracts.RenewParams{
 		TxOpts:      authOpts,
 		FullName:    firstPart,
-		DurationSec: queueItem.NameRenewDurationSec,
+		DurationSec: durSeconds,
 		Controller:  controller})
 
 	// can return ErrNonceTooLow error

@@ -74,6 +74,21 @@ func (mr *MockAccountAbstractionServiceMockRecorder) AdminNameRegister(ctx, in a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminNameRegister", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminNameRegister), ctx, in)
 }
 
+// AdminNameRenew mocks base method.
+func (m *MockAccountAbstractionService) AdminNameRenew(ctx context.Context, in *nameserviceproto.NameRenewRequest) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdminNameRenew", ctx, in)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdminNameRenew indicates an expected call of AdminNameRenew.
+func (mr *MockAccountAbstractionServiceMockRecorder) AdminNameRenew(ctx, in any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdminNameRenew", reflect.TypeOf((*MockAccountAbstractionService)(nil).AdminNameRenew), ctx, in)
+}
+
 // GetDataNameRegister mocks base method.
 func (m *MockAccountAbstractionService) GetDataNameRegister(ctx context.Context, in *nameserviceproto.NameRegisterRequest) ([]byte, []byte, error) {
 	m.ctrl.T.Helper()
