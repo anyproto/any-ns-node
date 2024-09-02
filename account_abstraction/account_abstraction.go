@@ -564,9 +564,11 @@ func (aa *anynsAA) getCallDataForNameRenewal(fullName string, registerPeriodMont
 		return nil, errors.New("invalid name")
 	}
 	firstPart := parts[0]
-	durSeconds := uint64(registerPeriodMonths) * (31 * 24 * 60 * 60)
 
-	callDataOriginal1, err := parsedABI.Pack("renew", firstPart, durSeconds)
+	durSeconds := int64(registerPeriodMonths) * (31 * 24 * 60 * 60)
+	var regTime big.Int = *big.NewInt(durSeconds)
+
+	callDataOriginal1, err := parsedABI.Pack("renew", firstPart, &regTime)
 	if err != nil {
 		return nil, err
 	}
