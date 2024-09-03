@@ -226,6 +226,71 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 	return &out, err
 }
 
+func (arpc *anynsRpc) AdminNameRenewSigned(ctx context.Context, in *nsp.NameRenewRequestSigned) (*nsp.OperationResponse, error) {
+	peerId, err := peer.CtxPeerId(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp nsp.OperationResponse
+
+	// 1 - unmarshal the signed request
+	var nrr nsp.NameRenewRequest
+	err = proto.Unmarshal(in.Payload, &nrr)
+	if err != nil {
+		resp.OperationState = nsp.OperationState_Error
+		log.Error("can not unmarshal NameRegisterRequest", zap.Error(err))
+		return &resp, err
+	}
+
+	// 2 - check signature
+	err = verification.VerifyAdminIdentity(arpc.confAccount.PeerKey, peerId)
+	isAllow := arpc.isAdmin(peerId)
+	if !isAllow {
+		log.Error("not an Admin!!!", zap.Error(err))
+		return nil, errors.New("not an Admin!!!")
+	}
+
+	// TODO: validate renew parameters without waiting for TX to fail in the smart contract
+
+	// old version: process it manually in the queue
+	/*
+		// 4 - add to queue
+		operationId, err := arpc.queue.AddNewRequest(ctx, &nrr)
+		resp.OperationId = fmt.Sprint(operationId)
+		resp.OperationState = nsp.OperationState_Pending
+		return &resp, err
+	*/
+
+	// 4 - new version - use AA to process it
+	opID, err := arpc.aa.AdminNameRenew(ctx, &nrr)
+	if err != nil {
+		log.Error("failed to process AdminNameRegister", zap.Error(err))
+		return nil, err
+	}
+
+	// 5 - save operation to mongo (can be used later)
+	cuor := nsp.CreateUserOperationRequest{
+		//Data: [],
+		//SignedData: [],
+		//Context: [],
+		OwnerAnyID:      nrr.OwnerAnyAddress,
+		FullName:        nrr.FullName,
+		OwnerEthAddress: nrr.OwnerEthAddress,
+	}
+	err = arpc.db.SaveOperation(ctx, opID, cuor)
+	if err != nil {
+		log.Error("failed to save operation to Mongo", zap.Error(err))
+		return nil, errors.New("failed to save operation")
+	}
+
+	var out nsp.OperationResponse
+	out.OperationId = opID
+	out.OperationState = nsp.OperationState_Pending
+
+	return &out, err
+}
+
 // Batch methods
 func (arpc *anynsRpc) BatchIsNameAvailable(ctx context.Context, in *nsp.BatchNameAvailableRequest) (out *nsp.BatchNameAvailableResponse, err error) {
 	// for each string in in.FullNames call IsNameAvailable and collect results into out.NameAvailableResponse[]

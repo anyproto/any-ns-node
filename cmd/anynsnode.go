@@ -62,7 +62,7 @@ var (
 	flagVersion    = flag.Bool("v", false, "show version and exit")
 	flagHelp       = flag.Bool("h", false, "show help and exit")
 	flagClient     = flag.Bool("cl", false, "run nsp client")
-	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-fund-user, is-name-available, name-by-address, get-operation, batch-is-name-available, batch-name-by-anyid, name-by-anyid]")
+	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-name-renew, admin-fund-user, is-name-available, name-by-address, get-operation, batch-is-name-available, batch-name-by-anyid, name-by-anyid]")
 	params         = flag.String("params", "", "command params in json format")
 )
 
@@ -164,6 +164,8 @@ func runAsClient(a *app.App, ctx context.Context) {
 	switch *command {
 	case "admin-name-register":
 		adminNameRegister(ctx, a, client)
+	case "admin-name-renew":
+		adminNameRenew(ctx, a, client)
 	case "is-name-available":
 		clientIsNameAvailable(ctx, client)
 	case "batch-is-name-available":
@@ -278,6 +280,48 @@ func adminNameRegister(ctx context.Context, a *app.App, client nsclient.AnyNsCli
 	log.Info("sending request", zap.Any("request", req))
 
 	resp, err := client.AdminRegisterName(ctx, reqSigned)
+	if err != nil {
+		log.Fatal("can't get response", zap.Error(err))
+	}
+	log.Info("got response", zap.Any("response", resp))
+}
+
+func adminNameRenew(ctx context.Context, a *app.App, client nsclient.AnyNsClientService) {
+	var req = &nsp.NameRenewRequest{}
+	err := json.Unmarshal([]byte(*params), &req)
+	if err != nil {
+		log.Fatal("wrong command parameters", zap.Error(err))
+	}
+
+	marshalled, err := req.Marshal()
+	if err != nil {
+		log.Fatal("can't marshal request", zap.Error(err))
+	}
+
+	var reqSigned = &nsp.NameRenewRequestSigned{}
+	reqSigned.Payload = marshalled
+
+	acc := a.MustComponent("config").(accountservice.ConfigGetter).GetAccount()
+
+	signKey, err := crypto.DecodeKeyFromString(
+		acc.SigningKey,
+		crypto.UnmarshalEd25519PrivateKey,
+		nil)
+
+	if err != nil {
+		log.Fatal("can't read signing key", zap.Error(err))
+	}
+
+	// SignKey is used to sign the request
+	sign, err := signKey.Sign(marshalled)
+	if err != nil {
+		log.Fatal("can't sign request", zap.Error(err))
+	}
+	reqSigned.Signature = sign
+
+	log.Info("sending request", zap.Any("request", req))
+
+	resp, err := client.AdminRenewName(ctx, reqSigned)
 	if err != nil {
 		log.Fatal("can't get response", zap.Error(err))
 	}
