@@ -19,7 +19,6 @@ import (
 	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/gogo/protobuf/proto"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 
@@ -188,7 +187,7 @@ func (arpc *anynsAARpc) AdminFundUserAccount(ctx context.Context, in *nsp.AdminF
 
 	// 1 - unmarshal the signed request
 	var afuar nsp.AdminFundUserAccountRequest
-	err = proto.Unmarshal(in.Payload, &afuar)
+	err = afuar.UnmarshalVT(in.Payload)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundUserAccount", zap.Error(err))
 		return nil, errors.New("can not unmarshal AdminFundUserAccount")
@@ -239,7 +238,7 @@ func (arpc *anynsAARpc) AdminFundGasOperations(ctx context.Context, in *nsp.Admi
 
 	// 1 - unmarshal the signed request
 	var afgor nsp.AdminFundGasOperationsRequest
-	err = proto.Unmarshal(in.Payload, &afgor)
+	err = afgor.UnmarshalVT(in.Payload)
 	if err != nil {
 		log.Error("can not unmarshal AdminFundGasOperationsRequest", zap.Error(err))
 		return nil, errors.New("can not unmarshal AdminFundGasOperationsRequest")
@@ -338,7 +337,7 @@ func (arpc *anynsAARpc) CreateUserOperation(ctx context.Context, in *nsp.CreateU
 
 	// 1 - unmarshal the signed request
 	var cuor nsp.CreateUserOperationRequest
-	err = proto.Unmarshal(in.Payload, &cuor)
+	err = cuor.UnmarshalVT(in.Payload)
 	if err != nil {
 		log.Error("can not unmarshal CreateUserOperationRequest", zap.Error(err))
 		return nil, errors.New("can not unmarshal CreateUserOperationRequest")

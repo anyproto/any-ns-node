@@ -8,7 +8,6 @@ import (
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/queue"
-	"github.com/gogo/protobuf/proto"
 
 	"github.com/anyproto/any-ns-node/verification"
 	"github.com/anyproto/any-sync/accountservice"
@@ -165,7 +164,7 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 
 	// 1 - unmarshal the signed request
 	var nrr nsp.NameRegisterRequest
-	err = proto.Unmarshal(in.Payload, &nrr)
+	err = nrr.UnmarshalVT(in.Payload)
 	if err != nil {
 		resp.OperationState = nsp.OperationState_Error
 		log.Error("can not unmarshal NameRegisterRequest", zap.Error(err))
@@ -236,7 +235,7 @@ func (arpc *anynsRpc) AdminNameRenewSigned(ctx context.Context, in *nsp.NameRene
 
 	// 1 - unmarshal the signed request
 	var nrr nsp.NameRenewRequest
-	err = proto.Unmarshal(in.Payload, &nrr)
+	err = nrr.UnmarshalVT(in.Payload)
 	if err != nil {
 		resp.OperationState = nsp.OperationState_Error
 		log.Error("can not unmarshal NameRegisterRequest", zap.Error(err))

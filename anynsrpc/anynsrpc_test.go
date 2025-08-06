@@ -427,7 +427,7 @@ func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
 		req.OwnerEthAddress = "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"
 
 		nrrs := nsp.NameRegisterRequestSigned{}
-		nrrs.Payload, err = req.Marshal()
+		nrrs.Payload, err = req.MarshalVT()
 		require.NoError(t, err)
 
 		nrrs.Signature, err = decodedPeerKey.Sign(nrrs.Payload)

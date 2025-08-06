@@ -243,7 +243,7 @@ func TestAnynsRpc_AdminFundUserAccount(t *testing.T) {
 			NamesCount: 0,
 		}
 
-		marshalled, err := nrr.Marshal()
+		marshalled, err := nrr.MarshalVT()
 		require.NoError(t, err)
 
 		signKey, err := crypto.DecodeKeyFromString(
@@ -687,7 +687,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		// OwnerAnyID in string format
 		cuor.OwnerAnyID = AnytypeID
 
-		marshalled, err := cuor.Marshal()
+		marshalled, err := cuor.MarshalVT()
 		assert.NoError(t, err)
 
 		var cuor_signed nsp.CreateUserOperationRequestSigned
@@ -750,7 +750,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		// OwnerAnyID in string format
 		cuor.OwnerAnyID = AnytypeID
 
-		marshalled, err := cuor.Marshal()
+		marshalled, err := cuor.MarshalVT()
 		assert.NoError(t, err)
 
 		var cuor_signed nsp.CreateUserOperationRequestSigned
@@ -826,7 +826,7 @@ func TestAnynsRpc_CreateUserOperation(t *testing.T) {
 		// OwnerAnyID in string format
 		cuor.OwnerAnyID = AnytypeID
 
-		marshalled, err := cuor.Marshal()
+		marshalled, err := cuor.MarshalVT()
 		assert.NoError(t, err)
 
 		var cuor_signed nsp.CreateUserOperationRequestSigned

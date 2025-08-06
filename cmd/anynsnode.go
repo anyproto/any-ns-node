@@ -251,7 +251,7 @@ func adminNameRegister(ctx context.Context, a *app.App, client nsclient.AnyNsCli
 		log.Fatal("wrong command parameters", zap.Error(err))
 	}
 
-	marshalled, err := req.Marshal()
+	marshalled, err := req.MarshalVT()
 	if err != nil {
 		log.Fatal("can't marshal request", zap.Error(err))
 	}
@@ -293,7 +293,7 @@ func adminNameRenew(ctx context.Context, a *app.App, client nsclient.AnyNsClient
 		log.Fatal("wrong command parameters", zap.Error(err))
 	}
 
-	marshalled, err := req.Marshal()
+	marshalled, err := req.MarshalVT()
 	if err != nil {
 		log.Fatal("can't marshal request", zap.Error(err))
 	}
@@ -416,7 +416,7 @@ func adminFundUserAccount(ctx context.Context, a *app.App, client nsclient.AnyNs
 		log.Fatal("wrong command parameters", zap.Error(err))
 	}
 
-	marshalled, err := req.Marshal()
+	marshalled, err := req.MarshalVT()
 	if err != nil {
 		log.Fatal("can't marshal request", zap.Error(err))
 	}
