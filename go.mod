@@ -6,7 +6,7 @@ require (
 	github.com/adraffy/ENSNormalize.go v0.0.1
 	github.com/ahmetb/govvv v0.3.0
 	github.com/anyproto/alchemy-aa-sdk v0.0.1
-	github.com/anyproto/any-sync v0.11.0
+	github.com/anyproto/any-sync v0.10.4
 	github.com/cheggaaa/mb/v3 v3.0.2
 	github.com/cockroachdb/errors v1.11.1
 	github.com/ethereum/go-ethereum v1.13.15
