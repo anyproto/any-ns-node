@@ -600,7 +600,7 @@ func newFixture(t *testing.T) *fixture {
 
 	fx.config.Contracts = config.Contracts{
 		AddrAdmin: "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51",
-		GethUrl:   "https://sepolia.infura.io/v3/68c55936b8534264801fa4bc313ff26f",
+		GethUrl:   "xxx",
 	}
 
 	fx.config.Queue = config.Queue{
