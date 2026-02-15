@@ -14,5 +14,4 @@ jobs:
     uses: anyproto/shared-actions/.github/workflows/coverage-go-daemons-reusable.yml@v1
     secrets: inherit # pass all secrets
     with:
-      start_redis: true
       start_mongodb: true
