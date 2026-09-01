@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
@@ -430,6 +431,139 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		require.Equal(t, resp.OperationState, nsp.OperationState_Completed)
 	})
 
+	t.Run("should not return Completed if name is not registered yet", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+
+		// do not sleep for real in tests
+		old := updateCacheRetryDelay
+		updateCacheRetryDelay = time.Millisecond
+		defer func() { updateCacheRetryDelay = old }()
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Completed,
+			}, nil
+		})
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+			// name is not in cache
+			return &nsp.NameAvailableResponse{Available: true}, nil
+		})
+
+		// the registry never catches up -> nothing is ever written to the cache
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+			return cache.ErrNameNotRegistered
+		}).Times(updateCacheRetryCount)
+
+		fx.db.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (op db_service.AAUserOperation, err error) {
+			return db_service.AAUserOperation{
+				OperationID: "123",
+				FullName:    "hello.any",
+			}, nil
+		}).MinTimes(1)
+
+		pctx := context.Background()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+		resp, err := fx.GetOperation(pctx, &gosr)
+
+		// the payment node should keep polling instead of latching a terminal state
+		require.NoError(t, err)
+		require.Equal(t, resp.OperationId, "123")
+		require.Equal(t, resp.OperationState, nsp.OperationState_PendingOrNotFound)
+	})
+
+	t.Run("operation completed - registry catches up on retry", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+
+		// do not sleep for real in tests
+		old := updateCacheRetryDelay
+		updateCacheRetryDelay = time.Millisecond
+		defer func() { updateCacheRetryDelay = old }()
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Completed,
+			}, nil
+		})
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+			// name is not in cache
+			return &nsp.NameAvailableResponse{Available: true}, nil
+		})
+
+		// the registry provider is lagging behind, but catches up on the second try
+		var tries int
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+			require.Equal(t, "hello.any", nar.FullName)
+
+			tries++
+			if tries == 1 {
+				return cache.ErrNameNotRegistered
+			}
+			return nil
+		}).Times(2)
+
+		fx.db.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (op db_service.AAUserOperation, err error) {
+			return db_service.AAUserOperation{
+				OperationID: "123",
+				FullName:    "hello.any",
+			}, nil
+		}).MinTimes(1)
+
+		pctx := context.Background()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+		resp, err := fx.GetOperation(pctx, &gosr)
+
+		require.NoError(t, err)
+		require.Equal(t, resp.OperationId, "123")
+		require.Equal(t, resp.OperationState, nsp.OperationState_Completed)
+	})
+
+	t.Run("should stop retrying if context is closed", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
+			return &accountabstraction.OperationInfo{
+				OperationState: nsp.OperationState_Completed,
+			}, nil
+		})
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
+			return &nsp.NameAvailableResponse{Available: true}, nil
+		})
+
+		// the context is already closed -> no second attempt
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+			return cache.ErrNameNotRegistered
+		}).Times(1)
+
+		fx.db.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (op db_service.AAUserOperation, err error) {
+			return db_service.AAUserOperation{
+				OperationID: "123",
+				FullName:    "hello.any",
+			}, nil
+		}).MinTimes(1)
+
+		pctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		gosr := nsp.GetOperationStatusRequest{
+			OperationId: "123",
+		}
+		_, err := fx.GetOperation(pctx, &gosr)
+
+		require.Error(t, err)
+	})
+
 	t.Run("should return error if update in cache failed", func(t *testing.T) {
 		fx := newFixture(t, "")
 		defer fx.finish(t)
@@ -440,6 +574,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 			}, nil
 		})
 
+		// a real failure, not ErrNameNotRegistered -> still an error for the caller
 		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
 			return errors.New("failed to update in cache")
 		})

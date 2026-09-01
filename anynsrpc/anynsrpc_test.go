@@ -171,6 +171,36 @@ func TestAnynsRpc_IsNameAvailable(t *testing.T) {
 		assert.True(t, resp.Available)
 	})
 
+	t.Run("name is available if it is not in the registry", func(t *testing.T) {
+		// see here >
+		readFromCache := false
+
+		fx := newFixture(t, readFromCache)
+		defer fx.finish(t)
+
+		// the registry has no owner for the name -> nothing was cached, but that is
+		// the normal answer for a free name and must not become an RPC error
+		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+			return cache.ErrNameNotRegistered
+		})
+
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (*nsp.NameAvailableResponse, error) {
+			return &nsp.NameAvailableResponse{
+				// free
+				Available: true,
+			}, nil
+		})
+
+		pctx := context.Background()
+		resp, err := fx.IsNameAvailable(pctx, &nsp.NameAvailableRequest{
+			FullName: "hello.any",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.True(t, resp.Available)
+	})
+
 	t.Run("fail if reading from smart contracts failed", func(t *testing.T) {
 		// see here >
 		readFromCache := false
