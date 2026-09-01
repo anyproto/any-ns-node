@@ -206,7 +206,9 @@ func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, nh [3
 		return common.Address{}, err
 	}
 
-	callOpts := bind.CallOpts{}
+	// without an explicit Context go-ethereum falls back to context.Background(),
+	// so the caller could neither cancel nor time out this call
+	callOpts := bind.CallOpts{Context: ctx}
 	own, err := reg.Owner(&callOpts, nh)
 
 	return own, err

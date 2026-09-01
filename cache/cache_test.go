@@ -333,7 +333,7 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 			FullName: "test.any",
 		})
 		require.Error(t, err)
-		require.Equal(t, "not found", err.Error())
+		require.ErrorIs(t, err, ErrNameNotRegistered)
 
 		// it should create new item in Mongo
 		// 2 - check if item is in DB
@@ -430,5 +430,29 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 		require.Equal(t, "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5", item.OwnerEthAddress)
 		require.Equal(t, "0xaab27b150451726ec7738aa1d0a94505c8729bd1", item.OwnerScwEthAddress)
 		require.Equal(t, "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS", item.OwnerAnyAddress)
+	})
+
+	t.Run("return ErrNameNotRegistered if owner is a zero address", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.contracts.EXPECT().CreateEthConnection().AnyTimes()
+
+		// zero address -> name is not in the registry
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, namehash interface{}) (common.Address, error) {
+			return common.Address{}, nil
+		}).Times(1)
+
+		// call it
+		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{
+			FullName: "test.any",
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrNameNotRegistered)
+
+		// nothing should be written to Mongo
+		item := &NameDataItem{}
+		err = fx.itemColl.FindOne(ctx, findNameDataByName{FullName: "test.any"}).Decode(&item)
+		require.Error(t, err)
 	})
 }

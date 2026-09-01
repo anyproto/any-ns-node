@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"time"
 
 	"github.com/anyproto/any-ns-node/cache"
 	"github.com/anyproto/any-ns-node/config"
@@ -28,6 +29,17 @@ import (
 )
 
 const CName = "any-ns.aa-rpc"
+
+// the ENS registry is read through another RPC provider than the one that returns
+// the user operation receipt, so it can lag behind for a short time after the name
+// was really registered on-chain. retry the cache update before giving up on this poll.
+//
+// deliberately NOT a config knob: an absent yaml key would leave the count at 0, the
+// loop would never run and every registration would report "not registered"
+const updateCacheRetryCount = 3
+
+// var and not const only so that tests can shrink it
+var updateCacheRetryDelay = 1 * time.Second
 
 var log = logger.NewNamed(CName)
 
@@ -139,6 +151,15 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 	out.OperationId = fmt.Sprint(in.OperationId)
 	out.OperationState = status.OperationState
 
+	// some operations (like AdminFundUserAccount) legitimately have no row in Mongo.
+	// but if a name registration has none (restored backup, wiped collection), then we
+	// report Completed without ever touching the cache - and there is no FullName here
+	// to tell a registration from a funding operation
+	if !operationFound && status.OperationState == nsp.OperationState_Completed {
+		log.Warn("operation is completed, but it is not in Mongo: cache was not updated",
+			zap.String("OperationId", in.OperationId))
+	}
+
 	// 2 - update cache (only once operation is completed)
 	if operationFound && status.OperationState == nsp.OperationState_Completed {
 		// 2.1 - is info already is in the cache?
@@ -152,17 +173,57 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 
 		// 2.2 - if not -> read from smart contracts
 		log.Info("operation completed, updating cache", zap.String("FullName", op.FullName))
-		err = arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
-			FullName: op.FullName,
-		})
+		err = arpc.updateInCacheWithRetry(ctx, op.FullName)
 
 		if err != nil {
+			// the operation is mined, but the name is still not visible in the registry,
+			// so nothing was written to the cache.
+			// never report Completed here: it is a terminal state for the payment node,
+			// nobody would ever retry and the name would stay unusable forever
+			if errors.Is(err, cache.ErrNameNotRegistered) {
+				log.Warn("operation is completed, but name is not in the registry yet",
+					zap.String("FullName", op.FullName))
+
+				out.OperationState = nsp.OperationState_PendingOrNotFound
+				return &out, nil
+			}
+
 			log.Error("failed to update cache", zap.Error(err))
 			return nil, errors.New("failed to update in cache")
 		}
 	}
 
 	return &out, nil
+}
+
+// the registry provider can lag behind for a short time right after the operation was
+// mined, so do not give up on the very first "not registered" answer.
+//
+// this is a latency optimization only. the payment node keeps polling us for as long as
+// the operation is not Completed, so a lag longer than the retry window is still handled
+// correctly - just one poll interval later
+func (arpc *anynsAARpc) updateInCacheWithRetry(ctx context.Context, fullName string) (err error) {
+	for i := 0; i < updateCacheRetryCount; i++ {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				log.Warn("context is closed while waiting for the registry", zap.String("FullName", fullName))
+				return ctx.Err()
+			case <-time.After(updateCacheRetryDelay):
+			}
+		}
+
+		log.Info("updating cache", zap.String("FullName", fullName), zap.Int("try", i))
+		err = arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
+			FullName: fullName,
+		})
+
+		if !errors.Is(err, cache.ErrNameNotRegistered) {
+			return err
+		}
+	}
+
+	return err
 }
 
 func (arpc *anynsAARpc) isAdmin(peerId string) bool {

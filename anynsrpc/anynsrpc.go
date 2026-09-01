@@ -85,7 +85,8 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailable
 			FullName: in.FullName,
 		})
 
-		if err != nil {
+		// name is not in the registry -> nothing to cache, it is still available
+		if err != nil && !errors.Is(err, cache.ErrNameNotRegistered) {
 			log.Error("failed to update in cache", zap.Error(err))
 			return nil, errors.New("failed to update in cache")
 		}

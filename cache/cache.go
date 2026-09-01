@@ -18,6 +18,12 @@ import (
 
 const CName = "any-ns.cache"
 
+// ErrNameNotRegistered is returned by UpdateInCache when the registry has no owner
+// for the name, so nothing was written to the cache.
+// it is not a transport error: callers should treat it as "not registered (yet)",
+// never as "the cache is up to date"
+var ErrNameNotRegistered = errors.New("name is not registered")
+
 var log = logger.NewNamed(CName)
 
 type NameDataItem struct {
@@ -56,9 +62,11 @@ type CacheService interface {
 	GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdRequest) (out *nsp.NameByAddressResponse, err error)
 
 	// call it when you need to read REAL data: smart contracts -> cache
-	// will return "not found" if can not find name
 	// will return no error if name is found and data was updated
-	// will return error if something went wrong
+	// will return ErrNameNotRegistered if the registry has no owner for the name.
+	// that is an expected answer, not a failure: nothing was written to the cache,
+	// so callers must never treat it as "the cache is up to date"
+	// will return any other error if something went wrong
 	UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error)
 
 	app.Component
@@ -220,20 +228,26 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 	addr, err := cs.contracts.GetOwnerForNamehash(ctx, nh)
 	if err != nil {
 		if err.Error() == "not found" {
-			log.Info("name is not registered yet...")
-			return err
+			// the registry has nothing for that name. same outcome as a zero owner:
+			// nothing was written to the cache, so report it the same way
+			log.Info("registry does not know the name", zap.String("FullName", in.GetFullName()))
+			return ErrNameNotRegistered
 		}
 
 		log.Error("can not get owner", zap.Error(err))
 		return err
 	}
 
+	if (addr == common.Address{}) {
+		// nothing was written to the cache -> never let the caller think it was.
+		// right after a registration this can also mean that the registry provider
+		// has simply not caught up yet, so it is not necessarily a free name
+		log.Warn("registry has no owner for the name", zap.String("FullName", in.GetFullName()))
+		return ErrNameNotRegistered
+	}
+
 	// the owner can be NameWrapper
 	log.Info("received owner address", zap.String("Owner addr", addr.Hex()))
-	if (addr == common.Address{}) {
-		log.Info("name is not registered yet...")
-		return nil
-	}
 
 	// 3 - if name is already registered, then get additional info
 	log.Info("name is already registered...Getting additional info")
