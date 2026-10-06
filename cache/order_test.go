@@ -710,13 +710,15 @@ func TestCacheService_StalledTransactionIsBounded(t *testing.T) {
 			// only this client's commands stall
 			const appName = "go7567-stall"
 			cs, m := serviceWithClient(t, fx, options.Client().SetAppName(appName))
-			expectRegistered(m, testScw, testEoa, testAnyID, notExpired+1)
+			// failCommand skips the test when fail points are unavailable; set it
+			// before the mock expectations so a skip leaves none unmet.
 			failCommand(t, bson.M{
 				"failCommands":    c.commands,
 				"appName":         appName,
 				"blockConnection": true,
 				"blockTimeMS":     stallBlock.Milliseconds(),
 			}, bson.M{"times": len(c.commands)})
+			expectRegistered(m, testScw, testEoa, testAnyID, notExpired+1)
 
 			start := time.Now()
 			var err error
