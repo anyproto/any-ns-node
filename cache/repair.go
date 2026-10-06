@@ -127,24 +127,17 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 	return err
 }
 
-// dueBy: the periodic scan takes the record at t at the latest (an earlier due time stays), never
-// before its lease or backoff
-func dueBy(t int64) bson.D {
-	return bson.D{{Key: "$set", Value: bson.M{
-		"repair_at": bson.M{"$max": bson.A{
-			bson.M{"$min": bson.A{bson.M{"$ifNull": bson.A{"$repair_at", t}}, t}},
-			bson.M{"$ifNull": bson.A{"$refresh_next_at", 0}},
-		}},
-	}}}
-}
-
-// retryLater makes the periodic scan take the cached registration of the name after the backoff:
-// a removal that is not final yet (the backfill). the data stays as it is
+// retryLater backs the cached registration of the name off (refresh_next_at, a longer lease
+// stays) and makes the periodic scan take it right after the backoff (repair_at follows it): a
+// removal that is not final yet (the backfill). the data stays as it is
 func (cs *cacheService) retryLater(ctx context.Context, fullName string) error {
 	ctx, cancel := boundedCtx(ctx)
 	defer cancel()
-	_, err := cs.itemColl.UpdateOne(ctx, bson.M{"name": fullName, "removed": bson.M{"$ne": true}},
-		mongo.Pipeline{dueBy(cs.now().Add(refreshFailureBackoff).UnixMilli())})
+	until := cs.now().Add(refreshFailureBackoff).UnixMilli()
+	_, err := cs.itemColl.UpdateOne(ctx, bson.M{"name": fullName, "removed": bson.M{"$ne": true}}, mongo.Pipeline{
+		{{Key: "$set", Value: bson.M{"refresh_next_at": bson.M{"$max": bson.A{bson.M{"$ifNull": bson.A{"$refresh_next_at", 0}}, until}}}}},
+		{{Key: "$set", Value: bson.M{"repair_at": "$refresh_next_at"}}},
+	})
 	return err
 }
 

@@ -138,6 +138,8 @@ func TestCacheService_RefreshAll(t *testing.T) {
 				return
 			}
 			require.Greater(t, item.RepairAt, time.Now().UnixMilli())
+			require.Equal(t, item.RefreshNextAt, item.RepairAt, "backing off: no lookup or scan takes it before")
+			require.Zero(t, repairRound(t, fx))
 
 			// finality catches up: the scan (no lookup) removes it after the backoff
 			later := time.Now().Add(refreshFailureBackoff + time.Second)
@@ -147,6 +149,33 @@ func TestCacheService_RefreshAll(t *testing.T) {
 			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
 			require.Equal(t, 1, repairRound(t, fx))
 			require.True(t, cachedItem(t, fx).Removed)
+		})
+
+		t.Run(fmt.Sprintf("apply=%v: a not-final record that was already overdue backs off too", apply), func(t *testing.T) {
+			fx := newFixture(t)
+			defer fx.finish(t)
+			seedItem(t, fx, inGrace, 10, 0)
+			_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"repair_at": int64(1)}})
+			require.NoError(t, err)
+
+			fx.setHead(300, time.Now())
+			fx.setFinalized(290, time.Now())
+			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
+			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(300)).Return(big.NewInt(lapsed), nil)
+			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(inGrace), nil)
+			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
+			require.NoError(t, err)
+			require.Equal(t, RefreshStats{Total: 1, NotFinal: 1}, stats)
+
+			item := cachedItem(t, fx)
+			if !apply {
+				require.Equal(t, int64(1), item.RepairAt)
+				return
+			}
+			require.Greater(t, item.RefreshNextAt, time.Now().Add(refreshFailureBackoff-10*time.Second).UnixMilli())
+			require.Equal(t, item.RefreshNextAt, item.RepairAt)
+			require.Zero(t, repairRound(t, fx), "not before the backoff")
+			require.False(t, needsRefresh(item, time.Now()), "nor a lookup")
 		})
 
 		t.Run(fmt.Sprintf("apply=%v: lapsed at the latest block, the finalized block can not be read: failed, not not-final", apply), func(t *testing.T) {
