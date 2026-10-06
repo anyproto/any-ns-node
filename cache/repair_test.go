@@ -518,19 +518,98 @@ func TestCacheService_Rereads(t *testing.T) {
 		require.Zero(t, repairRound(t, fx))
 	})
 
-	t.Run("an observation that loses to a newer record still does the due re-reads", func(t *testing.T) {
+	t.Run("a stale observation (older block) does not do the due re-reads, a read of the stored state does", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seedItem(t, fx, notExpired, 500, 0)
-		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"rereads": bson.A{int64(1000), int64(5000)}}})
+		r1, r2 := 10*time.Minute.Milliseconds(), 50*time.Minute.Milliseconds()
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"rereads": bson.A{r1, r2}, "repair_at": r1}})
 		require.NoError(t, err)
 
-		stored, err := fx.applyObservation(ctx, obsAt(400, blockHash(400).Hex(), 2000), refreshOpts{})
+		stored, err := fx.applyObservation(ctx, obsAt(400, blockHash(400).Hex(), r2+1), refreshOpts{})
 		require.NoError(t, err)
 		require.Equal(t, int64(500), stored.ObservedBlock)
 		item := cachedItem(t, fx)
-		require.Equal(t, []int64{5000}, item.Rereads)
-		require.Equal(t, int64(5000), item.RepairAt)
+		require.Equal(t, []int64{r1, r2}, item.Rereads)
+		require.Equal(t, r1, item.RepairAt)
+
+		// another fork at the same height, read before the stored one: stale too
+		_, err = fx.applyObservation(ctx, obsAt(500, blockHash(499).Hex(), -1), refreshOpts{})
+		require.NoError(t, err)
+		require.Equal(t, []int64{r1, r2}, cachedItem(t, fx).Rereads)
+
+		// the stored state read again (same block and hash) at 2000: the first one is done
+		_, err = fx.applyObservation(ctx, obsAt(500, blockHash(500).Hex(), r1+1), refreshOpts{})
+		require.NoError(t, err)
+		item = cachedItem(t, fx)
+		require.Equal(t, []int64{r2}, item.Rereads)
+		require.Equal(t, r2, item.RepairAt)
+	})
+
+	t.Run("re-reads against a lagging head stay due until the head moves, then reconcile", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		// a renewal cached at block 500 (it can be on a fork that is reorged away)
+		fx.setHead(500, time.Now())
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired+100)
+		require.NoError(t, fx.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+
+		// both re-reads hit a backend at block 499 (the old expiry): stale, they stay due
+		fx.setHead(499, time.Now())
+		for _, at := range []time.Duration{5 * time.Minute, 30 * time.Minute} {
+			later := time.Now().Add(at + time.Second)
+			fx.now = func() time.Time { return later }
+			expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+			require.Equal(t, 1, repairRound(t, fx))
+			item := cachedItem(t, fx)
+			require.Len(t, item.Rereads, 2)
+			require.Equal(t, notExpired+100, item.NameExpires)
+			// retried after the lease, not at the cached expiry
+			require.LessOrEqual(t, item.RepairAt, later.Add(refreshLease).UnixMilli())
+		}
+
+		// the chain moved on (block 510): the renewal was reorged away, the old expiry is final
+		later := time.Now().Add(31*time.Minute + refreshLease + time.Second)
+		fx.now = func() time.Time { return later }
+		fx.setHead(510, time.Now())
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.Equal(t, 1, repairRound(t, fx))
+		item := cachedItem(t, fx)
+		require.Equal(t, notExpired, item.NameExpires)
+		require.Empty(t, item.Rereads)
+		require.Equal(t, notExpired*1000, item.RepairAt)
+	})
+
+	t.Run("a removal refused against a newer registration keeps the re-reads", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		fx.setHead(500, time.Now())
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.NoError(t, fx.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+
+		// at the re-read: no owner at the latest block, and the finalized block (490) is behind
+		// the cached registration: the tombstone loses, not final
+		later := time.Now().Add(5*time.Minute + time.Second)
+		fx.now = func() time.Time { return later }
+		fx.setHead(505, time.Now())
+		fx.setFinalized(490, time.Now())
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
+		require.Equal(t, 1, repairRound(t, fx))
+		item := cachedItem(t, fx)
+		require.False(t, item.Removed)
+		require.Len(t, item.Rereads, 2)
+		require.Equal(t, later.Add(refreshFailureBackoff).UnixMilli(), item.RepairAt)
+
+		// finality catches up: removed
+		later2 := later.Add(refreshFailureBackoff + time.Second)
+		fx.now = func() time.Time { return later2 }
+		fx.setHead(520, time.Now())
+		fx.setFinalized(510, time.Now())
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
+		require.Equal(t, 1, repairRound(t, fx))
+		require.True(t, cachedItem(t, fx).Removed)
 	})
 
 	t.Run("a failed refresh after an operation marks the record (data kept) with the re-reads", func(t *testing.T) {

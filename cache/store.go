@@ -259,11 +259,20 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 		log.Info("the cache has a newer record of the name, keeping it", zap.String("FullName", item.FullName),
 			zap.Int64("cached block", stored.ObservedBlock), zap.Int64("read block", item.ObservedBlock))
 		set, unset := bson.M{}, bson.M{}
-		if item.ObservedBlock == stored.ObservedBlock && item.ObservedBlockHash == stored.ObservedBlockHash && item.ObservedAt > readAt(stored) {
+		sameState := item.ObservedBlock == stored.ObservedBlock && item.ObservedBlockHash == stored.ObservedBlockHash
+		if sameState && item.ObservedAt > readAt(stored) {
 			stored.ForkReadAt = item.ObservedAt
 			set["fork_read_at"] = stored.ForkReadAt
 		}
-		if rereads := mergeRereads(stored.Rereads, o.rereads, item.ObservedAt); !slices.Equal(rereads, stored.Rereads) {
+		// the due re-reads are done only by a read of the stored state itself (the same block):
+		// a stale read (an older block, a fork that lost, a removal the cache has a newer
+		// registration against) decides nothing, they stay due (the lease, or the backoff of a
+		// failed refresh, delays the next try)
+		doneAt := int64(0)
+		if sameState {
+			doneAt = item.ObservedAt
+		}
+		if rereads := mergeRereads(stored.Rereads, o.rereads, doneAt); !slices.Equal(rereads, stored.Rereads) {
 			stored.Rereads = rereads
 			setOrUnset(set, unset, "rereads", rereads, len(rereads) == 0)
 			stored.RepairAt = repairAt(stored)
@@ -286,6 +295,13 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 
 	if item.RefreshNeeded && stored != nil {
 		mergeConfirmedOwner(&item, stored)
+	}
+	// a replacement in the same fork keeps the latest read of that fork (the stored record's,
+	// if it was read later: e.g. an incomplete read replaced by an earlier complete one)
+	if stored != nil && item.ObservedBlock == stored.ObservedBlock && item.ObservedBlockHash == stored.ObservedBlockHash {
+		if read := readAt(stored); read > item.ObservedAt {
+			item.ForkReadAt = max(item.ForkReadAt, read)
+		}
 	}
 	var before []int64
 	if stored != nil {

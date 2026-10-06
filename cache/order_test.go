@@ -340,6 +340,33 @@ func TestCacheService_ChainOrder(t *testing.T) {
 		}
 	})
 
+	t.Run("a replacement in the same fork keeps the fork's latest read: a stale other fork can not win", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		// fork A at block 600, incomplete, read at 300
+		incomplete := obsAt(600, "0xa", 300)
+		incomplete.RefreshNeeded, incomplete.OwnerEthAddress = true, ""
+		_, err := fx.applyObservation(ctx, incomplete, refreshOpts{})
+		require.NoError(t, err)
+		// a delayed complete read of fork A from 100 replaces it (complete wins in one fork)
+		complete := obsAt(600, "0xa", 100)
+		_, err = fx.applyObservation(ctx, complete, refreshOpts{})
+		require.NoError(t, err)
+		item := cachedItem(t, fx)
+		require.False(t, item.RefreshNeeded)
+		require.Equal(t, int64(300), item.ForkReadAt)
+
+		// a delayed read of fork B from 200: fork A was read later, it stays
+		b := obsAt(600, "0xb", 200)
+		b.OwnerEthAddress = otherEoa
+		_, err = fx.applyObservation(ctx, b, refreshOpts{})
+		require.NoError(t, err)
+		item = cachedItem(t, fx)
+		require.Equal(t, "0xa", item.ObservedBlockHash)
+		require.Equal(t, testEoa, item.OwnerEthAddress)
+	})
+
 	t.Run("a legacy record (raw BSON, no observation fields) is replaced by any read", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)

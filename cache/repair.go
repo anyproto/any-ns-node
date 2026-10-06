@@ -175,7 +175,8 @@ func repairAt(d *NameDataItem) int64 {
 		due = 1
 	} else {
 		if len(d.Rereads) > 0 {
-			due = d.Rereads[0]
+			// the earliest (an update outside of a transaction appends unsorted, see ScheduleRereads)
+			due = slices.Min(d.Rereads)
 		}
 		if !d.Removed && d.NameExpires > 0 {
 			if e := expiryCheckAt(d); due == 0 || e < due {
