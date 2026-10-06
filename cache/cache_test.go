@@ -116,6 +116,14 @@ func (fx *fixture) setHeadFunc(head func() *contracts.Block) {
 	fx.head = head
 }
 
+// setFinalized makes FinalizedBlock return this block from now on
+func (fx *fixture) setFinalized(block int64, at time.Time) {
+	fx.headMu.Lock()
+	defer fx.headMu.Unlock()
+	b := testBlock(block, at)
+	fx.finalized = func() *contracts.Block { return b }
+}
+
 // setFinalizedErr makes FinalizedBlock fail with err from now on
 func (fx *fixture) setFinalizedErr(err error) {
 	fx.headMu.Lock()
@@ -154,6 +162,8 @@ func newFixture(t *testing.T) *fixture {
 		Connect:  testMongoURI(),
 		Database: testDbName,
 	}
+	// the tests run on a standalone Mongo too (see testMongoURI)
+	fx.config.Cache = config.Cache{AllowUnsafeStandalone: true}
 
 	fx.a.Register(fx.ts).
 		Register(fx.config).
@@ -189,6 +199,15 @@ func newFixture(t *testing.T) *fixture {
 	require.NoError(t, err)
 
 	return fx
+}
+
+// setNameData writes the record as it is (an upsert by the name), like a node older than GO-7567
+// did. the refresh paths of the cache never do: they write in order (see applyObservation)
+func (fx *fixture) setNameData(ctx context.Context, in *NameDataItem) error {
+	in.OwnerScwEthAddress = strings.ToLower(in.OwnerScwEthAddress)
+	in.OwnerEthAddress = strings.ToLower(in.OwnerEthAddress)
+	_, err := fx.itemColl.ReplaceOne(ctx, findNameDataByName{FullName: in.FullName}, in, options.Replace().SetUpsert(true))
+	return err
 }
 
 func (fx *fixture) finish(t *testing.T) {

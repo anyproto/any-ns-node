@@ -40,6 +40,7 @@ type Config struct {
 	Quic             quic.Config            `yaml:"quic"`
 	Yamux            yamux.Config           `yaml:"yamux"`
 	Mongo            Mongo                  `yaml:"mongo"`
+	Cache            Cache                  `yaml:"cache"`
 	Contracts        Contracts              `yaml:"contracts"`
 	Aa               AA                     `yaml:"accountAbstraction"`
 	Metric           metric.Config          `yaml:"metric"`

@@ -48,6 +48,13 @@ func expectRegistered(m *mock_contracts.MockContractsService, scw string, eoa st
 	m.EXPECT().GetScwOwner(gomock.Any(), common.HexToAddress(scw), gomock.Any()).Return(common.HexToAddress(eoa), nil)
 }
 
+// the contracts answer for a lapsed name: the registry still points to the NameWrapper.
+// read twice: at the latest block, then (a cached record is removed) at the finalized one
+func expectLapsed(m *mock_contracts.MockContractsService) {
+	m.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
+	m.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil).Times(2)
+}
+
 // pause makes a mocked call block until release (or until the test ends)
 type pause struct {
 	entered chan struct{}
@@ -62,6 +69,11 @@ func newPause(t *testing.T) *pause {
 }
 
 func (p *pause) Release() { p.once.Do(func() { close(p.release) }) }
+
+func (p *pause) wait() {
+	close(p.entered)
+	<-p.release
+}
 
 func (p *pause) Entered(t *testing.T) {
 	t.Helper()
