@@ -250,6 +250,39 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		require.EqualValues(t, 1, n)
 	})
 
+	t.Run("a mixed-case operation of a cached name takes the cached path (no contract read in the poll)", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+		cs, cm, coll := newRealCache(t)
+		fx.anynsAARpc.cache = cs
+		seed(t, coll)
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).Return(&accountabstraction.OperationInfo{
+			OperationState: nsp.OperationState_Completed,
+		}, nil)
+		fx.db.EXPECT().GetOperation(gomock.Any(), gomock.Any()).Return(db_service.AAUserOperation{
+			OperationID: "123",
+			FullName:    "Hello.any",
+		}, nil)
+		// the background refresh is held until the poll returned
+		release := make(chan struct{})
+		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, _ [32]byte, _ common.Hash) (common.Address, error) {
+				select {
+				case <-release:
+				case <-ctx.Done():
+				}
+				return common.Address{}, errors.New("released")
+			}).AnyTimes()
+
+		start := time.Now()
+		resp, err := getOperation(t, fx)
+		require.NoError(t, err)
+		require.Equal(t, nsp.OperationState_Completed, resp.OperationState)
+		require.Less(t, time.Since(start), 3*time.Second)
+		require.Len(t, cachedItem(t, coll).Rereads, 2)
+		close(release)
+	})
+
 	t.Run("not cached, the registry does not have it yet: Pending, nothing is cached", func(t *testing.T) {
 		old := updateCacheRetryDelay
 		updateCacheRetryDelay = time.Millisecond
