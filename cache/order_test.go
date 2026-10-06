@@ -501,13 +501,13 @@ func TestCacheService_TransactionInterleave(t *testing.T) {
 			}
 			done := make(chan result, 1)
 			go func() {
-				w, err := fx.applyObservation(ctx, c.older)
+				w, err := fx.applyObservation(ctx, c.older, refreshOpts{})
 				done <- result{w, err}
 			}()
 			p.Entered(t)
 
 			// the newer observation commits while the older one is in its transaction
-			w, err := fx.applyObservation(ctx, c.newerO)
+			w, err := fx.applyObservation(ctx, c.newerO, refreshOpts{})
 			require.NoError(t, err)
 			require.Equal(t, int64(200), w.ObservedBlock)
 
@@ -553,7 +553,7 @@ func TestCacheService_ConcurrentWriters(t *testing.T) {
 				if block%3 == 0 {
 					o = &NameDataItem{FullName: testFullName, Removed: true, ObservedBlock: block, ObservedBlockHash: blockHash(block).Hex()}
 				}
-				_, err := fx.applyObservation(ctx, o)
+				_, err := fx.applyObservation(ctx, o, refreshOpts{})
 				errs <- err
 			}(int64(i))
 		}
@@ -585,7 +585,7 @@ func TestCacheService_ConcurrentFirstWrites(t *testing.T) {
 		for i := 1; i <= writers; i++ {
 			go func(block int64) {
 				<-start
-				_, err := fx.applyObservation(ctx, obsAt(block, blockHash(block).Hex(), time.Now().UnixMilli()))
+				_, err := fx.applyObservation(ctx, obsAt(block, blockHash(block).Hex(), time.Now().UnixMilli()), refreshOpts{})
 				errs <- err
 			}(int64(i))
 		}

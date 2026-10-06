@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -43,9 +44,54 @@ const (
 // a var only so that tests can shrink it
 var refreshLease = time.Minute
 
+// rereadDelays: after a completed operation the name is read again at these delays (by the
+// periodic scan, see Rereads), whatever the first refresh found:
+//   - 5 minutes: the contracts provider (load balanced backends) can lag behind the one that
+//     returned the operation's receipt; a few minutes later it has the operation's block
+//   - 30 minutes: longer than the Sepolia finality (~13 minutes), so the operation's block is
+//     final by then: a reorg that dropped or changed the operation shows up in this read
+var rereadDelays = []time.Duration{5 * time.Minute, 30 * time.Minute}
+
+const (
+	// re-reads closer than this to each other are one (repeated polls of an operation)
+	rereadCoalesce = time.Minute
+	// at most this many pending re-reads per record
+	maxRereads = 8
+)
+
+// rereadTimes: the re-reads of a name changed by an operation completed now
+func (cs *cacheService) rereadTimes() []int64 {
+	now := cs.now()
+	out := make([]int64, 0, len(rereadDelays))
+	for _, d := range rereadDelays {
+		out = append(out, now.Add(d).UnixMilli())
+	}
+	return out
+}
+
+// mergeRereads: the pending re-reads of a and b, without the ones done by a read at doneAt
+// (unix ms), sorted, coalesced, at most maxRereads
+func mergeRereads(a, b []int64, doneAt int64) []int64 {
+	all := append(append(make([]int64, 0, len(a)+len(b)), a...), b...)
+	slices.Sort(all)
+	var out []int64
+	for _, t := range all {
+		if t <= doneAt || (len(out) > 0 && t-out[len(out)-1] < rereadCoalesce.Milliseconds()) {
+			continue
+		}
+		if len(out) == maxRereads {
+			break
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
 // refreshRequest: a name for the background worker
 type refreshRequest struct {
 	name string
+	// after a completed operation: no lease, and the re-reads (see RefreshAfterOperation)
+	afterOp bool
 }
 
 // refreshQueue is the in-memory queue of the background worker: non-blocking, deduplicated
@@ -117,18 +163,25 @@ func needsRefresh(item *NameDataItem, now time.Time) bool {
 }
 
 // repairAt: when the periodic scan takes the record (unix ms; 0: never, the field is unset):
-//   - an incomplete record: now (after its backoff)
+//   - an incomplete record (or one marked after a failed refresh): now (after its backoff)
+//   - a scheduled re-read (see rereadDelays)
 //   - a registration: when it expires (a renewal?); expired: when it lapses, and once per
 //     expiredRepairInterval (a renewal elsewhere)
 //
 // never before the record's lease or backoff (RefreshNextAt)
 func repairAt(d *NameDataItem) int64 {
 	var due int64
-	switch {
-	case d.RefreshNeeded:
+	if d.RefreshNeeded {
 		due = 1
-	case !d.Removed && d.NameExpires > 0:
-		due = expiryCheckAt(d)
+	} else {
+		if len(d.Rereads) > 0 {
+			due = d.Rereads[0]
+		}
+		if !d.Removed && d.NameExpires > 0 {
+			if e := expiryCheckAt(d); due == 0 || e < due {
+				due = e
+			}
+		}
 	}
 	if due == 0 {
 		return 0
@@ -250,7 +303,25 @@ func (cs *cacheService) worker(ctx context.Context) {
 
 // handle runs a request of the queue
 func (cs *cacheService) handle(ctx context.Context, r refreshRequest) {
+	if r.afterOp {
+		cs.refreshAfterOperation(ctx, r.name)
+		return
+	}
 	cs.refreshLeased(ctx, r.name)
+}
+
+// refreshAfterOperation: see RefreshAfterOperation. it does not wait for the lease: the re-reads
+// must be scheduled whatever another refresh does
+func (cs *cacheService) refreshAfterOperation(ctx context.Context, fullName string) {
+	o := refreshOpts{background: true, rereads: cs.rereadTimes()}
+	_, err := cs.refresh(ctx, fullName, o)
+	if !failed(err) {
+		return
+	}
+	log.Warn("failed to refresh a name after its operation, marking it", zap.String("FullName", fullName), zap.Error(err))
+	if err = cs.markRefreshNeeded(ctx, fullName, o.rereads); err != nil {
+		log.Warn("failed to mark a name for a refresh", zap.String("FullName", fullName), zap.Error(err))
+	}
 }
 
 // refreshLeased refreshes the name under its lease (skips it if another refresh holds it).

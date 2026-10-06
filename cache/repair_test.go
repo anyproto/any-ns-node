@@ -164,7 +164,7 @@ func TestCacheService_BackgroundRefresh(t *testing.T) {
 		defer fx.finish(t)
 		_, err := fx.applyObservation(ctx, &NameDataItem{FullName: testFullName, Removed: true,
 			ObservedBlock: 500, ObservedBlockHash: blockHash(500).Hex(),
-			ObservedAt: time.Now().Add(-expiredRefreshInterval - time.Minute).UnixMilli()})
+			ObservedAt: time.Now().Add(-expiredRefreshInterval - time.Minute).UnixMilli()}, refreshOpts{})
 		require.NoError(t, err)
 
 		require.True(t, isNameAvailable(t, fx.cacheService).Available)
@@ -179,7 +179,7 @@ func TestCacheService_BackgroundRefresh(t *testing.T) {
 		defer fx.finish(t)
 		_, err := fx.applyObservation(ctx, &NameDataItem{FullName: testFullName, Removed: true,
 			ObservedBlock: 500, ObservedBlockHash: blockHash(500).Hex(),
-			ObservedAt: time.Now().Add(-expiredRefreshInterval - time.Minute).UnixMilli()})
+			ObservedAt: time.Now().Add(-expiredRefreshInterval - time.Minute).UnixMilli()}, refreshOpts{})
 		require.NoError(t, err)
 
 		require.True(t, isNameAvailable(t, fx.cacheService).Available)
@@ -200,7 +200,7 @@ func TestCacheService_BackgroundRefresh(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		_, err := fx.applyObservation(ctx, &NameDataItem{FullName: testFullName, Removed: true,
-			ObservedBlock: 500, ObservedBlockHash: blockHash(500).Hex(), ObservedAt: time.Now().UnixMilli()})
+			ObservedBlock: 500, ObservedBlockHash: blockHash(500).Hex(), ObservedAt: time.Now().UnixMilli()}, refreshOpts{})
 		require.NoError(t, err)
 
 		require.True(t, isNameAvailable(t, fx.cacheService).Available)
@@ -437,4 +437,125 @@ func TestCacheService_StalledLeaseWritesAreBounded(t *testing.T) {
 			require.Less(t, time.Since(start), stallBlock-time.Second, "the write was waited for")
 		})
 	}
+}
+
+func TestMergeRereads(t *testing.T) {
+	m := time.Minute.Milliseconds()
+	// union, sorted
+	require.Equal(t, []int64{10 * m, 20 * m, 30 * m}, mergeRereads([]int64{20 * m}, []int64{30 * m, 10 * m}, 0))
+	// the ones at or before the read are done
+	require.Equal(t, []int64{30 * m}, mergeRereads([]int64{10 * m, 20 * m}, []int64{30 * m}, 20*m))
+	// close ones coalesce (repeated polls)
+	require.Equal(t, []int64{10 * m, 35 * m}, mergeRereads([]int64{10 * m, 35 * m}, []int64{10*m + 1000, 35*m + 2000}, 0))
+	// bounded
+	var many []int64
+	for i := int64(1); i <= 20; i++ {
+		many = append(many, i*10*m)
+	}
+	require.Len(t, mergeRereads(many, nil, 0), maxRereads)
+	require.Nil(t, mergeRereads(nil, nil, 0))
+}
+
+// a completed operation schedules re-reads of the name (rereadDelays): to pick up a lagging
+// provider and reorgs. the periodic scan runs them; a read after one is done with it
+func TestCacheService_Rereads(t *testing.T) {
+	t.Run("scheduled in the write of the refresh, run by the scan at their time, then done", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		start := time.Now()
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.NoError(t, fx.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		item := cachedItem(t, fx)
+		require.Len(t, item.Rereads, 2)
+		require.GreaterOrEqual(t, item.Rereads[0], start.Add(5*time.Minute).UnixMilli())
+		require.GreaterOrEqual(t, item.Rereads[1], start.Add(30*time.Minute).UnixMilli())
+		require.Equal(t, item.Rereads[0], item.RepairAt)
+		require.Zero(t, repairRound(t, fx))
+
+		// 5 minutes later: the first one. the lagging provider has caught up with a renewal
+		fx.now = func() time.Time { return time.Now().Add(5*time.Minute + time.Second) }
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired+100)
+		require.Equal(t, 1, repairRound(t, fx))
+		item = cachedItem(t, fx)
+		require.Equal(t, notExpired+100, item.NameExpires)
+		require.Len(t, item.Rereads, 1)
+		require.Equal(t, item.Rereads[0], item.RepairAt)
+
+		// 30 minutes later: the second one, nothing changed
+		fx.now = func() time.Time { return time.Now().Add(30*time.Minute + time.Second) }
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired+100)
+		require.Equal(t, 1, repairRound(t, fx))
+		item = cachedItem(t, fx)
+		require.Empty(t, item.Rereads)
+		require.Equal(t, (notExpired+100)*1000, item.RepairAt, "back to the expiry")
+		require.Zero(t, repairRound(t, fx))
+	})
+
+	t.Run("a re-read that fails backs off and stays", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.NoError(t, fx.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+
+		later := time.Now().Add(5*time.Minute + time.Second)
+		fx.now = func() time.Time { return later }
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
+		require.Equal(t, 1, repairRound(t, fx))
+		item := cachedItem(t, fx)
+		require.Len(t, item.Rereads, 2)
+		require.Equal(t, later.Add(refreshFailureBackoff).UnixMilli(), item.RepairAt)
+		require.Zero(t, repairRound(t, fx))
+	})
+
+	t.Run("an observation that loses to a newer record still does the due re-reads", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 500, 0)
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"rereads": bson.A{int64(1000), int64(5000)}}})
+		require.NoError(t, err)
+
+		stored, err := fx.applyObservation(ctx, obsAt(400, blockHash(400).Hex(), 2000), refreshOpts{})
+		require.NoError(t, err)
+		require.Equal(t, int64(500), stored.ObservedBlock)
+		item := cachedItem(t, fx)
+		require.Equal(t, []int64{5000}, item.Rereads)
+		require.Equal(t, int64(5000), item.RepairAt)
+	})
+
+	t.Run("a failed refresh after an operation marks the record (data kept) with the re-reads", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
+		fx.RefreshAfterOperation(testFullName)
+		require.Equal(t, 1, fx.runQueued())
+
+		item := cachedItem(t, fx)
+		require.True(t, item.RefreshNeeded)
+		require.Len(t, item.Rereads, 2)
+		require.Greater(t, item.RefreshNextAt, time.Now().UnixMilli())
+		require.Equal(t, item.RefreshNextAt, item.RepairAt)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+	})
+
+	t.Run("after an operation the background does not wait for the lease", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+
+		other, _ := otherCacheService(t, fx, 1, time.Now())
+		claimed, err := other.claimRefresh(ctx, testFullName, time.Now())
+		require.NoError(t, err)
+		require.True(t, claimed)
+
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired+100)
+		fx.RefreshAfterOperation(testFullName)
+		require.Equal(t, 1, fx.runQueued())
+		item := cachedItem(t, fx)
+		require.Equal(t, notExpired+100, item.NameExpires)
+		require.Len(t, item.Rereads, 2)
+	})
 }

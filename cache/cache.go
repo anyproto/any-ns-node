@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/anyproto/any-ns-node/config"
@@ -67,6 +68,9 @@ type NameDataItem struct {
 	RefreshNextAt int64 `bson:"refresh_next_at,omitempty"`
 	// when the periodic scan takes the record (unix ms, see repairAt). indexed
 	RepairAt int64 `bson:"repair_at,omitempty"`
+	// scheduled re-reads of the record (unix ms, sorted): after a completed operation, see
+	// rereadDelays. a read after one of them is done with it
+	Rereads []int64 `bson:"rereads,omitempty"`
 
 	// a tombstone: the name is not registered (or has lapsed) at ObservedBlock, a finalized
 	// block. it keeps the block, so that an older read can not bring the name back. lookups
@@ -106,6 +110,14 @@ type CacheService interface {
 	// read: the cache has it as taken, without the owner (see ErrNameDataIncomplete)
 	// will return any other error if something went wrong
 	UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error)
+	// UpdateInCacheAfterOperation is UpdateInCache for a name that a completed operation changed:
+	// the same refresh at the latest block, and it schedules re-reads of the name (see
+	// rereadDelays) in the same write, to pick up a lagging provider or a reorg
+	UpdateInCacheAfterOperation(ctx context.Context, in *nsp.NameAvailableRequest) (err error)
+	// RefreshAfterOperation hands a name that a completed operation changed to the background:
+	// a refresh at the latest block and the re-reads, or (if the refresh fails) the record is
+	// marked refresh_needed with the re-reads. it never blocks (dropped if the queue is full)
+	RefreshAfterOperation(fullName string)
 
 	app.Component
 }
@@ -119,6 +131,9 @@ type cacheService struct {
 
 	// Mongo is a replica set (or a sharded cluster): cache writes run in transactions
 	txSupported bool
+	// the transactions that withTx stopped waiting for (or not yet): Close lets them end (abort
+	// or commit) before it disconnects, so that none is left open on the server
+	inflight sync.WaitGroup
 
 	// the background refresh (see worker): the queue lookups hand names to, and the periodic
 	// scan (0: off)
@@ -214,6 +229,17 @@ func (cs *cacheService) Close(ctx context.Context) (err error) {
 		cs.stopWorker = nil
 	}
 	if cs.itemColl != nil {
+		// bounded: every transaction ends within its storeTimeout, its session within another one
+		ended := make(chan struct{})
+		go func() {
+			cs.inflight.Wait()
+			close(ended)
+		}()
+		select {
+		case <-ended:
+		case <-time.After(2 * storeTimeout):
+			log.Warn("closing the name cache with a transaction still running")
+		}
 		err = cs.itemColl.Database().Client().Disconnect(ctx)
 		cs.itemColl = nil
 	}
@@ -305,6 +331,17 @@ func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailable
 	return err
 }
 
+func (cs *cacheService) UpdateInCacheAfterOperation(ctx context.Context, in *nsp.NameAvailableRequest) (err error) {
+	log.Debug("reading data from smart contracts -> cache, after an operation", zap.String("FullName", in.FullName))
+
+	_, err = cs.refresh(ctx, in.FullName, refreshOpts{rereads: cs.rereadTimes()})
+	return err
+}
+
+func (cs *cacheService) RefreshAfterOperation(fullName string) {
+	cs.requestRefresh(refreshRequest{name: fullName, afterOp: true})
+}
+
 // refreshOpts: how a refresh stores what it read
 type refreshOpts struct {
 	// decide exactly the same (the reads, the finality confirmation, the order of the records),
@@ -315,6 +352,8 @@ type refreshOpts struct {
 	// request never does: it does not read the finalized block for a name that is not cached
 	// as taken
 	background bool
+	// re-reads to schedule on the record (unix ms, see rereadDelays), in the same write
+	rereads []int64
 }
 
 // refresh reads the name from the contracts at the latest block and stores what the chain
@@ -342,9 +381,9 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 		err    error
 	)
 	if o.dry {
-		stored, err = cs.applyObservationTx(ctx, obs, true)
+		stored, err = cs.applyObservationTx(ctx, obs, o)
 	} else {
-		stored, err = cs.applyObservation(ctx, obs)
+		stored, err = cs.applyObservation(ctx, obs, o)
 	}
 	if err != nil {
 		log.Error("failed to store name data", zap.String("FullName", fullName), zap.Error(err))

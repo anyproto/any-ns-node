@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -82,7 +83,9 @@ func withTx[T any](ctx context.Context, cs *cacheService, fn func(ctx context.Co
 	}
 	// buffered: the goroutine never blocks on a caller that is gone
 	done := make(chan result, 1)
+	cs.inflight.Add(1)
 	go func() {
+		defer cs.inflight.Done()
 		v, err := runTx(ctx, cs.itemColl.Database().Client(), timeout, fn)
 		done <- result{v, err}
 	}()
@@ -182,15 +185,47 @@ func mergeConfirmedOwner(obs *NameDataItem, stored *NameDataItem) {
 	}
 }
 
+func setOrUnset(set, unset bson.M, key string, value interface{}, empty bool) {
+	if empty {
+		unset[key] = ""
+	} else {
+		set[key] = value
+	}
+}
+
+// markRefreshNeeded marks the record of the name (if there is one) for a refresh by the periodic
+// scan after the backoff, and adds the re-reads to it. the data stays as it is: the name is still
+// served as it was (a registration as taken)
+func (cs *cacheService) markRefreshNeeded(ctx context.Context, fullName string, rereads []int64) error {
+	_, err := withTx(ctx, cs, func(ctx context.Context) (struct{}, error) {
+		stored, err := cs.getNameData(ctx, fullName)
+		if err != nil || stored == nil {
+			return struct{}{}, err
+		}
+		stored.RefreshNeeded = true
+		stored.RefreshNextAt = max(stored.RefreshNextAt, cs.now().Add(refreshFailureBackoff).UnixMilli())
+		stored.Rereads = mergeRereads(stored.Rereads, rereads, 0)
+		stored.RepairAt = repairAt(stored)
+		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, bson.M{"$set": bson.M{
+			"refresh_needed":  true,
+			"refresh_next_at": stored.RefreshNextAt,
+			"rereads":         stored.Rereads,
+			"repair_at":       stored.RepairAt,
+		}})
+		return struct{}{}, err
+	})
+	return err
+}
+
 // applyObservation stores what the contracts said about the name at a block, in one transaction:
 // it reads the record of the name and replaces it only if the observation is newer (see newer).
 // returns the record that is in the cache afterwards (nil: none)
-func (cs *cacheService) applyObservation(ctx context.Context, obs *NameDataItem) (stored *NameDataItem, err error) {
+func (cs *cacheService) applyObservation(ctx context.Context, obs *NameDataItem, o refreshOpts) (stored *NameDataItem, err error) {
 	// two first inserts of a name can race. with the unique index on the name the loser gets a
 	// duplicate key error: run it again, it will see the winner's record then
 	for i := 0; i < 3; i++ {
 		stored, err = withTx(ctx, cs, func(ctx context.Context) (*NameDataItem, error) {
-			return cs.applyObservationTx(ctx, obs, false)
+			return cs.applyObservationTx(ctx, obs, o)
 		})
 		if !mongo.IsDuplicateKeyError(err) {
 			return stored, err
@@ -201,8 +236,10 @@ func (cs *cacheService) applyObservation(ctx context.Context, obs *NameDataItem)
 
 // applyObservationTx is the body of the transaction: it can run more than once, it starts from
 // scratch every time and does not change obs.
-// dry: decide exactly the same, but write nothing (the dry run of the backfill)
-func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataItem, dry bool) (*NameDataItem, error) {
+// o.dry: decide exactly the same, but write nothing (the dry run of the backfill).
+// o.rereads are scheduled on whatever record stays; the ones due before the read are done
+func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataItem, o refreshOpts) (*NameDataItem, error) {
+	dry := o.dry
 	item := *obs
 	item.ID = primitive.NilObjectID
 	item.OwnerScwEthAddress = strings.ToLower(item.OwnerScwEthAddress)
@@ -221,12 +258,27 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 		// one) still counts for which fork was read last
 		log.Info("the cache has a newer record of the name, keeping it", zap.String("FullName", item.FullName),
 			zap.Int64("cached block", stored.ObservedBlock), zap.Int64("read block", item.ObservedBlock))
+		set, unset := bson.M{}, bson.M{}
 		if item.ObservedBlock == stored.ObservedBlock && item.ObservedBlockHash == stored.ObservedBlockHash && item.ObservedAt > readAt(stored) {
 			stored.ForkReadAt = item.ObservedAt
-			if !dry {
-				if _, err := cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, bson.M{"$set": bson.M{"fork_read_at": stored.ForkReadAt}}); err != nil {
-					return nil, err
-				}
+			set["fork_read_at"] = stored.ForkReadAt
+		}
+		if rereads := mergeRereads(stored.Rereads, o.rereads, item.ObservedAt); !slices.Equal(rereads, stored.Rereads) {
+			stored.Rereads = rereads
+			setOrUnset(set, unset, "rereads", rereads, len(rereads) == 0)
+			stored.RepairAt = repairAt(stored)
+			setOrUnset(set, unset, "repair_at", stored.RepairAt, stored.RepairAt == 0)
+		}
+		if !dry && len(set)+len(unset) > 0 {
+			update := bson.M{}
+			if len(set) > 0 {
+				update["$set"] = set
+			}
+			if len(unset) > 0 {
+				update["$unset"] = unset
+			}
+			if _, err := cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, update); err != nil {
+				return nil, err
 			}
 		}
 		return stored, nil
@@ -235,6 +287,11 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	if item.RefreshNeeded && stored != nil {
 		mergeConfirmedOwner(&item, stored)
 	}
+	var before []int64
+	if stored != nil {
+		before = stored.Rereads
+	}
+	item.Rereads = mergeRereads(before, o.rereads, item.ObservedAt)
 	item.RepairAt = repairAt(&item)
 	switch {
 	case dry:

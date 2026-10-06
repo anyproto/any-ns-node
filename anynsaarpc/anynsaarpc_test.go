@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/mock/gomock"
 
 	"github.com/anyproto/any-sync/nodeconf/mock_nodeconf"
@@ -92,22 +91,13 @@ func newFixture(t *testing.T, adminSignKey string) *fixture {
 		GethUrl:   "xxx",
 	}
 
-	fx.config.Mongo = config.Mongo{
-		Connect:  "mongodb://localhost:27017",
-		Database: "any-ns-test",
-	}
+	// no Mongo: the database and the cache are mocked (the tests that need a real cache make
+	// their own, see newRealCache)
 
 	fx.config.Account = accountservice.Config{
 		SigningKey: adminSignKey,
 		PeerKey:    "psqF8Rj52Ci6gsUl5ttwBVhINTP8Yowc2hea73MeFm4Ek9AxedYSB4+r7DYCclDL4WmLggj2caNapFUmsMtn5Q==",
 	}
-
-	// drop everything
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(fx.config.Mongo.Connect))
-	require.NoError(t, err)
-
-	err = client.Database(fx.config.Mongo.Database).Drop(ctx)
-	require.NoError(t, err)
 
 	fx.aa = mock_accountabstraction.NewMockAccountAbstractionService(fx.ctrl)
 	fx.aa.EXPECT().Name().Return(accountabstraction.CName).AnyTimes()
@@ -348,13 +338,16 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		fx := newFixture(t, "")
 		defer fx.finish(t)
 
+		// Completed, and the cached record is refreshed in the background (never in the poll)
+		fx.cache.EXPECT().RefreshAfterOperation("hello.any").Times(1)
+
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
 			return &accountabstraction.OperationInfo{
 				OperationState: nsp.OperationState_Completed,
 			}, nil
 		})
 
-		//fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).MinTimes(1)
+		//fx.cache.EXPECT().UpdateInCacheAfterOperation(gomock.Any(), gomock.Any()).MinTimes(1)
 
 		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
 			// name already in cache!
@@ -397,7 +390,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 			}, nil
 		})
 
-		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).MinTimes(1)
+		fx.cache.EXPECT().UpdateInCacheAfterOperation(gomock.Any(), gomock.Any()).MinTimes(1)
 
 		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
 			// name is not in cache!
@@ -435,6 +428,9 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		fx := newFixture(t, "")
 		defer fx.finish(t)
 
+		// the background tries again
+		fx.cache.EXPECT().RefreshAfterOperation("hello.any").Times(1)
+
 		// do not sleep for real in tests
 		old := updateCacheRetryDelay
 		updateCacheRetryDelay = time.Millisecond
@@ -452,7 +448,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		})
 
 		// the registry never catches up -> nothing is ever written to the cache
-		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+		fx.cache.EXPECT().UpdateInCacheAfterOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *nsp.NameAvailableRequest) (err error) {
 			return cache.ErrNameNotRegistered
 		}).Times(updateCacheRetryCount)
 
@@ -498,7 +494,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 
 		// the registry provider is lagging behind, but catches up on the second try
 		var tries int
-		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+		fx.cache.EXPECT().UpdateInCacheAfterOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, nar *nsp.NameAvailableRequest) (err error) {
 			require.Equal(t, "hello.any", nar.FullName)
 
 			tries++
@@ -531,6 +527,9 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		fx := newFixture(t, "")
 		defer fx.finish(t)
 
+		// the background tries again
+		fx.cache.EXPECT().RefreshAfterOperation("hello.any").Times(1)
+
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
 			return &accountabstraction.OperationInfo{
 				OperationState: nsp.OperationState_Completed,
@@ -542,7 +541,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		})
 
 		// the context is already closed -> no second attempt
-		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+		fx.cache.EXPECT().UpdateInCacheAfterOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *nsp.NameAvailableRequest) (err error) {
 			return cache.ErrNameNotRegistered
 		}).Times(1)
 
@@ -568,6 +567,9 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		fx := newFixture(t, "")
 		defer fx.finish(t)
 
+		// the background tries again (and marks the record)
+		fx.cache.EXPECT().RefreshAfterOperation("hello.any").Times(1)
+
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
 			return &accountabstraction.OperationInfo{
 				OperationState: nsp.OperationState_Completed,
@@ -575,7 +577,7 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 		})
 
 		// a real failure, not ErrNameNotRegistered -> still an error for the caller
-		fx.cache.EXPECT().UpdateInCache(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, nar *nsp.NameAvailableRequest) (err error) {
+		fx.cache.EXPECT().UpdateInCacheAfterOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *nsp.NameAvailableRequest) (err error) {
 			return errors.New("failed to update in cache")
 		})
 
