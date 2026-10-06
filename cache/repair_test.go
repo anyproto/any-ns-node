@@ -434,15 +434,17 @@ func TestCacheService_StalledLeaseWritesAreBounded(t *testing.T) {
 
 			const appName = "go7567-stall-lease"
 			cs, m := serviceWithClient(t, fx, options.Client().SetAppName(appName))
-			if c.name == "backoff" {
-				m.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
-			}
+			// failCommand skips the test when fail points are unavailable; set it
+			// before the mock expectations so a skip leaves none unmet.
 			failCommand(t, bson.M{
 				"failCommands":    []string{"update"},
 				"appName":         appName,
 				"blockConnection": true,
 				"blockTimeMS":     stallBlock.Milliseconds(),
 			}, c.mode)
+			if c.name == "backoff" {
+				m.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
+			}
 
 			start := time.Now()
 			within(t, "repairOnce", func() {
