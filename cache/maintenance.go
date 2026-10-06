@@ -27,6 +27,12 @@ type Maintainer interface {
 	// (ErrNameIndexNotUnique), it is never dropped
 	VerifyNameIndex(ctx context.Context, apply bool) (NameIndexStats, error)
 
+	// MigrateAliases resolves the records cached under a non-canonical spelling (see alias.go),
+	// one transaction per record: no canonical record -> the alias is renamed to the canonical
+	// name (its data kept, marked for a refresh); the canonical record is live, complete and at
+	// least as new -> the alias is deleted; otherwise both stay (Kept). apply == false is a dry run
+	MigrateAliases(ctx context.Context, apply bool) (AliasStats, error)
+
 	// PurgeTombstones prepares the cache for a rollback to a version older than GO-7567: such a
 	// node reads ANY record of a name as a taken name, a tombstone too. it deletes the
 	// tombstones. it refuses to run while the cache has incomplete records without an owner

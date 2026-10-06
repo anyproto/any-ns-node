@@ -1,3 +1,4 @@
+// Package cache mirrors the name contracts in Mongo (see "Name cache" in the README).
 package cache
 
 import (
@@ -136,6 +137,8 @@ type cacheService struct {
 	txSupported bool
 	// names are normalized like the registration does (config: ensip15validation)
 	ensip15 bool
+	// records under a non-canonical spelling (see alias.go)
+	aliases aliasIndex
 	// the transactions that withTx stopped waiting for (or not yet): Close lets them end (abort
 	// or commit) before it disconnects, so that none is left open on the server
 	inflight sync.WaitGroup
@@ -222,6 +225,7 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 			return err
 		}
 		cs.ensureRepairIndex(initCtx)
+		cs.loadAliases(initCtx)
 	}
 
 	log.Info("mongo for cache connected!", zap.String("unique name index", status), zap.Duration("repairInterval", cs.repairInterval))
@@ -275,6 +279,24 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
 	}
+	// no live canonical record: a record under another spelling still keeps the name taken
+	if item == nil || item.Removed {
+		canonical, cerr := cs.canonical(in.FullName)
+		if cerr != nil {
+			canonical = in.FullName
+		}
+		alias, err := cs.liveAlias(ctx, canonical)
+		if err != nil {
+			log.Error("failed to get item from DB", zap.Error(err))
+			return nil, err
+		}
+		if alias != nil {
+			if needsRefresh(alias, cs.now()) {
+				cs.requestRefresh(refreshRequest{name: alias.FullName})
+			}
+			return nameTaken(alias), nil
+		}
+	}
 	if item == nil {
 		return &nsp.NameAvailableResponse{Available: true}, nil
 	}
@@ -292,6 +314,10 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 
 	// 2 - if found in the cache -> return false. an expired nameExpires is only a lower bound (a
 	// renewal elsewhere does not touch the cache), it never makes a name available on its own
+	return nameTaken(item), nil
+}
+
+func nameTaken(item *NameDataItem) *nsp.NameAvailableResponse {
 	return &nsp.NameAvailableResponse{
 		Available:          false,
 		OwnerEthAddress:    item.OwnerEthAddress,
@@ -299,7 +325,7 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 		OwnerAnyAddress:    item.OwnerAnyAddress,
 		SpaceId:            item.SpaceId,
 		NameExpires:        item.NameExpires,
-	}, nil
+	}
 }
 
 // getNameData returns the record of the name (a tombstone too), nil if there is none.
@@ -327,23 +353,55 @@ func (cs *cacheService) GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdR
 	return cs.reverseLookup(ctx, bson.M{"owner_any_address": in.AnyAddress})
 }
 
-// reverseLookup finds a name by an owner field. tombstones never match
+// reverseLookupLimit: how many matching records a reverse lookup considers (one per name; more
+// than one only with records under a non-canonical spelling)
+const reverseLookupLimit = 16
+
+// reverseLookup finds a name by an owner field. tombstones never match. a record under a
+// non-canonical spelling (see alias.go) counts only if its name has no canonical record; the
+// name is answered in its canonical spelling
 func (cs *cacheService) reverseLookup(ctx context.Context, filter bson.M) (*nsp.NameByAddressResponse, error) {
 	filter["removed"] = bson.M{"$ne": true}
 
-	item := &NameDataItem{}
-	err := cs.itemColl.FindOne(ctx, filter).Decode(item)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return &nsp.NameByAddressResponse{Found: false}, nil
-	}
+	cur, err := cs.itemColl.Find(ctx, filter, options.Find().SetLimit(reverseLookupLimit))
 	if err != nil {
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
 	}
-	if needsRefresh(item, cs.now()) {
-		cs.requestRefresh(refreshRequest{name: item.FullName})
+	var items []NameDataItem
+	if err = cur.All(ctx, &items); err != nil {
+		log.Error("failed to get item from DB", zap.Error(err))
+		return nil, err
 	}
-	return &nsp.NameByAddressResponse{Found: true, Name: item.FullName}, nil
+
+	found := func(item *NameDataItem, name string) (*nsp.NameByAddressResponse, error) {
+		if needsRefresh(item, cs.now()) {
+			cs.requestRefresh(refreshRequest{name: item.FullName})
+		}
+		return &nsp.NameByAddressResponse{Found: true, Name: name}, nil
+	}
+	// 1 - a canonical record
+	var aliases []int
+	for i := range items {
+		canonical, err := cs.canonical(items[i].FullName)
+		if err != nil || canonical == items[i].FullName {
+			return found(&items[i], items[i].FullName)
+		}
+		aliases = append(aliases, i)
+	}
+	// 2 - an alias whose name has no canonical record
+	for _, i := range aliases {
+		canonical, _ := cs.canonical(items[i].FullName)
+		c, err := cs.getNameData(ctx, canonical)
+		if err != nil {
+			log.Error("failed to get item from DB", zap.Error(err))
+			return nil, err
+		}
+		if c == nil {
+			return found(&items[i], canonical)
+		}
+	}
+	return &nsp.NameByAddressResponse{Found: false}, nil
 }
 
 func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error) {

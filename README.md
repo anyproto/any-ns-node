@@ -105,7 +105,13 @@ Maintenance (one-off runs of the node binary; all are dry runs unless `-refresh-
 
 - `-dedupe-cache`: verifies the unique index on `{name: 1}`. An existing unique one is accepted
   (`unique name index=exists`). A missing one is created (with `-refresh-apply`). A
-  non-unique one, or duplicates of a name, is an error (exit 1); nothing is ever dropped or deleted.
+  non-unique one, or duplicates of a name, is an error (exit 1); the index is never dropped.
+  It then migrates records cached under a non-canonical spelling (e.g. `Foo.any`, written by an
+  old node), one transaction each: no canonical record → renamed to the canonical name (data
+  kept, marked for a refresh); a live, complete canonical record at least as new → the alias is
+  deleted; otherwise both stay and are listed (`kept:`) for an operator. Until then the node
+  warns at start, a live alias keeps its name taken, reverse lookups prefer the canonical record,
+  and the background refreshes the canonical name instead of the alias.
 - `-refresh-cache`: re-reads every cached name (tombstones too) with the same decisions as the node.
   `-refresh-interval` is the delay between two names (default 1s). Exits 1 if any name failed,
   including names whose finalized block could not be read. `not-final` (the finalized block does not
@@ -122,7 +128,9 @@ Rollout (both ns nodes share the cache):
 2. `anynsnode -c <config> -dedupe-cache` (prod: expect `unique name index=exists`).
 3. Upgrade **both** ns nodes together. In the short mixed window an old node still serves a lapsed
    name as taken (today's behaviour) and still writes records without the new fields.
-4. Only after both run the new version: `anynsnode -c <config> -refresh-cache` (dry run), then with
+4. Only after both run the new version: `anynsnode -c <config> -dedupe-cache` (dry run), then with
+   `-refresh-apply` (migrates the non-canonical records, including any written in the mixed window).
+5. Then `anynsnode -c <config> -refresh-cache` (dry run), then with
    `-refresh-apply`. It removes lapsed names (confirmed at a finalized block), fixes stale records
    (including what an old node wrote in the mixed window) and schedules every record for the
    periodic scan. Re-run until `failed=0`; `not-final` names are picked up by the background.

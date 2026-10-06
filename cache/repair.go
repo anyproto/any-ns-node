@@ -379,6 +379,12 @@ func (cs *cacheService) worker(ctx context.Context) {
 			if _, err := cs.repairOnce(ctx, repairBatch); err != nil && ctx.Err() == nil {
 				log.Warn("cache repair failed", zap.Error(err))
 			}
+			cs.aliases.mu.RLock()
+			rescan := cs.now().Sub(cs.aliases.scannedAt) >= aliasRescanInterval
+			cs.aliases.mu.RUnlock()
+			if rescan {
+				cs.loadAliases(ctx)
+			}
 		}
 	}
 }
@@ -412,6 +418,19 @@ func (cs *cacheService) refreshAfterOperation(ctx context.Context, fullName stri
 // refreshLeased refreshes the name under its lease (skips it if another refresh holds it).
 // a failure backs off. returns false if the name was skipped
 func (cs *cacheService) refreshLeased(ctx context.Context, fullName string) bool {
+	// a record under a non-canonical spelling: its canonical name is what is refreshed, the
+	// record itself leaves the scan (until -dedupe-cache migrates it). the canonical record may
+	// not exist (nothing to lease): the settled alias throttles this
+	if canonical, err := cs.canonical(fullName); err == nil && canonical != fullName {
+		cs.settleAlias(ctx, fullName)
+		if c, err := cs.getNameData(ctx, canonical); err == nil && c == nil {
+			if _, err = cs.refresh(ctx, canonical, refreshOpts{background: true}); failed(err) {
+				log.Warn("cache repair: failed to re-read a name", zap.String("FullName", canonical), zap.Error(err))
+			}
+			return true
+		}
+		fullName = canonical
+	}
 	claimed, err := cs.claimRefresh(ctx, fullName, cs.now())
 	if err != nil {
 		log.Warn("cache repair: failed to take the refresh lease", zap.String("FullName", fullName), zap.Error(err))

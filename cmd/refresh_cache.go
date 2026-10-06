@@ -58,6 +58,16 @@ func maintainCache(ctx context.Context, m cache.Maintainer, task cacheTask, out 
 			log.Error("dedupe failed", zap.Error(err))
 			return 1
 		}
+		aliases, err := m.MigrateAliases(ctx, task.apply)
+		_, _ = fmt.Fprintf(out, "dedupe %s: non-canonical records=%d renamed=%d deleted=%d kept=%d\n",
+			mode, aliases.Aliases, aliases.Renamed, aliases.Deleted, len(aliases.Kept))
+		for _, name := range aliases.Kept {
+			_, _ = fmt.Fprintf(out, "  kept: %s\n", name)
+		}
+		if err != nil {
+			log.Error("dedupe failed", zap.Error(err))
+			return 1
+		}
 	}
 
 	// 2 - no tombstones (before a rollback)

@@ -851,17 +851,17 @@ func TestCacheService_CanonicalNames(t *testing.T) {
 			"owner_scw_eth_address": testScw, "owner_any_address": testAnyID, "name_expires": lapsed})
 		require.NoError(t, err)
 
-		// the backfill (apply), and the background refresh a reverse lookup hands it to
+		// the backfill (apply) refreshes the canonical name
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
 		stats, err := fx.RefreshAll(ctx, true, time.Millisecond)
 		require.NoError(t, err)
 		require.Equal(t, RefreshStats{Total: 1, Updated: 1, NonCanonical: 1}, stats)
 
+		// the reverse lookup answers the canonical record (fresh: nothing is handed to the background)
 		res, err := fx.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{AnyAddress: testAnyID})
 		require.NoError(t, err)
-		require.True(t, res.Found)
-		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.Equal(t, 1, fx.runQueued())
+		require.Equal(t, testFullName, res.Name)
+		require.Zero(t, fx.runQueued())
 
 		var legacy NameDataItem
 		require.NoError(t, fx.itemColl.FindOne(ctx, bson.M{"name": "Test.any"}).Decode(&legacy))

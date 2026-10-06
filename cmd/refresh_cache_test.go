@@ -17,6 +17,8 @@ type fakeMaintainer struct {
 	refreshErr   error
 	indexStats   cache.NameIndexStats
 	indexErr     error
+	aliasStats   cache.AliasStats
+	aliasErr     error
 	purgeStats   cache.PurgeStats
 	purgeErr     error
 
@@ -31,6 +33,11 @@ func (f *fakeMaintainer) PurgeTombstones(_ context.Context, _ bool) (cache.Purge
 func (f *fakeMaintainer) RefreshAll(_ context.Context, _ bool, _ time.Duration) (cache.RefreshStats, error) {
 	f.calls = append(f.calls, "refresh")
 	return f.refreshStats, f.refreshErr
+}
+
+func (f *fakeMaintainer) MigrateAliases(_ context.Context, _ bool) (cache.AliasStats, error) {
+	f.calls = append(f.calls, "aliases")
+	return f.aliasStats, f.aliasErr
 }
 
 func (f *fakeMaintainer) VerifyNameIndex(_ context.Context, _ bool) (cache.NameIndexStats, error) {
@@ -94,9 +101,24 @@ func TestMaintainCache_ExitCode(t *testing.T) {
 		task.dedupe = true
 		task.purge = true
 		require.Equal(t, 0, maintainCache(context.Background(), f, task, &out))
-		require.Equal(t, []string{"dedupe", "purge", "refresh"}, f.calls)
+		require.Equal(t, []string{"dedupe", "aliases", "purge", "refresh"}, f.calls)
 		require.Contains(t, out.String(), "unique name index=exists")
 		require.Contains(t, out.String(), "purge tombstones APPLIED: tombstones=3 incomplete records=0")
+	})
+
+	t.Run("the alias migration is reported, kept ones listed, a failure stops the rest", func(t *testing.T) {
+		var out bytes.Buffer
+		f := &fakeMaintainer{indexStats: cache.NameIndexStats{NameIndex: "exists"},
+			aliasStats: cache.AliasStats{Aliases: 3, Renamed: 1, Deleted: 1, Kept: []string{"Foo.any"}}}
+		task := cacheTask{dedupe: true}
+		require.Equal(t, 0, maintainCache(context.Background(), f, task, &out))
+		require.Contains(t, out.String(), "non-canonical records=3 renamed=1 deleted=1 kept=1\n  kept: Foo.any\n")
+
+		f = &fakeMaintainer{aliasErr: errors.New("mongo is down")}
+		task = refresh
+		task.dedupe = true
+		require.Equal(t, 1, maintainCache(context.Background(), f, task, &out))
+		require.Equal(t, []string{"dedupe", "aliases"}, f.calls)
 	})
 
 	t.Run("purge refused (incomplete records): they are listed, exit 1, no refresh", func(t *testing.T) {
