@@ -64,6 +64,13 @@ var (
 	flagClient     = flag.Bool("cl", false, "run nsp client")
 	command        = flag.String("cmd", "", "command to run: [admin-name-register, admin-name-renew, admin-fund-user, is-name-available, name-by-address, get-operation, batch-is-name-available, batch-name-by-anyid, name-by-anyid]")
 	params         = flag.String("params", "", "command params in json format")
+
+	// cache maintenance (one-off runs, see the "Name cache" section of the README)
+	flagDedupeCache     = flag.Bool("dedupe-cache", false, "verify the unique index on the name of the cache (an existing one is accepted whatever its name; a missing one is created with -refresh-apply; a non-unique one is an error, never dropped), and exit. runs before -purge-tombstones and -refresh-cache")
+	flagRefreshCache    = flag.Bool("refresh-cache", false, "re-read every cached name from the contracts and exit (1 if any name failed). a dry run unless -refresh-apply is set")
+	flagPurgeTombstones = flag.Bool("purge-tombstones", false, "delete the tombstones of the name cache and exit: before a rollback to a version older than GO-7567. a dry run unless -refresh-apply is set. runs before -refresh-cache")
+	flagRefreshApply    = flag.Bool("refresh-apply", false, "with -refresh-cache, -dedupe-cache or -purge-tombstones: write the changes")
+	flagRefreshInterval = flag.Duration("refresh-interval", time.Second, "with -refresh-cache: delay between two names")
 )
 
 func main() {
@@ -120,6 +127,16 @@ func main() {
 	if *flagClient {
 		runAsClient(a, ctx)
 		return
+	}
+
+	if *flagRefreshCache || *flagDedupeCache || *flagPurgeTombstones {
+		os.Exit(runCacheMaintenance(ctx, a, cacheTask{
+			dedupe:   *flagDedupeCache,
+			purge:    *flagPurgeTombstones,
+			refresh:  *flagRefreshCache,
+			apply:    *flagRefreshApply,
+			interval: *flagRefreshInterval,
+		}))
 	}
 
 	BootstrapServer(a)

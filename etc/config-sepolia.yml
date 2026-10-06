@@ -77,3 +77,6 @@ limiter:
 sentry:
    dsn: 0
    environment: staging
+cache:
+  # a local standalone Mongo (development only, see the README)
+  allowUnsafeStandalone: true
