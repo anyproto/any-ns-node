@@ -162,6 +162,14 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 
 	// 2 - update cache (only once operation is completed)
 	if operationFound && status.OperationState == nsp.OperationState_Completed {
+		// the cache key and every contract read use the canonical spelling (the registration
+		// normalizes the name, the operation keeps it as the client sent it)
+		if name, err := contracts.NormalizeAnyName(op.FullName, arpc.conf.Ensip15Validation); err == nil {
+			op.FullName = name
+		} else {
+			log.Warn("can not normalize the name of the operation", zap.String("FullName", op.FullName), zap.Error(err))
+		}
+
 		// 2.1 - is info already is in the cache?
 		cacheRes, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
 			FullName: op.FullName,

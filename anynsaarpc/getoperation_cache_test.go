@@ -226,6 +226,30 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		requireRereads(t, item, start)
 	})
 
+	t.Run("an operation saved with a mixed-case name: Completed, cached under the canonical name", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+		cs, cm, coll := newRealCache(t)
+		fx.anynsAARpc.cache = cs
+		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).Return(&accountabstraction.OperationInfo{
+			OperationState: nsp.OperationState_Completed,
+		}, nil)
+		fx.db.EXPECT().GetOperation(gomock.Any(), gomock.Any()).Return(db_service.AAUserOperation{
+			OperationID: "123",
+			FullName:    "Hello.any",
+		}, nil)
+		// (the mocks expect opName, "hello.any": the registrar label is hashed as "hello")
+		expectRegistered(cm, newScw, newEoa, newAnyID, newExpires)
+
+		resp, err := getOperation(t, fx)
+		require.NoError(t, err)
+		require.Equal(t, nsp.OperationState_Completed, resp.OperationState)
+		require.Equal(t, newEoa, cachedItem(t, coll).OwnerEthAddress)
+		n, err := coll.CountDocuments(ctx, bson.M{})
+		require.NoError(t, err)
+		require.EqualValues(t, 1, n)
+	})
+
 	t.Run("not cached, the registry does not have it yet: Pending, nothing is cached", func(t *testing.T) {
 		old := updateCacheRetryDelay
 		updateCacheRetryDelay = time.Millisecond

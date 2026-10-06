@@ -59,7 +59,9 @@ The Mongo `cache` collection mirrors the contracts; with `readFromCache: true` t
 from it. The rule: a name is reported as available, and a cached record is dropped, only when the
 chain confirmed it. When unsure, the cached record is served as taken and refreshed in the background.
 
-- **Reads.** A refresh reads the latest block header once (number, hash and timestamp as the node
+- **Reads.** Every read and the cache key use the canonical spelling of the name (the
+  normalization of the registration, `ensip15validation`). A registry owner without a registrar
+  expiry is a failure (retried), never a lapse. A refresh reads the latest block header once (number, hash and timestamp as the node
   reports them) and pins every contract read to that block by its hash. A name is registered if the
   registry has an owner and `nameExpires + 90 days (grace) >= block.timestamp`.
 - **Writes.** One record per name (the unique index on `{name: 1}`; the node accepts an existing one
@@ -106,6 +108,9 @@ Maintenance (one-off runs of the node binary; all are dry runs unless `-refresh-
   `-refresh-interval` is the delay between two names (default 1s). Exits 1 if any name failed,
   including names whose finalized block could not be read. `not-final` (the finalized block does not
   confirm a removal yet) is counted separately and is not a failure: run it again later.
+  `non-canonical` counts records cached under a spelling other than the canonical one (e.g.
+  `Foo.any`): the canonical name is refreshed, such a record is left as it is (taken) for an
+  operator to look at.
 - `-purge-tombstones`: deletes the tombstones before a rollback (see below). It refuses (exit 1) while
   the cache has incomplete records without an owner; it lists them.
 

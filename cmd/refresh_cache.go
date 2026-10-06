@@ -77,8 +77,8 @@ func maintainCache(ctx context.Context, m cache.Maintainer, task cacheTask, out 
 	// 3 - every name from the contracts
 	if task.refresh {
 		stats, err := m.RefreshAll(ctx, task.apply, task.interval)
-		_, _ = fmt.Fprintf(out, "refresh %s: total=%d unchanged=%d updated=%d removed=%d not-final=%d failed=%d\n",
-			mode, stats.Total, stats.Unchanged, stats.Updated, stats.Removed, stats.NotFinal, stats.Failed)
+		_, _ = fmt.Fprintf(out, "refresh %s: total=%d unchanged=%d updated=%d removed=%d not-final=%d failed=%d non-canonical=%d\n",
+			mode, stats.Total, stats.Unchanged, stats.Updated, stats.Removed, stats.NotFinal, stats.Failed, stats.NonCanonical)
 		if err != nil {
 			log.Error("refresh failed", zap.Error(err))
 			return 1

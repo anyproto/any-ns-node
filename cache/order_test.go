@@ -830,3 +830,67 @@ func TestCacheService_NameIndexAtStart(t *testing.T) {
 	})
 	reset()
 }
+
+// every contract read and the cache key use the canonical spelling of the name; a registry owner
+// without a registrar expiry is a failure, never a lapse
+func TestCacheService_CanonicalNames(t *testing.T) {
+	t.Run("a mixed-case name is read and cached as the canonical one", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		// (the mocks expect testFullName, "test.any")
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: "Test.any"}))
+		require.Equal(t, testEoa, cachedItem(t, fx).OwnerEthAddress)
+		require.EqualValues(t, 1, countRecords(t, fx))
+	})
+
+	t.Run("a legacy record under a non-canonical spelling is never removed while the name is registered", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		_, err := fx.itemColl.InsertOne(ctx, bson.M{"name": "Test.any", "owner_eth_address": testEoa,
+			"owner_scw_eth_address": testScw, "owner_any_address": testAnyID, "name_expires": lapsed})
+		require.NoError(t, err)
+
+		// the backfill (apply), and the background refresh a reverse lookup hands it to
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		stats, err := fx.RefreshAll(ctx, true, time.Millisecond)
+		require.NoError(t, err)
+		require.Equal(t, RefreshStats{Total: 1, Updated: 1, NonCanonical: 1}, stats)
+
+		res, err := fx.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{AnyAddress: testAnyID})
+		require.NoError(t, err)
+		require.True(t, res.Found)
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.Equal(t, 1, fx.runQueued())
+
+		var legacy NameDataItem
+		require.NoError(t, fx.itemColl.FindOne(ctx, bson.M{"name": "Test.any"}).Decode(&legacy))
+		require.False(t, legacy.Removed)
+		require.Equal(t, testEoa, legacy.OwnerEthAddress)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+	})
+
+	t.Run("a registry owner without a registrar expiry: a failure, nothing removed", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, inGrace, 10, 0)
+
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).AnyTimes()
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(0), nil).AnyTimes()
+
+		err := fx.updateConfirmed()
+		require.ErrorIs(t, err, errInconsistentRegistry)
+		require.NotErrorIs(t, err, ErrNameNotRegistered)
+
+		stats, err := fx.RefreshAll(ctx, true, time.Millisecond)
+		require.NoError(t, err)
+		require.Equal(t, RefreshStats{Total: 1, Failed: 1}, stats)
+
+		require.True(t, fx.queue.push(refreshRequest{name: testFullName}))
+		require.Equal(t, 1, fx.runQueued())
+		item := cachedItem(t, fx)
+		require.False(t, item.Removed)
+		require.Greater(t, item.RefreshNextAt, time.Now().UnixMilli(), "backing off")
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), inGrace)
+	})
+}

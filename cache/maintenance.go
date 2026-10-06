@@ -56,6 +56,10 @@ type RefreshStats struct {
 	// nothing decided (e.g. a contract read failed, the finalized block could not be read), or
 	// the owner could not be read (the confirmed part is stored, marked): run it again
 	Failed int
+	// cached under a spelling that is not the canonical one (e.g. "Foo.any"): the canonical
+	// name was refreshed, the record under this spelling is left as it is (taken), for an
+	// operator to look at
+	NonCanonical int
 }
 
 // NameIndexStats is what VerifyNameIndex found (or did)
@@ -122,6 +126,16 @@ func (cs *cacheService) RefreshAll(ctx context.Context, apply bool, interval tim
 }
 
 func (cs *cacheService) refreshOne(ctx context.Context, fullName string, apply bool, stats *RefreshStats) error {
+	name, err := cs.canonical(fullName)
+	if err != nil {
+		return err
+	}
+	if name != fullName {
+		stats.NonCanonical++
+		log.Warn("refresh: a cached name is not in its canonical spelling, refreshing the canonical one, the record is left as it is",
+			zap.String("FullName", fullName), zap.String("canonical", name))
+		fullName = name
+	}
 	old, err := cs.getNameData(ctx, fullName)
 	if err != nil {
 		return err

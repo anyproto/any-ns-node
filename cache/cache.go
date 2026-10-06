@@ -133,6 +133,8 @@ type cacheService struct {
 	maintenance bool
 	// Mongo is a replica set (or a sharded cluster): cache writes run in transactions
 	txSupported bool
+	// names are normalized like the registration does (config: ensip15validation)
+	ensip15 bool
 	// the transactions that withTx stopped waiting for (or not yet): Close lets them end (abort
 	// or commit) before it disconnects, so that none is left open on the server
 	inflight sync.WaitGroup
@@ -158,6 +160,7 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 	cs.confContracts = conf.GetContracts()
 	cs.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	cs.now = time.Now
+	cs.ensip15 = conf.Ensip15Validation
 	if !cs.maintenance {
 		cs.queue = newRefreshQueue(refreshQueueSize)
 	}
@@ -350,6 +353,15 @@ func (cs *cacheService) RefreshAfterOperation(fullName string) {
 	cs.requestRefresh(refreshRequest{name: fullName, afterOp: true})
 }
 
+// canonical is the spelling of the name that the registration uses (and the cache key)
+func (cs *cacheService) canonical(fullName string) (string, error) {
+	name, err := contracts.NormalizeAnyName(fullName, cs.ensip15)
+	if err != nil {
+		return "", fmt.Errorf("normalize the name %q: %w", fullName, err)
+	}
+	return name, nil
+}
+
 // refreshOpts: how a refresh stores what it read
 type refreshOpts struct {
 	// decide exactly the same (the reads, the finality confirmation, the order of the records),
@@ -376,6 +388,14 @@ type refreshOpts struct {
 //     block, or the cache has a newer one)
 //   - any other error: nothing was decided, nothing was written
 func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshOpts) (*NameDataItem, error) {
+	// every contract read and the cache key use the canonical spelling: a raw "Foo.any" would
+	// hash its label as "Foo" for nameExpires (0: never registered) while the registry
+	// normalizes it to "foo.any"
+	fullName, err := cs.canonical(fullName)
+	if err != nil {
+		return nil, err
+	}
+
 	obs, readErr := cs.readNameData(ctx, fullName)
 	if errors.Is(readErr, ErrNameNotRegistered) {
 		// a destructive change: only a finalized block can decide it
@@ -386,10 +406,7 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 		return nil, readErr
 	}
 
-	var (
-		stored *NameDataItem
-		err    error
-	)
+	var stored *NameDataItem
 	if o.dry {
 		stored, err = cs.applyObservationTx(ctx, obs, o)
 	} else {

@@ -314,6 +314,9 @@ func (cs *cacheService) handle(ctx context.Context, r refreshRequest) {
 // refreshAfterOperation: see RefreshAfterOperation. it does not wait for the lease: the re-reads
 // must be scheduled whatever another refresh does
 func (cs *cacheService) refreshAfterOperation(ctx context.Context, fullName string) {
+	if name, err := cs.canonical(fullName); err == nil {
+		fullName = name
+	}
 	o := refreshOpts{background: true, rereads: cs.rereadTimes()}
 	_, err := cs.refresh(ctx, fullName, o)
 	if !failed(err) {

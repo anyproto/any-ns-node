@@ -13,6 +13,10 @@ import (
 	"github.com/anyproto/any-ns-node/contracts"
 )
 
+// errInconsistentRegistry: the registry has an owner for the name, but the registrar has no
+// expiry for it. a failure (retried), never "not registered"
+var errInconsistentRegistry = errors.New("the registry has an owner, but the registrar has no expiry")
+
 // gracePeriodSec is the registrar's GRACE_PERIOD (a constant in the contract: 7776000 sec).
 // a name can be renewed until nameExpires + gracePeriod, and only after that it is
 // available again: the registrar's available() is "nameExpires + GRACE_PERIOD < block.timestamp"
@@ -69,6 +73,12 @@ func (cs *cacheService) readRegistration(ctx context.Context, fullName string, n
 	if err != nil {
 		log.Error("failed to get expiration of the name", zap.Error(err))
 		return common.Address{}, 0, false, err
+	}
+	// the registry has an owner, the registrar has no expiry: the two reads disagree (e.g. a
+	// label hashed in another spelling). never a lapse: nothing is concluded from it
+	if exp == nil || exp.Sign() <= 0 {
+		log.Error("the registry has an owner, but the registrar has no expiry", zap.String("FullName", fullName), zap.Int64("block", block.Number))
+		return common.Address{}, 0, false, fmt.Errorf("%w: %s at block %d", errInconsistentRegistry, fullName, block.Number)
 	}
 
 	// a lapsed name stays in the registry (owned by the NameWrapper), but the registrar
