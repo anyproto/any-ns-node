@@ -68,7 +68,9 @@ chain confirmed it. When unsure, the cached record is served as taken and refres
   record only with a newer observation: the higher block wins. The node refuses to start without a
   replica set unless `allowUnsafeStandalone` is set (local development only).
 - **Removal.** A name becomes available only when the latest block says it is not registered *and*
-  a re-read at the finalized (fallback: safe) block confirms it. The record then becomes a
+  a re-read at the finalized (fallback: safe) block confirms it. Only the background refresh and the
+  backfill read the finalized block; a request (`readFromCache: false`, `GetOperation`) keeps the
+  record and hands the name to the background. The record then becomes a
   tombstone at the finalized block: lookups treat it as a cache miss, reverse lookups skip it, and
   an older observation can not replace it. Otherwise the record stays as it is.
 - **Lookups** never read the contracts and never write. A record that can be stale (expired,

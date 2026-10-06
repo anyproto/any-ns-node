@@ -145,6 +145,10 @@ func TestCacheService_BackgroundRefresh(t *testing.T) {
 		fx.setFinalizedErr(errors.New("unknown block tag"))
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil)
+		// a short lease: what holds the record afterwards is the backoff
+		old := refreshLease
+		refreshLease = time.Second
+		defer func() { refreshLease = old }()
 
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
 		require.Equal(t, 1, fx.runQueued())
@@ -326,6 +330,11 @@ func TestCacheService_Repair(t *testing.T) {
 	t.Run("a failing record backs off and can not starve the others", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
+
+		// a short lease: what moves the failing records back is their backoff
+		old := refreshLease
+		refreshLease = time.Millisecond
+		defer func() { refreshLease = old }()
 
 		// repairBatch failing records, due first; then one that works
 		for i := 0; i < repairBatch; i++ {

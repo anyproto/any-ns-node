@@ -122,7 +122,7 @@ func TestAnynsRpc_IsNameAvailable_LapsedName(t *testing.T) {
 	lapsed := time.Now().Add(-100 * 24 * time.Hour).Unix()
 
 	for _, readFromCache := range []bool{true, false} {
-		t.Run(fmt.Sprintf("readFromCache=%v: available only after the finalized block confirmed it, then a tombstone", readFromCache), func(t *testing.T) {
+		t.Run(fmt.Sprintf("readFromCache=%v: taken until the background confirmed the lapse at the finalized block, then a tombstone", readFromCache), func(t *testing.T) {
 			fx := newFixture(t, readFromCache)
 			defer fx.finish(t)
 
@@ -135,24 +135,23 @@ func TestAnynsRpc_IsNameAvailable_LapsedName(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// the registry still points to the NameWrapper: read at the latest block, then
-			// confirmed at the finalized one
-			cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
-			cm.EXPECT().GetNameExpires(gomock.Any(), fullName, gomock.Any()).Return(big.NewInt(lapsed), nil).Times(2)
+			// the registry still points to the NameWrapper: read at the latest block (by the
+			// request with readFromCache: false, and by the background), then confirmed at the
+			// finalized one (by the background only)
+			cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).MinTimes(2)
+			cm.EXPECT().GetNameExpires(gomock.Any(), fullName, gomock.Any()).Return(big.NewInt(lapsed), nil).MinTimes(2)
 
+			// served from the cache as taken; the background confirms the lapse
 			resp, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
 			require.NoError(t, err)
-			if readFromCache {
-				// served from the cache as taken; the background confirms the lapse
-				require.False(t, resp.Available)
-				require.Equal(t, testEoa, resp.OwnerEthAddress)
-				deadline := time.Now().Add(watchdog)
-				for !resp.Available {
-					require.True(t, time.Now().Before(deadline), "the background refresh did not confirm the lapse")
-					time.Sleep(10 * time.Millisecond)
-					resp, err = fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
-					require.NoError(t, err)
-				}
+			require.False(t, resp.Available)
+			require.Equal(t, testEoa, resp.OwnerEthAddress)
+			deadline := time.Now().Add(watchdog)
+			for !resp.Available {
+				require.True(t, time.Now().Before(deadline), "the background refresh did not confirm the lapse")
+				time.Sleep(10 * time.Millisecond)
+				resp, err = fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
+				require.NoError(t, err)
 			}
 			require.True(t, resp.Available)
 			require.Empty(t, resp.OwnerEthAddress)

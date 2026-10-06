@@ -119,6 +119,13 @@ func failCommand(t *testing.T, data bson.M, mode bson.M) {
 	})
 }
 
+// updateConfirmed is UpdateInCache as the background (and the backfill) runs it: a removal is
+// confirmed at the finalized block
+func (cs *cacheService) updateConfirmed() error {
+	_, err := cs.refresh(ctx, testFullName, refreshOpts{confirm: true})
+	return err
+}
+
 func obsAt(block int64, hash string, observedAt int64) *NameDataItem {
 	return &NameDataItem{FullName: testFullName, OwnerEthAddress: testEoa, OwnerScwEthAddress: testScw, NameExpires: notExpired,
 		ObservedBlock: block, ObservedBlockHash: hash, ObservedAt: observedAt}
@@ -184,14 +191,14 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+			done <- fx.updateConfirmed()
 		}()
 		p.Entered(t)
 
 		// node B: a new registration is cached at block 101
 		b, bContracts := otherCacheService(t, fx, 101, time.Now())
 		expectRegistered(bContracts, otherScw, otherEoa, otherAnyID, notExpired)
-		require.NoError(t, b.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, b.updateConfirmed())
 
 		p.Release()
 		select {
@@ -213,11 +220,11 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(200, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, fx.updateConfirmed())
 
 		lagging, laggingContracts := otherCacheService(t, fx, 150, time.Now())
 		expectRegistered(laggingContracts, testScw, testEoa, testAnyID, inGrace)
-		require.NoError(t, lagging.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, lagging.updateConfirmed())
 
 		require.Equal(t, notExpired, cachedItem(t, fx).NameExpires)
 	})
@@ -228,12 +235,12 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(200, time.Now())
 		expectRegistered(fx.contracts, otherScw, otherEoa, otherAnyID, notExpired)
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, fx.updateConfirmed())
 
 		// a lagging provider: block 150 (latest and finalized), before the registration
 		lagging, laggingContracts := otherCacheService(t, fx, 150, time.Now())
 		expectLapsed(laggingContracts)
-		err := lagging.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		err := lagging.updateConfirmed()
 		require.ErrorIs(t, err, errNotFinal)
 
 		item := cachedItem(t, fx)
@@ -251,12 +258,12 @@ func TestCacheService_ChainOrder(t *testing.T) {
 		fx.setHead(310, time.Now())
 		fx.setFinalized(300, time.Now())
 		expectLapsed(fx.contracts)
-		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameNotRegistered)
+		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
 
 		// a backfill that read block 250 (still registered then) finishes after it
 		backfill, backfillContracts := otherCacheService(t, fx, 250, time.Now().Add(time.Hour))
 		expectRegistered(backfillContracts, testScw, testEoa, testAnyID, inGrace)
-		err := backfill.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		err := backfill.updateConfirmed()
 		require.ErrorIs(t, err, ErrNameNotRegistered)
 
 		item := cachedItem(t, fx)
@@ -280,11 +287,11 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(300, time.Now())
 		expectLapsed(fx.contracts)
-		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameNotRegistered)
+		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
 
 		fx.setHead(301, time.Now())
 		expectRegistered(fx.contracts, otherScw, otherEoa, otherAnyID, notExpired)
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, fx.updateConfirmed())
 
 		require.Equal(t, otherEoa, isNameAvailable(t, fx.cacheService).OwnerEthAddress)
 		require.EqualValues(t, 1, countRecords(t, fx))
@@ -296,13 +303,13 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(400, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, fx.updateConfirmed())
 
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(notExpired), nil)
 		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), testFullName, gomock.Any()).Return("", "", "", errors.New("rpc is down"))
 		// the cache has the complete record of that block: that is what the caller gets
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, fx.updateConfirmed())
 
 		item := cachedItem(t, fx)
 		require.False(t, item.RefreshNeeded)
@@ -323,7 +330,7 @@ func TestCacheService_ChainOrder(t *testing.T) {
 			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(notExpired), nil)
 			fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), testFullName, gomock.Any()).Return(c.scw, testAnyID, "", nil)
 			fx.contracts.EXPECT().GetScwOwner(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
-			require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+			require.ErrorIs(t, fx.updateConfirmed(), ErrNameDataIncomplete)
 
 			item := cachedItem(t, fx)
 			require.Equal(t, c.owner, item.OwnerEthAddress)
@@ -345,11 +352,27 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(1, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.NoError(t, fx.updateConfirmed())
 
 		require.Equal(t, notExpired, cachedItem(t, fx).NameExpires)
 		require.EqualValues(t, 1, countRecords(t, fx))
 	})
+}
+
+// a tombstone never resolves in a reverse lookup, whatever fields its document has
+func TestCacheService_ReverseLookupSkipsTombstones(t *testing.T) {
+	fx := newFixture(t)
+	defer fx.finish(t)
+	_, err := fx.itemColl.InsertOne(ctx, bson.M{"name": testFullName, "removed": true, "observed_block": 10,
+		"owner_scw_eth_address": testScw, "owner_any_address": testAnyID})
+	require.NoError(t, err)
+
+	res, err := fx.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{AnyAddress: testAnyID})
+	require.NoError(t, err)
+	require.False(t, res.Found)
+	res, err = fx.GetNameByAddress(ctx, &nsp.NameByAddressRequest{OwnerScwEthAddress: testScw})
+	require.NoError(t, err)
+	require.False(t, res.Found)
 }
 
 // a cached name becomes available only when the latest block says it is not registered AND a
@@ -366,7 +389,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(notExpired), nil)
 
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		err := fx.updateConfirmed()
 		require.ErrorIs(t, err, ErrNameNotRegistered)
 		require.ErrorIs(t, err, errNotFinal)
 
@@ -388,7 +411,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(exp), nil).Times(2)
 
-		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), errNotFinal)
+		require.ErrorIs(t, fx.updateConfirmed(), errNotFinal)
 		require.False(t, cachedItem(t, fx).Removed)
 	})
 
@@ -401,7 +424,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil)
 
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		err := fx.updateConfirmed()
 		require.Error(t, err)
 		require.NotErrorIs(t, err, ErrNameNotRegistered, "not a not-final answer: the confirmation failed")
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
@@ -417,7 +440,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.Address{}, errors.New("rpc is down"))
 
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		err := fx.updateConfirmed()
 		require.Error(t, err)
 		require.NotErrorIs(t, err, ErrNameNotRegistered)
 		require.False(t, cachedItem(t, fx).Removed)
@@ -432,7 +455,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.setFinalized(280, time.Now())
 		expectLapsed(fx.contracts)
 
-		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameNotRegistered)
+		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
 		item := cachedItem(t, fx)
 		require.True(t, item.Removed)
 		require.Equal(t, int64(280), item.ObservedBlock)
@@ -451,8 +474,38 @@ func TestCacheService_Finality(t *testing.T) {
 		// at the latest block, then at the finalized one
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
 
-		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameNotRegistered)
+		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
 		require.True(t, cachedItem(t, fx).Removed)
+	})
+
+	t.Run("a request never reads the finalized block: the record stays taken, the background confirms", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, lapsed, 10, time.Now().UnixMilli())
+
+		fx.setHead(300, time.Now())
+		fx.setFinalized(290, time.Now())
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.HexToAddress(nameWrapper), nil).Times(2)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(300)).Return(big.NewInt(lapsed), nil).Times(2)
+
+		var headers int
+		fx.setHeadFunc(func() *contracts.Block {
+			headers++
+			return testBlock(300, time.Now())
+		})
+		fx.setFinalizedErr(errors.New("a request must not read the finalized block"))
+		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		require.ErrorIs(t, err, errNotFinal)
+		require.Equal(t, 1, headers)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
+
+		// the background confirms it at the finalized block
+		fx.setFinalizedErr(nil)
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(lapsed), nil)
+		require.Equal(t, 1, fx.runQueued())
+		require.True(t, isNameAvailable(t, fx.cacheService).Available)
+		require.Equal(t, int64(290), cachedItem(t, fx).ObservedBlock)
 	})
 
 	t.Run("not registered and nothing cached: no finalized read, nothing written", func(t *testing.T) {
@@ -462,7 +515,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.setFinalizedErr(errors.New("must not be read"))
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
 
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
+		err := fx.updateConfirmed()
 		require.ErrorIs(t, err, ErrNameNotRegistered)
 		require.NotErrorIs(t, err, errNotFinal)
 		require.Zero(t, countRecords(t, fx))

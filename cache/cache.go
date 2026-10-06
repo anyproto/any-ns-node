@@ -355,10 +355,12 @@ type refreshOpts struct {
 	// decide exactly the same (the reads, the finality confirmation, the order of the records),
 	// but write nothing (the dry run of the backfill)
 	dry bool
-	// the background refresh: a tombstone is confirmed again (and rewritten at a newer
-	// finalized block) when the latest block still says that the name is not registered. a
-	// request never does: it does not read the finalized block for a name that is not cached
-	// as taken
+	// the finalized block may be read to confirm the removal of a cached registration (the
+	// background refresh, the backfill). a request never waits for that read: it keeps the
+	// record as it is and hands the name to the background
+	confirm bool
+	// the background refresh: confirm, and a tombstone is also confirmed again (rewritten at a
+	// newer finalized block) when the latest block still says that the name is not registered
 	background bool
 	// re-reads to schedule on the record (unix ms, see rereadDelays), in the same write
 	rereads []int64
@@ -414,7 +416,8 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 }
 
 // confirmNotRegistered: the latest block says that the name is not registered. that makes a
-// cached name available, so it must be final: a read of a block that is reorged away later (or
+// cached name available, so it must be final (and it is decided in the background only, see
+// refreshOpts.confirm): a read of a block that is reorged away later (or
 // of another fork, or of a lagging backend behind a load balancer) would make a registered name
 // available. it reads the registry again at the finalized block:
 //   - a tombstone at that block and ErrNameNotRegistered: confirmed
@@ -430,6 +433,11 @@ func (cs *cacheService) confirmNotRegistered(ctx context.Context, fullName strin
 	}
 	if stored == nil || (stored.Removed && !o.background) {
 		return nil, ErrNameNotRegistered
+	}
+	if !o.confirm && !o.background {
+		// a request: the record stays (taken) until the background confirmed the removal
+		cs.requestRefresh(refreshRequest{name: fullName})
+		return nil, fmt.Errorf("%w: handed to the background refresh", errNotFinal)
 	}
 
 	nh, err := contracts.NameHash(fullName)
