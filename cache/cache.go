@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/anyproto/any-ns-node/config"
 	"github.com/anyproto/any-ns-node/contracts"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
-	"github.com/ethereum/go-ethereum/common"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
@@ -24,6 +24,11 @@ const CName = "any-ns.cache"
 // never as "the cache is up to date"
 var ErrNameNotRegistered = errors.New("name is not registered")
 
+// ErrNameDataIncomplete is returned by UpdateInCache when the registry confirmed the name
+// (it is registered and not lapsed), but its owner could not be read. the confirmed part is
+// cached and the record is marked refresh_needed, so lookups keep reporting the name as taken
+var ErrNameDataIncomplete = errors.New("name is registered, but its owner could not be read")
+
 var log = logger.NewNamed(CName)
 
 type NameDataItem struct {
@@ -34,6 +39,19 @@ type NameDataItem struct {
 	OwnerAnyAddress    string `bson:"owner_any_address"`
 	SpaceId            string `bson:"space_id"`
 	NameExpires        int64  `bson:"name_expires"`
+
+	// the block the contracts were read at (all the reads of a refresh by its hash).
+	// 0 for records written before it was added
+	ObservedBlock     int64  `bson:"observed_block,omitempty"`
+	ObservedBlockHash string `bson:"observed_block_hash,omitempty"`
+	// that block's timestamp (unix seconds): lapse decisions use it, not the local clock
+	ObservedBlockTime int64 `bson:"observed_block_time,omitempty"`
+	// the local time of the read (unix ms)
+	ObservedAt int64 `bson:"observed_at,omitempty"`
+
+	// the registry confirmed the name, but its owner could not be read: the record holds only
+	// what was confirmed (it is still a taken name)
+	RefreshNeeded bool `bson:"refresh_needed,omitempty"`
 }
 
 // TODO: index it
@@ -63,9 +81,12 @@ type CacheService interface {
 
 	// call it when you need to read REAL data: smart contracts -> cache
 	// will return no error if name is found and data was updated
-	// will return ErrNameNotRegistered if the registry has no owner for the name.
-	// that is an expected answer, not a failure: nothing was written to the cache,
+	// will return ErrNameNotRegistered if the registry has no owner for the name, or if the
+	// name has lapsed (nameExpires + grace period has passed, it can be registered again).
+	// that is an expected answer, not a failure: the cache does not have the name as taken,
 	// so callers must never treat it as "the cache is up to date"
+	// will return ErrNameDataIncomplete if the name is registered, but its owner could not be
+	// read: the cache has it as taken, without the owner (see ErrNameDataIncomplete)
 	// will return any other error if something went wrong
 	UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error)
 
@@ -78,6 +99,9 @@ type cacheService struct {
 
 	confContracts config.Contracts
 	contracts     contracts.ContractsService
+
+	// the local clock. a field so that tests can move it
+	now func() time.Time
 }
 
 func (cs *cacheService) Name() (name string) {
@@ -88,6 +112,7 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 	cs.confMongo = a.MustComponent(config.CName).(*config.Config).Mongo
 	cs.confContracts = a.MustComponent(config.CName).(*config.Config).GetContracts()
 	cs.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
+	cs.now = time.Now
 
 	// connect to mongo
 	uri := cs.confMongo.Connect
@@ -122,16 +147,13 @@ func (cs *cacheService) Close(ctx context.Context) (err error) {
 
 func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error) {
 	// 1 - lookup in the cache
-	item := &NameDataItem{}
-	err = cs.itemColl.FindOne(ctx, findNameDataByName{FullName: in.FullName}).Decode(&item)
-
+	item, err := cs.getNameData(ctx, in.FullName)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return &nsp.NameAvailableResponse{Available: true}, nil
-		}
-
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
+	}
+	if item == nil {
+		return &nsp.NameAvailableResponse{Available: true}, nil
 	}
 
 	log.Debug("found item in cache", zap.String("FullName", in.FullName))
@@ -145,6 +167,19 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 		SpaceId:            item.SpaceId,
 		NameExpires:        item.NameExpires,
 	}, nil
+}
+
+// getNameData returns the record of the name, nil if there is none
+func (cs *cacheService) getNameData(ctx context.Context, fullName string) (*NameDataItem, error) {
+	item := &NameDataItem{}
+	err := cs.itemColl.FindOne(ctx, findNameDataByName{FullName: fullName}).Decode(item)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func (cs *cacheService) GetNameByAddress(ctx context.Context, in *nsp.NameByAddressRequest) (out *nsp.NameByAddressResponse, err error) {
@@ -216,75 +251,18 @@ func (cs *cacheService) setNameData(ctx context.Context, in *NameDataItem) (err 
 func (cs *cacheService) UpdateInCache(ctx context.Context, in *nsp.NameAvailableRequest) (err error) {
 	log.Debug("reading data from smart contracts -> cache", zap.String("FullName", in.FullName))
 
-	// 1 - convert to name hash
-	nh, err := contracts.NameHash(in.FullName)
-	if err != nil {
-		log.Error("can not convert FullName to namehash", zap.Error(err))
+	// 1 - read the name at the latest block (all reads pinned to it)
+	obs, err := cs.readNameData(ctx, in.FullName)
+	if obs == nil || errors.Is(err, ErrNameNotRegistered) {
+		// nothing confirmed, or not registered: the cache is not changed.
+		// (a cached record is never removed on the word of a single read)
 		return err
 	}
 
-	// 2 - call contract's method
-	log.Info("getting owner for name", zap.String("FullName", in.GetFullName()))
-	addr, err := cs.contracts.GetOwnerForNamehash(ctx, nh)
-	if err != nil {
-		if err.Error() == "not found" {
-			// the registry has nothing for that name. same outcome as a zero owner:
-			// nothing was written to the cache, so report it the same way
-			log.Info("registry does not know the name", zap.String("FullName", in.GetFullName()))
-			return ErrNameNotRegistered
-		}
-
-		log.Error("can not get owner", zap.Error(err))
-		return err
+	// 2 - update cache: the confirmed part, even if the owner could not be read
+	if serr := cs.setNameData(ctx, obs); serr != nil {
+		log.Error("failed to update name data after reading from smart contracts", zap.Error(serr))
+		return serr
 	}
-
-	if (addr == common.Address{}) {
-		// nothing was written to the cache -> never let the caller think it was.
-		// right after a registration this can also mean that the registry provider
-		// has simply not caught up yet, so it is not necessarily a free name
-		log.Warn("registry has no owner for the name", zap.String("FullName", in.GetFullName()))
-		return ErrNameNotRegistered
-	}
-
-	// the owner can be NameWrapper
-	log.Info("received owner address", zap.String("Owner addr", addr.Hex()))
-
-	// 3 - if name is already registered, then get additional info
-	log.Info("name is already registered...Getting additional info")
-	ea, aa, si, exp, err := cs.contracts.GetAdditionalNameInfo(ctx, addr, in.GetFullName())
-	if err != nil {
-		log.Error("failed to get additional info", zap.Error(err))
-		return err
-	}
-
-	// 4 - update cache
-	var ndi NameDataItem
-	ndi.FullName = in.FullName
-	ndi.OwnerAnyAddress = aa
-	ndi.SpaceId = si
-	ndi.NameExpires = exp.Int64()
-
-	own, err := cs.contracts.GetScwOwner(ctx, common.HexToAddress(ea))
-	if err != nil {
-		log.Warn("failed to get SCW -> owner", zap.Error(err))
-
-		ndi.OwnerScwEthAddress = ""
-		ndi.OwnerEthAddress = strings.ToLower(ea)
-	} else {
-		ndi.OwnerScwEthAddress = strings.ToLower(ea)
-		ndi.OwnerEthAddress = strings.ToLower(own.Hex())
-	}
-
-	// convert unixtime (big int) to string
-	//timestamp := time.Unix(exp.Int64(), 0)
-	//timeString := timestamp.Format("2001-01-02 15:04:05")
-
-	err = cs.setNameData(ctx, &ndi)
-	if err != nil {
-		log.Error("failed to update name data after reading from smart contracts", zap.Error(err))
-		return err
-	}
-
-	// success
-	return nil
+	return err
 }

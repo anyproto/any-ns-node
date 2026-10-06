@@ -29,6 +29,7 @@ import (
 type MockContractsService struct {
 	ctrl     *gomock.Controller
 	recorder *MockContractsServiceMockRecorder
+	isgomock struct{}
 }
 
 // MockContractsServiceMockRecorder is the mock recorder for MockContractsService.
@@ -184,6 +185,21 @@ func (mr *MockContractsServiceMockRecorder) CreateEthConnection() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEthConnection", reflect.TypeOf((*MockContractsService)(nil).CreateEthConnection))
 }
 
+// FinalizedBlock mocks base method.
+func (m *MockContractsService) FinalizedBlock(ctx context.Context) (*contracts.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FinalizedBlock", ctx)
+	ret0, _ := ret[0].(*contracts.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FinalizedBlock indicates an expected call of FinalizedBlock.
+func (mr *MockContractsServiceMockRecorder) FinalizedBlock(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FinalizedBlock", reflect.TypeOf((*MockContractsService)(nil).FinalizedBlock), ctx)
+}
+
 // GenerateAuthOptsForAdmin mocks base method.
 func (m *MockContractsService) GenerateAuthOptsForAdmin() (*bind.TransactOpts, error) {
 	m.ctrl.T.Helper()
@@ -200,21 +216,20 @@ func (mr *MockContractsServiceMockRecorder) GenerateAuthOptsForAdmin() *gomock.C
 }
 
 // GetAdditionalNameInfo mocks base method.
-func (m *MockContractsService) GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string) (string, string, string, *big.Int, error) {
+func (m *MockContractsService) GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string, block common.Hash) (string, string, string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", ctx, currentOwner, fullName)
+	ret := m.ctrl.Call(m, "GetAdditionalNameInfo", ctx, currentOwner, fullName, block)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(string)
-	ret3, _ := ret[3].(*big.Int)
-	ret4, _ := ret[4].(error)
-	return ret0, ret1, ret2, ret3, ret4
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
 }
 
 // GetAdditionalNameInfo indicates an expected call of GetAdditionalNameInfo.
-func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(ctx, currentOwner, fullName any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetAdditionalNameInfo(ctx, currentOwner, fullName, block any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), ctx, currentOwner, fullName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdditionalNameInfo", reflect.TypeOf((*MockContractsService)(nil).GetAdditionalNameInfo), ctx, currentOwner, fullName, block)
 }
 
 // GetBalanceOf mocks base method.
@@ -247,34 +262,49 @@ func (mr *MockContractsServiceMockRecorder) GetNameByAddress(address any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameByAddress", reflect.TypeOf((*MockContractsService)(nil).GetNameByAddress), address)
 }
 
-// GetOwnerForNamehash mocks base method.
-func (m *MockContractsService) GetOwnerForNamehash(ctx context.Context, namehash [32]byte) (common.Address, error) {
+// GetNameExpires mocks base method.
+func (m *MockContractsService) GetNameExpires(ctx context.Context, fullName string, block common.Hash) (*big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOwnerForNamehash", ctx, namehash)
+	ret := m.ctrl.Call(m, "GetNameExpires", ctx, fullName, block)
+	ret0, _ := ret[0].(*big.Int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNameExpires indicates an expected call of GetNameExpires.
+func (mr *MockContractsServiceMockRecorder) GetNameExpires(ctx, fullName, block any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNameExpires", reflect.TypeOf((*MockContractsService)(nil).GetNameExpires), ctx, fullName, block)
+}
+
+// GetOwnerForNamehash mocks base method.
+func (m *MockContractsService) GetOwnerForNamehash(ctx context.Context, namehash [32]byte, block common.Hash) (common.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOwnerForNamehash", ctx, namehash, block)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOwnerForNamehash indicates an expected call of GetOwnerForNamehash.
-func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(ctx, namehash any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetOwnerForNamehash(ctx, namehash, block any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), ctx, namehash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOwnerForNamehash", reflect.TypeOf((*MockContractsService)(nil).GetOwnerForNamehash), ctx, namehash, block)
 }
 
 // GetScwOwner mocks base method.
-func (m *MockContractsService) GetScwOwner(ctx context.Context, address common.Address) (common.Address, error) {
+func (m *MockContractsService) GetScwOwner(ctx context.Context, address common.Address, block common.Hash) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetScwOwner", ctx, address)
+	ret := m.ctrl.Call(m, "GetScwOwner", ctx, address, block)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetScwOwner indicates an expected call of GetScwOwner.
-func (mr *MockContractsServiceMockRecorder) GetScwOwner(ctx, address any) *gomock.Call {
+func (mr *MockContractsServiceMockRecorder) GetScwOwner(ctx, address, block any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScwOwner", reflect.TypeOf((*MockContractsService)(nil).GetScwOwner), ctx, address)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScwOwner", reflect.TypeOf((*MockContractsService)(nil).GetScwOwner), ctx, address, block)
 }
 
 // Init mocks base method.
@@ -304,6 +334,21 @@ func (m *MockContractsService) IsContractDeployed(ctx context.Context, address c
 func (mr *MockContractsServiceMockRecorder) IsContractDeployed(ctx, address any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsContractDeployed", reflect.TypeOf((*MockContractsService)(nil).IsContractDeployed), ctx, address)
+}
+
+// LatestBlock mocks base method.
+func (m *MockContractsService) LatestBlock(ctx context.Context) (*contracts.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LatestBlock", ctx)
+	ret0, _ := ret[0].(*contracts.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LatestBlock indicates an expected call of LatestBlock.
+func (mr *MockContractsServiceMockRecorder) LatestBlock(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LatestBlock", reflect.TypeOf((*MockContractsService)(nil).LatestBlock), ctx)
 }
 
 // MakeCommitment mocks base method.
