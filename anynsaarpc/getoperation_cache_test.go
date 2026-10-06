@@ -328,6 +328,8 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, nsp.OperationState_Completed, resp.OperationState)
 		require.Equal(t, oldExpires, cachedItem(t, coll).NameExpires)
+		// the re-reads are stored before the poll returns (the refresh has not run yet)
+		require.Len(t, cachedItem(t, coll).Rereads, 2)
 		close(release)
 
 		eventually(t, "the background refresh", func() bool { return cachedItem(t, coll).NameExpires == newExpires })
@@ -385,7 +387,8 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 	})
 }
 
-// the cached path of a completed operation never waits for Mongo writes or the contracts
+// the cached path of a completed operation never waits for the contracts, and for a Mongo write
+// only for the short bounded schedule of the re-reads (2s)
 func TestAnynsRpc_GetOperation_CachedNeverWaits(t *testing.T) {
 	fx := newFixture(t, "")
 	defer fx.finish(t)
@@ -415,5 +418,5 @@ func TestAnynsRpc_GetOperation_CachedNeverWaits(t *testing.T) {
 	resp, err := getOperation(t, fx)
 	require.NoError(t, err)
 	require.Equal(t, nsp.OperationState_Completed, resp.OperationState)
-	require.Less(t, time.Since(start), time.Second)
+	require.Less(t, time.Since(start), 3*time.Second)
 }

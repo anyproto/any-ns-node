@@ -85,7 +85,9 @@ chain confirmed it. When unsure, the cached record is served as taken and refres
   waiting first.
 - **GetOperation** answers as before (GO-7482). A completed operation's name is refreshed at the
   latest block: in the poll if it is not cached yet (as before), in the background if it is
-  (the poll never waits for that). Re-reads are scheduled at +5 and +30 minutes (lagging providers,
+  (the poll never waits for the contracts; for a cached name it stores the re-reads on the record
+  first, one write bounded by 2 seconds, so a dropped background request or a restart can not lose
+  them). Re-reads are scheduled at +5 and +30 minutes (lagging providers,
   reorgs past the Sepolia finality). If the background refresh fails, the record is marked
   `refresh_needed`; its data stays.
 

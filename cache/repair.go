@@ -59,6 +59,42 @@ const (
 	maxRereads = 8
 )
 
+// scheduleTimeout bounds the write of ScheduleRereads: a GetOperation poll waits for it.
+// a var only so that tests can shrink it
+var scheduleTimeout = 2 * time.Second
+
+// ScheduleRereads adds the re-reads of a name changed by an operation completed now to its record
+// (if there is one), in one update outside of a transaction, bounded by scheduleTimeout: durable,
+// so that a dropped background request or a restart does not lose the refresh. the periodic scan
+// runs them (not before the record's lease or backoff)
+func (cs *cacheService) ScheduleRereads(ctx context.Context, fullName string) error {
+	name, err := cs.canonical(fullName)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, scheduleTimeout)
+	defer cancel()
+
+	times := cs.rereadTimes()
+	add := bson.A{}
+	for _, t := range times {
+		add = append(add, t)
+	}
+	first := slices.Min(times)
+	_, err = cs.itemColl.UpdateOne(ctx, bson.M{"name": name}, mongo.Pipeline{
+		{{Key: "$set", Value: bson.M{
+			"rereads": bson.M{"$setUnion": bson.A{bson.M{"$ifNull": bson.A{"$rereads", bson.A{}}}, add}},
+		}}},
+		{{Key: "$set", Value: bson.M{
+			"repair_at": bson.M{"$max": bson.A{
+				bson.M{"$min": bson.A{bson.M{"$ifNull": bson.A{"$repair_at", first}}, first}},
+				bson.M{"$ifNull": bson.A{"$refresh_next_at", 0}},
+			}},
+		}}},
+	})
+	return err
+}
+
 // rereadTimes: the re-reads of a name changed by an operation completed now
 func (cs *cacheService) rereadTimes() []int64 {
 	now := cs.now()

@@ -646,4 +646,61 @@ func TestCacheService_Rereads(t *testing.T) {
 		require.Equal(t, notExpired+100, item.NameExpires)
 		require.Len(t, item.Rereads, 2)
 	})
+
+	t.Run("the re-reads of a cached name survive a dropped request and a restart", func(t *testing.T) {
+		for _, c := range []string{"queue overflow", "restart"} {
+			t.Run(c, func(t *testing.T) {
+				fx := newFixture(t)
+				defer fx.finish(t)
+				// an unexpired renewal: nothing else would refresh it before the old expiry
+				seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+
+				start := time.Now()
+				require.NoError(t, fx.ScheduleRereads(ctx, testFullName))
+				if c == "queue overflow" {
+					fx.queue = newRefreshQueue(1)
+					require.True(t, fx.queue.push(refreshRequest{name: "other.any"}))
+					fx.RefreshAfterOperation(testFullName)
+					require.Len(t, fx.queue.ch, 1, "dropped")
+				}
+				item := cachedItem(t, fx)
+				require.Len(t, item.Rereads, 2)
+				require.GreaterOrEqual(t, item.RepairAt, start.Add(5*time.Minute).UnixMilli())
+				require.Less(t, item.RepairAt, notExpired*1000)
+
+				// "restart": another service on the same collection, its queue empty
+				cs := fx.cacheService
+				var m = fx.contracts
+				if c == "restart" {
+					cs, m = otherCacheService(t, fx, 600, time.Now())
+				}
+				later := time.Now().Add(5*time.Minute + time.Second)
+				cs.now = func() time.Time { return later }
+				expectRegistered(m, testScw, testEoa, testAnyID, notExpired+100)
+				n, err := cs.repairOnce(ctx, repairBatch)
+				require.NoError(t, err)
+				require.Equal(t, 1, n)
+				item = cachedItem(t, fx)
+				require.Equal(t, notExpired+100, item.NameExpires)
+				require.Len(t, item.Rereads, 1)
+			})
+		}
+	})
+
+	t.Run("scheduling respects the record's lease, and a repeated schedule coalesces on the next write", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+		now := time.Now()
+		claimed, err := fx.claimRefresh(ctx, testFullName, now.Add(10*time.Minute))
+		require.NoError(t, err)
+		require.True(t, claimed)
+
+		require.NoError(t, fx.ScheduleRereads(ctx, testFullName))
+		require.NoError(t, fx.ScheduleRereads(ctx, testFullName))
+		item := cachedItem(t, fx)
+		require.Equal(t, item.RefreshNextAt, item.RepairAt, "not before the lease")
+		require.LessOrEqual(t, len(item.Rereads), 4)
+		require.Len(t, mergeRereads(item.Rereads, nil, 0), 2)
+	})
 }

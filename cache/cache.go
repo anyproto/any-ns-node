@@ -118,6 +118,9 @@ type CacheService interface {
 	// a refresh at the latest block and the re-reads, or (if the refresh fails) the record is
 	// marked refresh_needed with the re-reads. it never blocks (dropped if the queue is full)
 	RefreshAfterOperation(fullName string)
+	// ScheduleRereads stores the re-reads (see rereadDelays) of a name that a completed operation
+	// changed on its cached record, durably, with one short bounded write (scheduleTimeout)
+	ScheduleRereads(ctx context.Context, fullName string) error
 
 	app.Component
 }
