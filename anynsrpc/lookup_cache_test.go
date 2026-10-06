@@ -54,6 +54,9 @@ func withAppName(uri, app string) string {
 	return uri + "/?appName=" + app
 }
 
+// finalizedGate, if set, holds every read of the finalized block until it is closed
+var finalizedGate atomic.Pointer[chan struct{}]
+
 // a real cache (local test Mongo, its client named realCacheApp) on top of mocked contracts: a
 // new block on every read of the latest one, the finalized block is the latest one. the
 // background worker runs (the periodic scan does not). a separate database, so that it does not
@@ -73,7 +76,14 @@ func newRealCache(t *testing.T) (cache.CacheService, *mock_contracts.MockContrac
 		n := 1000 + block.Add(1)
 		return &contracts.Block{Number: n, Hash: common.BigToHash(big.NewInt(n)), Time: uint64(time.Now().Unix())}, nil
 	}).AnyTimes()
-	cm.EXPECT().FinalizedBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
+	cm.EXPECT().FinalizedBlock(gomock.Any()).DoAndReturn(func(ctx context.Context) (*contracts.Block, error) {
+		if gate := finalizedGate.Load(); gate != nil {
+			select {
+			case <-*gate:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
 		n := 1000 + block.Load()
 		return &contracts.Block{Number: n, Hash: common.BigToHash(big.NewInt(n)), Time: uint64(time.Now().Unix())}, nil
 	}).AnyTimes()
@@ -141,11 +151,16 @@ func TestAnynsRpc_IsNameAvailable_LapsedName(t *testing.T) {
 			cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).MinTimes(2)
 			cm.EXPECT().GetNameExpires(gomock.Any(), fullName, gomock.Any()).Return(big.NewInt(lapsed), nil).MinTimes(2)
 
-			// served from the cache as taken; the background confirms the lapse
+			// served from the cache as taken; the background confirms the lapse (held until the
+			// first answer was checked: the worker could otherwise confirm it in between)
+			gate := make(chan struct{})
+			finalizedGate.Store(&gate)
+			defer finalizedGate.Store(nil)
 			resp, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
 			require.NoError(t, err)
 			require.False(t, resp.Available)
 			require.Equal(t, testEoa, resp.OwnerEthAddress)
+			close(gate)
 			deadline := time.Now().Add(watchdog)
 			for !resp.Available {
 				require.True(t, time.Now().Before(deadline), "the background refresh did not confirm the lapse")
