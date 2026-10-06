@@ -19,10 +19,11 @@ import (
 //   - reverse lookups prefer the canonical record, an alias only counts when there is none
 //   - the background refresh of an alias refreshes the canonical name and settles the alias
 
-// the collation of the alias check: case- and width-insensitive (strength 2 ignores tertiary
-// differences), so every spelling that the normalization maps to the canonical one matches (the
-// candidates are then checked by the normalization itself)
-var aliasCollation = &options.Collation{Locale: "en", Strength: 2}
+// the collation of the alias check: primary strength, it ignores case, width, compatibility
+// forms and accents, so it is broader than the normalization (strength 2 is not: it tells "ſ"
+// from "s", which the normalization maps to one). the candidates are then checked by the
+// normalization itself
+var aliasCollation = &options.Collation{Locale: "en", Strength: 1}
 
 // aliasIndexName: the index of the alias check (non-unique, with aliasCollation). a failure to
 // create it only makes the check a scan of the cache (a few thousand records)
@@ -38,8 +39,9 @@ func (cs *cacheService) ensureAliasIndex(ctx context.Context) {
 	}
 }
 
-// aliasCandidates bounds the records the alias check looks at (one per spelling of a name)
-const aliasCandidates = 16
+// aliasCandidates bounds the records the alias check looks at (the spellings of a name, and
+// names that differ only by accents)
+const aliasCandidates = 64
 
 // liveAlias: a live (not a tombstone) record whose name normalizes to canonical, nil if there is
 // none. authoritative: one query of the collection at the time of the lookup (it also finds a
@@ -55,7 +57,7 @@ func (cs *cacheService) liveAlias(ctx context.Context, canonical string) (*NameD
 		return nil, err
 	}
 	for i := range items {
-		// the collation is broader than the normalization (e.g. "ss" and "ß"): only a record
+		// the collation is broader than the normalization (e.g. "tést" and "test"): only a record
 		// whose name normalizes to the requested one counts
 		if c, err := cs.canonical(items[i].FullName); err == nil && c == canonical {
 			return &items[i], nil

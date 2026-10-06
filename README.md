@@ -113,7 +113,7 @@ Maintenance (one-off runs of the node binary; all are dry runs unless `-refresh-
   unknown freshness); otherwise both stay, the canonical one is marked for a refresh, and they are
   listed (`kept:`) for an operator or a later run. Until then the node warns at start, a live alias
   keeps its name taken (every lookup without a live canonical record checks for one, through a
-  case-insensitive index `name_ci` the node creates), reverse lookups prefer the canonical record,
+  case- and accent-insensitive index `name_ci` the node creates; the candidates are checked by the normalization), reverse lookups prefer the canonical record,
   and the background refreshes the canonical name instead of the alias.
 - `-refresh-cache`: re-reads every cached name (tombstones too) with the same decisions as the node.
   `-refresh-interval` is the delay between two names (default 1s). Exits 1 if any name failed,

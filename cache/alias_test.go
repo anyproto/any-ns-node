@@ -141,12 +141,19 @@ func TestCacheService_Aliases(t *testing.T) {
 	t.Run("the collation is broader than the normalization: another name never counts", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-		// "strasse" and "straße" are equal at strength 2, but they are different names
-		_, err := fx.itemColl.InsertOne(ctx, bson.M{"name": "strasse.any", "owner_eth_address": testEoa, "name_expires": notExpired})
-		require.NoError(t, err)
-		out, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: "straße.any"})
-		require.NoError(t, err)
-		require.True(t, out.Available)
+		// "tést" and "test" are equal at the primary strength, but they are different names
+		insertRaw(t, fx, bson.M{"name": "tést.any", "owner_eth_address": testEoa, "name_expires": notExpired})
+		require.True(t, isNameAvailable(t, fx.cacheService).Available)
+	})
+
+	t.Run("every spelling the normalization maps to the name counts (case, width, long s)", func(t *testing.T) {
+		for _, alias := range []string{"TEST.any", "ｔｅｓｔ.any", "teſt.any"} {
+			fx := newFixture(t)
+			insertRaw(t, fx, bson.M{"name": alias, "owner_eth_address": testEoa, "owner_scw_eth_address": testScw,
+				"owner_any_address": testAnyID, "name_expires": notExpired})
+			requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+			fx.finish(t)
+		}
 	})
 
 	t.Run("two legacy records without a block (unknown freshness): both kept, the canonical one marked", func(t *testing.T) {
