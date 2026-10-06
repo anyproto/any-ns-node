@@ -49,34 +49,46 @@ func (cs *cacheService) observation(fullName string, block *contracts.Block) *Na
 	}
 }
 
-// readRegistration: is the name registered (owned and not lapsed) at the block?
-// returns the registry owner and nameExpires if it is
+// readRegistration: is the name registered (not available at the registrar) at the block?
+// returns the registry owner (zero: a reserved name, see below) and nameExpires if it is
 func (cs *cacheService) readRegistration(ctx context.Context, fullName string, nh [32]byte, block *contracts.Block) (owner common.Address, expires int64, registered bool, err error) {
 	addr, err := cs.contracts.GetOwnerForNamehash(ctx, nh, block.Hash)
 	if err != nil {
-		if err.Error() == "not found" {
-			// the registry has nothing for that name. same outcome as a zero owner
-			log.Info("registry does not know the name", zap.String("FullName", fullName))
-			return common.Address{}, 0, false, nil
+		if err.Error() != "not found" {
+			log.Error("can not get owner", zap.Error(err))
+			return common.Address{}, 0, false, err
 		}
-		log.Error("can not get owner", zap.Error(err))
-		return common.Address{}, 0, false, err
-	}
-	if (addr == common.Address{}) {
-		// right after a registration this can also mean that the registry provider
-		// has simply not caught up yet, so it is not necessarily a free name
-		log.Warn("registry has no owner for the name", zap.String("FullName", fullName), zap.Int64("block", block.Number))
-		return common.Address{}, 0, false, nil
+		// the registry has nothing for that name: the same as a zero owner
+		addr = common.Address{}
 	}
 
+	// the registrar decides, even without a registry owner: its registrant can reclaim the name
+	// to address(0) and it stays reserved (not available) until it lapses
 	exp, err := cs.contracts.GetNameExpires(ctx, fullName, block.Hash)
 	if err != nil {
 		log.Error("failed to get expiration of the name", zap.Error(err))
 		return common.Address{}, 0, false, err
 	}
+	noExpiry := exp == nil || exp.Sign() <= 0
+
+	if (addr == common.Address{}) {
+		if noExpiry {
+			// never registered (right after a registration this can also mean that the
+			// provider has simply not caught up yet: not necessarily a free name)
+			log.Warn("registry has no owner for the name", zap.String("FullName", fullName), zap.Int64("block", block.Number))
+			return common.Address{}, 0, false, nil
+		}
+		if isLapsed(exp.Int64(), time.Unix(int64(block.Time), 0)) {
+			return common.Address{}, 0, false, nil
+		}
+		log.Info("the name has no registry owner, but the registrar still reserves it",
+			zap.String("FullName", fullName), zap.Int64("NameExpires", exp.Int64()), zap.Int64("block", block.Number))
+		return common.Address{}, exp.Int64(), true, nil
+	}
+
 	// the registry has an owner, the registrar has no expiry: the two reads disagree (e.g. a
 	// label hashed in another spelling). never a lapse: nothing is concluded from it
-	if exp == nil || exp.Sign() <= 0 {
+	if noExpiry {
 		log.Error("the registry has an owner, but the registrar has no expiry", zap.String("FullName", fullName), zap.Int64("block", block.Number))
 		return common.Address{}, 0, false, fmt.Errorf("%w: %s at block %d", errInconsistentRegistry, fullName, block.Number)
 	}
@@ -127,16 +139,21 @@ func (cs *cacheService) readNameData(ctx context.Context, fullName string) (*Nam
 		return obs, ErrNameNotRegistered
 	}
 	obs.NameExpires = exp
+	obs.RegistryOwner = strings.ToLower(addr.Hex())
+	if (addr == common.Address{}) {
+		// reserved without a registry owner: taken, nobody owns it (complete as it is)
+		return obs, nil
+	}
 
 	// 3 - the name is confirmed: everything below only enriches it, with its own time budget.
 	// a failure here is ErrNameDataIncomplete, never a plain error
 	enrichCtx, cancelEnrich := context.WithTimeout(ctx, enrichTimeout)
 	defer cancelEnrich()
 
-	incomplete := func(cause error) (*NameDataItem, error) {
+	incomplete := func(unread unreadFields, cause error) (*NameDataItem, error) {
 		log.Warn("name is registered, but its owner could not be read",
 			zap.String("FullName", fullName), zap.Error(cause))
-		obs.RefreshNeeded = true
+		obs.Incomplete, obs.RefreshNeeded, obs.unread = true, true, unread
 		// re-read in the background, after a backoff
 		obs.RefreshNextAt = cs.now().Add(refreshFailureBackoff).UnixMilli()
 		return obs, fmt.Errorf("%w: %w", ErrNameDataIncomplete, cause)
@@ -145,14 +162,14 @@ func (cs *cacheService) readNameData(ctx context.Context, fullName string) (*Nam
 	// the owner, AnyID and space ID: read together, all or nothing
 	ea, aa, si, err := cs.contracts.GetAdditionalNameInfo(enrichCtx, addr, fullName, head.Hash)
 	if err != nil {
-		return incomplete(err)
+		return incomplete(unreadAll, err)
 	}
 	obs.OwnerAnyAddress = aa
 	obs.SpaceId = si
 
 	// never cache a guess: an owner we could not read must not end up in the cache
 	if !common.IsHexAddress(ea) || (common.HexToAddress(ea) == common.Address{}) {
-		return incomplete(fmt.Errorf("the name wrapper returned owner %q", ea))
+		return incomplete(unreadOwner, fmt.Errorf("the name wrapper returned owner %q", ea))
 	}
 
 	own, err := cs.contracts.GetScwOwner(enrichCtx, common.HexToAddress(ea), head.Hash)
@@ -170,10 +187,10 @@ func (cs *cacheService) readNameData(ctx context.Context, fullName string) (*Nam
 	case err != nil:
 		// a failed lookup: do not store the wallet as if it was the owner
 		obs.OwnerScwEthAddress = strings.ToLower(ea)
-		return incomplete(fmt.Errorf("wallet owner: %w", err))
+		return incomplete(unreadEOA, fmt.Errorf("wallet owner: %w", err))
 	default:
 		obs.OwnerScwEthAddress = strings.ToLower(ea)
-		return incomplete(fmt.Errorf("wallet %s has no owner", ea))
+		return incomplete(unreadEOA, fmt.Errorf("wallet %s has no owner", ea))
 	}
 
 	return obs, nil

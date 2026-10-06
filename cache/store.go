@@ -175,8 +175,8 @@ func newer(a, b *NameDataItem) bool {
 		}
 		return a.ObservedBlockHash > b.ObservedBlockHash
 	}
-	if a.RefreshNeeded != b.RefreshNeeded {
-		return !a.RefreshNeeded
+	if a.Incomplete != b.Incomplete {
+		return !a.Incomplete
 	}
 	return a.ObservedAt > b.ObservedAt
 }
@@ -186,18 +186,32 @@ func readAt(d *NameDataItem) int64 {
 	return max(d.ObservedAt, d.ForkReadAt)
 }
 
-// mergeConfirmedOwner fills what an incomplete observation could not read from the stored
-// record, only where the observation itself proves that it can not have changed: the NameWrapper
-// returned the same wallet, only the wallet's owner (EOA) could not be read.
-// nothing else is carried over: the owner, AnyID and space ID are read together (one failed
-// read leaves all of them unknown, a successful one can be empty on purpose), and an unexpired
-// name can still be transferred
-func mergeConfirmedOwner(obs *NameDataItem, stored *NameDataItem) {
-	if stored.Removed || obs.OwnerEthAddress != "" || obs.OwnerScwEthAddress == "" {
+// carryOver fills what an incomplete observation could not read (see unreadFields) from the
+// stored record, only where the observation proves that it can not have changed:
+//   - only the wallet's owner (EOA) is unread: the NameWrapper returned the same wallet
+//   - the owner (and, if unread, AnyID and space ID): the registry owner is the same as the one
+//     the stored record was read with (records from before it was stored carry nothing)
+//
+// otherwise the fields stay empty. the record stays incomplete, it is retried after the backoff
+func carryOver(obs *NameDataItem, stored *NameDataItem) {
+	if stored.Removed {
 		return
 	}
-	if strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
-		obs.OwnerEthAddress = stored.OwnerEthAddress
+	sameRegistryOwner := stored.RegistryOwner != "" && stored.RegistryOwner == obs.RegistryOwner
+	switch obs.unread {
+	case unreadEOA:
+		if obs.OwnerScwEthAddress != "" && strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
+			obs.OwnerEthAddress = stored.OwnerEthAddress
+		}
+	case unreadOwner:
+		if sameRegistryOwner {
+			obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
+		}
+	case unreadAll:
+		if sameRegistryOwner {
+			obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
+			obs.OwnerAnyAddress, obs.SpaceId = stored.OwnerAnyAddress, stored.SpaceId
+		}
 	}
 }
 
@@ -309,8 +323,15 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 		return stored, nil
 	}
 
-	if item.RefreshNeeded && stored != nil {
-		mergeConfirmedOwner(&item, stored)
+	item.Canon = item.FullName
+	if item.Incomplete && stored != nil {
+		carryOver(&item, stored)
+	}
+	// a changed registration (a new one, another owner, a renewal; not a removal: that is final)
+	// is read again later, like after an operation: an unfinalized change can be reorged away
+	rereads := o.rereads
+	if !item.Removed && (stored == nil || !sameNameData(stored, &item)) {
+		rereads = append(append([]int64{}, rereads...), cs.rereadTimes()...)
 	}
 	// a replacement in the same fork keeps the latest read of that fork (the stored record's,
 	// if it was read later: e.g. an incomplete read replaced by an earlier complete one)
@@ -323,8 +344,15 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	if stored != nil {
 		before = stored.Rereads
 	}
-	item.Rereads = mergeRereads(before, o.rereads, item.ObservedAt)
+	item.Rereads = mergeRereads(before, rereads, item.ObservedAt)
 	item.RepairAt = repairAt(&item)
+	// a removal (confirmed at a finalized block) also retires the legacy records of the name under
+	// another spelling: without a block of their own, the chain is authoritative for the name
+	if item.Removed && !dry {
+		if err := cs.retireLegacyAliases(ctx, item.FullName); err != nil {
+			return nil, err
+		}
+	}
 	switch {
 	case dry:
 	case stored == nil:

@@ -134,14 +134,7 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 // stays) and makes the periodic scan take it right after the backoff (repair_at follows it): a
 // removal that is not final yet (the backfill). the data stays as it is
 func (cs *cacheService) retryLater(ctx context.Context, fullName string) error {
-	ctx, cancel := boundedCtx(ctx)
-	defer cancel()
-	until := cs.now().Add(refreshFailureBackoff).UnixMilli()
-	_, err := cs.itemColl.UpdateOne(ctx, bson.M{"name": fullName, "removed": bson.M{"$ne": true}}, mongo.Pipeline{
-		{{Key: "$set", Value: bson.M{"refresh_next_at": bson.M{"$max": bson.A{bson.M{"$ifNull": bson.A{"$refresh_next_at", 0}}, until}}}}},
-		{{Key: "$set", Value: bson.M{"repair_at": "$refresh_next_at"}}},
-	})
-	return err
+	return cs.retryAfterBackoff(ctx, bson.M{"name": fullName, "removed": bson.M{"$ne": true}})
 }
 
 // rereadTimes: the re-reads of a name changed by an operation completed now
@@ -155,7 +148,7 @@ func (cs *cacheService) rereadTimes() []int64 {
 }
 
 // mergeRereads: the pending re-reads of a and b, without the ones done by a read at doneAt
-// (unix ms), sorted, coalesced, at most maxRereads
+// (unix ms), sorted, coalesced, at most maxRereads (the earliest, and the latest)
 func mergeRereads(a, b []int64, doneAt int64) []int64 {
 	all := append(append(make([]int64, 0, len(a)+len(b)), a...), b...)
 	slices.Sort(all)
@@ -164,10 +157,12 @@ func mergeRereads(a, b []int64, doneAt int64) []int64 {
 		if t <= doneAt || (len(out) > 0 && t-out[len(out)-1] < rereadCoalesce.Milliseconds()) {
 			continue
 		}
-		if len(out) == maxRereads {
-			break
-		}
 		out = append(out, t)
+	}
+	// capped: the earliest ones, and always the latest (the finality follow-up of the newest
+	// change: dropping it could leave nothing after a reorg)
+	if len(out) > maxRereads {
+		out = append(out[:maxRereads-1], out[len(out)-1])
 	}
 	return out
 }
@@ -175,7 +170,7 @@ func mergeRereads(a, b []int64, doneAt int64) []int64 {
 // refreshRequest: a name for the background worker
 type refreshRequest struct {
 	name string
-	// after a completed operation: no lease, and the re-reads (see RefreshAfterOperation)
+	// after a completed operation: the re-reads (see RefreshAfterOperation)
 	afterOp bool
 }
 
@@ -308,13 +303,23 @@ func (cs *cacheService) claimRefresh(ctx context.Context, fullName string, now t
 // backOff keeps every node from re-reading the name for refreshFailureBackoff.
 // it does not touch the data or the observation
 func (cs *cacheService) backOff(ctx context.Context, fullName string) {
-	ctx, cancel := boundedCtx(ctx)
-	defer cancel()
-
-	_, err := cs.itemColl.UpdateOne(ctx, bson.M{"name": fullName}, holdUntil(cs.now().Add(refreshFailureBackoff).UnixMilli()))
-	if err != nil {
+	if err := cs.retryAfterBackoff(ctx, bson.M{"name": fullName}); err != nil {
 		log.Warn("failed to store the refresh backoff", zap.String("FullName", fullName), zap.Error(err))
 	}
+}
+
+// retryAfterBackoff: nobody refreshes the matching record before now + refreshFailureBackoff (a
+// longer lease or backoff stays), and the periodic scan takes it right then: repair_at is set to
+// it, whatever it was (a distant expiry included), so a failed refresh is always retried
+func (cs *cacheService) retryAfterBackoff(ctx context.Context, filter bson.M) error {
+	ctx, cancel := boundedCtx(ctx)
+	defer cancel()
+	until := cs.now().Add(refreshFailureBackoff).UnixMilli()
+	_, err := cs.itemColl.UpdateOne(ctx, filter, mongo.Pipeline{
+		{{Key: "$set", Value: bson.M{"refresh_next_at": bson.M{"$max": bson.A{bson.M{"$ifNull": bson.A{"$refresh_next_at", 0}}, until}}}}},
+		{{Key: "$set", Value: bson.M{"repair_at": "$refresh_next_at"}}},
+	})
+	return err
 }
 
 // holdUntil: nobody refreshes the record before until (a lease, a backoff). its scan time (if it
@@ -403,7 +408,20 @@ func (cs *cacheService) refreshAfterOperation(ctx context.Context, fullName stri
 		fullName = name
 	}
 	o := refreshOpts{background: true, rereads: cs.rereadTimes()}
-	_, err := cs.refresh(ctx, fullName, o)
+	// the shared lease and the backoff apply here too (repeated polls during an incident must
+	// not multiply the reads): a held record is left to the holder and the scan, its re-reads are
+	// stored anyway (see scheduleRereadsAsync). a name that is not cached has nothing to lease
+	claimed, err := cs.claimRefresh(ctx, fullName, cs.now())
+	if err != nil {
+		log.Warn("failed to take the refresh lease after an operation", zap.String("FullName", fullName), zap.Error(err))
+		return
+	}
+	if !claimed {
+		if stored, err := cs.getNameData(ctx, fullName); err != nil || stored != nil {
+			return
+		}
+	}
+	_, err = cs.refresh(ctx, fullName, o)
 	if !failed(err) {
 		return
 	}

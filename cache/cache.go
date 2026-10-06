@@ -79,10 +79,36 @@ type NameDataItem struct {
 	// serve it as "not in the cache"
 	Removed bool `bson:"removed,omitempty"`
 
-	// the registry confirmed the name, but its owner could not be read: the record holds only
-	// what was confirmed (it is still a taken name)
+	// the registry confirmed the name, but the enrichment (owner, AnyID, space ID) failed: the
+	// record holds what was confirmed, and what it could carry over from the previous record
+	// (see carryOver). this is what orders two records of one block (see newer)
+	Incomplete bool `bson:"incomplete,omitempty"`
+	// the record is retried by the background (an incomplete read, or a failed refresh after an
+	// operation): scheduling only, its data can be complete
 	RefreshNeeded bool `bson:"refresh_needed,omitempty"`
+
+	// the registry owner at ObservedBlock (lower case; the NameWrapper for a wrapped name, zero
+	// for a reserved name without a registry owner). "" for records written before it was added
+	RegistryOwner string `bson:"registry_owner,omitempty"`
+	// the canonical spelling of the name (the normalizer's output), written with every record:
+	// the alias check finds records under another spelling by it (see alias.go). indexed
+	Canon string `bson:"canon,omitempty"`
+
+	// not stored: which fields of an incomplete observation could not be read (see carryOver)
+	unread unreadFields
 }
+
+// unreadFields: what an incomplete read could not read
+type unreadFields int
+
+const (
+	// the owner, its wallet, AnyID and space ID (the NameWrapper and the resolver failed)
+	unreadAll unreadFields = iota + 1
+	// the owner and its wallet (the NameWrapper returned no owner)
+	unreadOwner
+	// the EOA owner of the wallet only
+	unreadEOA
+)
 
 type findNameDataByName struct {
 	FullName string `bson:"name"`
@@ -227,6 +253,7 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 		}
 		cs.ensureRepairIndex(initCtx)
 		cs.ensureAliasIndex(initCtx)
+		cs.ensureCanonIndex(initCtx)
 		cs.warnAliases(initCtx)
 	}
 
@@ -504,7 +531,7 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 		return stored, fmt.Errorf("%w: the cache has a registration at a later block %d", errNotFinal, stored.ObservedBlock)
 	case stored == nil || stored.Removed:
 		return stored, ErrNameNotRegistered
-	case stored.RefreshNeeded:
+	case stored.Incomplete:
 		if errors.Is(readErr, ErrNameDataIncomplete) {
 			return stored, readErr
 		}

@@ -239,7 +239,7 @@ func (cs *cacheService) VerifyNameIndex(ctx context.Context, apply bool) (stats 
 func (cs *cacheService) PurgeTombstones(ctx context.Context, apply bool) (stats PurgeStats, err error) {
 	// 1 - no incomplete record without an owner
 	incomplete, err := cs.itemColl.Distinct(ctx, "name", bson.M{
-		"refresh_needed":    true,
+		"$or":               bson.A{bson.M{"incomplete": true}, bson.M{"refresh_needed": true}},
 		"removed":           bson.M{"$ne": true},
 		"owner_eth_address": bson.M{"$in": bson.A{"", nil}},
 	})

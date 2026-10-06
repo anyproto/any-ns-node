@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -62,10 +63,10 @@ func TestCacheService_Aliases(t *testing.T) {
 		require.Equal(t, &nsp.NameByAddressResponse{Found: true, Name: testFullName}, byAnyID(t, fx, testAnyID))
 
 		// dry run: decided, nothing changed
-		require.Equal(t, AliasStats{Aliases: 1, Renamed: 1}, migrate(t, fx, false))
+		require.Equal(t, AliasStats{Aliases: 1, Renamed: 1, Canon: 1}, migrate(t, fx, false))
 		require.EqualValues(t, 1, aliasCount(t, fx))
 
-		require.Equal(t, AliasStats{Aliases: 1, Renamed: 1}, migrate(t, fx, true))
+		require.Equal(t, AliasStats{Aliases: 1, Renamed: 1}, migrate(t, fx, true), "renamed with its canon")
 		require.Zero(t, aliasCount(t, fx))
 		item := cachedItem(t, fx)
 		require.Equal(t, testEoa, item.OwnerEthAddress, "the data is kept")
@@ -86,7 +87,7 @@ func TestCacheService_Aliases(t *testing.T) {
 		insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": 10})
 
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
-		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, true))
+		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}, Canon: 2}, migrate(t, fx, true))
 		require.EqualValues(t, 1, aliasCount(t, fx))
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
 	})
@@ -102,7 +103,7 @@ func TestCacheService_Aliases(t *testing.T) {
 		require.Equal(t, &nsp.NameByAddressResponse{Found: true, Name: testFullName}, byAnyID(t, fx, otherAnyID))
 		require.Equal(t, otherEoa, isNameAvailable(t, fx.cacheService).OwnerEthAddress)
 
-		require.Equal(t, AliasStats{Aliases: 1, Deleted: 1}, migrate(t, fx, true))
+		require.Equal(t, AliasStats{Aliases: 1, Deleted: 1, Canon: 1}, migrate(t, fx, true))
 		require.Zero(t, aliasCount(t, fx))
 		require.Equal(t, &nsp.NameByAddressResponse{Found: true, Name: testFullName}, byAnyID(t, fx, otherAnyID))
 	})
@@ -130,7 +131,7 @@ func TestCacheService_Aliases(t *testing.T) {
 		defer fx.finish(t)
 		insertRaw(t, fx, aliasDoc(testAnyID, 0))
 		hookBeforeAliasCheck = func() {
-			require.Equal(t, AliasStats{Aliases: 1, Renamed: 1}, migrate(t, fx, true))
+			require.Equal(t, AliasStats{Aliases: 1, Renamed: 1}, migrate(t, fx, true), "renamed with its canon")
 		}
 		defer func() { hookBeforeAliasCheck = nil }()
 
@@ -162,9 +163,9 @@ func TestCacheService_Aliases(t *testing.T) {
 		insertRaw(t, fx, aliasDoc(testAnyID, 0))
 		insertRaw(t, fx, bson.M{"name": testFullName, "owner_eth_address": otherEoa, "owner_any_address": otherAnyID, "name_expires": notExpired})
 
-		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, false))
+		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}, Canon: 2}, migrate(t, fx, false))
 		require.False(t, cachedItem(t, fx).RefreshNeeded, "a dry run writes nothing")
-		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, true))
+		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}, Canon: 2}, migrate(t, fx, true))
 		require.EqualValues(t, 1, aliasCount(t, fx))
 		item := cachedItem(t, fx)
 		require.True(t, item.RefreshNeeded)
@@ -185,13 +186,13 @@ func TestCacheService_Aliases(t *testing.T) {
 
 	t.Run("migration keeps the alias when the canonical record is incomplete or older", func(t *testing.T) {
 		for _, canonical := range []bson.M{
-			{"name": testFullName, "observed_block": int64(10), "refresh_needed": true, "name_expires": notExpired},
+			{"name": testFullName, "observed_block": int64(10), "incomplete": true, "refresh_needed": true, "name_expires": notExpired},
 			{"name": testFullName, "observed_block": int64(4), "owner_eth_address": otherEoa, "name_expires": notExpired},
 		} {
 			fx := newFixture(t)
 			insertRaw(t, fx, aliasDoc(testAnyID, 5))
 			insertRaw(t, fx, canonical)
-			require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, true))
+			require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}, Canon: 2}, migrate(t, fx, true))
 			require.EqualValues(t, 1, aliasCount(t, fx))
 			fx.finish(t)
 		}
@@ -208,13 +209,16 @@ func TestCacheService_Aliases(t *testing.T) {
 				expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
 			} else {
 				fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
+				fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
 			}
 			require.Equal(t, 1, repairRound(t, fx))
 			// (no more contract expectations: another refresh would fail the test)
 			require.Zero(t, repairRound(t, fx))
-			later := time.Now().Add(time.Hour)
-			fx.now = func() time.Time { return later }
-			require.Zero(t, repairRound(t, fx))
+			if !registered {
+				later := time.Now().Add(time.Hour)
+				fx.now = func() time.Time { return later }
+				require.Zero(t, repairRound(t, fx))
+			}
 
 			var alias NameDataItem
 			require.NoError(t, fx.itemColl.FindOne(ctx, bson.M{"name": testAlias}).Decode(&alias))

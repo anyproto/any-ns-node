@@ -112,7 +112,7 @@ func TestMaintainCache_ExitCode(t *testing.T) {
 			aliasStats: cache.AliasStats{Aliases: 3, Renamed: 1, Deleted: 1, Kept: []string{"Foo.any"}}}
 		task := cacheTask{dedupe: true}
 		require.Equal(t, 0, maintainCache(context.Background(), f, task, &out))
-		require.Contains(t, out.String(), "non-canonical records=3 renamed=1 deleted=1 kept=1\n  kept: Foo.any\n")
+		require.Contains(t, out.String(), "non-canonical records=3 renamed=1 deleted=1 kept=1 canon set=0\n  kept: Foo.any\n")
 
 		f = &fakeMaintainer{aliasErr: errors.New("mongo is down")}
 		task = refresh

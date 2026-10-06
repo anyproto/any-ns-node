@@ -61,7 +61,8 @@ chain confirmed it. When unsure, the cached record is served as taken and refres
 
 - **Reads.** Every read and the cache key use the canonical spelling of the name (the
   normalization of the registration, `ensip15validation`). A registry owner without a registrar
-  expiry is a failure (retried), never a lapse. A refresh reads the latest block header once (number, hash and timestamp as the node
+  expiry is a failure (retried), never a lapse; a name without a registry owner that the
+  registrar still reserves (reclaimed to address(0), unexpired) stays taken. A refresh reads the latest block header once (number, hash and timestamp as the node
   reports them) and pins every contract read to that block by its hash. A name is registered if the
   registry has an owner and `nameExpires + 90 days (grace) >= block.timestamp`.
 - **Writes.** One record per name (the unique index on `{name: 1}`; the node accepts an existing one
@@ -75,6 +76,10 @@ chain confirmed it. When unsure, the cached record is served as taken and refres
   record and hands the name to the background. The record then becomes a
   tombstone at the finalized block: lookups treat it as a cache miss, reverse lookups skip it, and
   an older observation can not replace it. Otherwise the record stays as it is.
+- **Changes** (a new registration, another owner, a renewal) are read again at +5 and +30
+  minutes, whoever wrote them. A read whose enrichment failed keeps the owner fields of the
+  previous record only if the registry owner (or the wallet) is the same; it never replaces a
+  complete record of the same block. Every record stores its canonical spelling (`canon`).
 - **Lookups** never read the contracts and never write. A record that can be stale (expired,
   lapsed, incomplete, an old tombstone) is served as it is and handed to a background worker through
   a non-blocking in-memory queue (dropped when full).
@@ -114,7 +119,10 @@ Maintenance (one-off runs of the node binary; all are dry runs unless `-refresh-
   listed (`kept:`) for an operator or a later run. Until then the node warns at start, a live alias
   keeps its name taken (every lookup without a live canonical record checks for one, through a
   case- and accent-insensitive index `name_ci` the node creates; the candidates are checked by the normalization), reverse lookups prefer the canonical record,
-  and the background refreshes the canonical name instead of the alias.
+  and the background refreshes the canonical name instead of the alias. A removal confirmed at a
+  finalized block retires the aliases of the name that have no block of their own (legacy).
+  `-dedupe-cache -refresh-apply` also gives every record its `canon`: the alias check finds an
+  alias by it (e.g. a punycode spelling, which the collation can not equate).
 - `-refresh-cache`: re-reads every cached name (tombstones too) with the same decisions as the node.
   `-refresh-interval` is the delay between two names (default 1s). Exits 1 if any name failed,
   including names whose finalized block could not be read. `not-final` (the finalized block does not

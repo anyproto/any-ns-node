@@ -59,8 +59,8 @@ func maintainCache(ctx context.Context, m cache.Maintainer, task cacheTask, out 
 			return 1
 		}
 		aliases, err := m.MigrateAliases(ctx, task.apply)
-		_, _ = fmt.Fprintf(out, "dedupe %s: non-canonical records=%d renamed=%d deleted=%d kept=%d\n",
-			mode, aliases.Aliases, aliases.Renamed, aliases.Deleted, len(aliases.Kept))
+		_, _ = fmt.Fprintf(out, "dedupe %s: non-canonical records=%d renamed=%d deleted=%d kept=%d canon set=%d\n",
+			mode, aliases.Aliases, aliases.Renamed, aliases.Deleted, len(aliases.Kept), aliases.Canon)
 		for _, name := range aliases.Kept {
 			_, _ = fmt.Fprintf(out, "  kept: %s\n", name)
 		}

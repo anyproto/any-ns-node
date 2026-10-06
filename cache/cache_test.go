@@ -466,6 +466,9 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 			return common.Address{}, errors.New("not found")
 		})
 
+		// and no registrar expiry: never registered
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
+
 		// call it
 		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{
 			FullName: "test.any",
@@ -579,6 +582,9 @@ func TestCacheService_UpdateInCache(t *testing.T) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ interface{}, _ interface{}, _ interface{}) (common.Address, error) {
 			return common.Address{}, nil
 		}).Times(1)
+
+		// and no registrar expiry: never registered
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
 
 		// call it
 		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{

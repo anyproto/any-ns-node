@@ -159,7 +159,7 @@ func TestNewer(t *testing.T) {
 
 	// one chain state: a complete one over an incomplete one, then the later read
 	inc := obsAt(10, "0xa", 500)
-	inc.RefreshNeeded = true
+	inc.Incomplete = true
 	require.False(t, newer(inc, a))
 	require.True(t, newer(a, inc))
 	require.True(t, newer(obsAt(10, "0xa", 101), a))
@@ -346,7 +346,7 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		// fork A at block 600, incomplete, read at 300
 		incomplete := obsAt(600, "0xa", 300)
-		incomplete.RefreshNeeded, incomplete.OwnerEthAddress = true, ""
+		incomplete.Incomplete, incomplete.RefreshNeeded, incomplete.OwnerEthAddress = true, true, ""
 		_, err := fx.applyObservation(ctx, incomplete, refreshOpts{})
 		require.NoError(t, err)
 		// a delayed complete read of fork A from 100 replaces it (complete wins in one fork)
@@ -354,7 +354,7 @@ func TestCacheService_ChainOrder(t *testing.T) {
 		_, err = fx.applyObservation(ctx, complete, refreshOpts{})
 		require.NoError(t, err)
 		item := cachedItem(t, fx)
-		require.False(t, item.RefreshNeeded)
+		require.False(t, item.Incomplete)
 		require.Equal(t, int64(300), item.ForkReadAt)
 
 		// a delayed read of fork B from 200: fork A was read later, it stays
@@ -413,6 +413,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.setHead(300, time.Now())
 		fx.setFinalized(290, time.Now())
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), blockHash(300)).Return(big.NewInt(0), nil)
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(notExpired), nil)
 
@@ -465,6 +466,7 @@ func TestCacheService_Finality(t *testing.T) {
 		fx.setHead(300, time.Now())
 		fx.setFinalized(290, time.Now())
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), blockHash(300)).Return(big.NewInt(0), nil)
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.Address{}, errors.New("rpc is down"))
 
 		err := fx.updateConfirmed()
@@ -500,6 +502,7 @@ func TestCacheService_Finality(t *testing.T) {
 
 		// at the latest block, then at the finalized one
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil).Times(2)
 
 		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
 		require.True(t, cachedItem(t, fx).Removed)
@@ -541,6 +544,7 @@ func TestCacheService_Finality(t *testing.T) {
 
 		fx.setFinalizedErr(errors.New("must not be read"))
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
 
 		err := fx.updateConfirmed()
 		require.ErrorIs(t, err, ErrNameNotRegistered)
@@ -809,14 +813,14 @@ func TestCacheService_NameIndexAtStart(t *testing.T) {
 				Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName(name)})
 			require.NoError(t, err)
 			require.NoError(t, startCache(t, conf))
-			require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, name: true}, indexes())
+			require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "canon": false, name: true}, indexes())
 		}
 	})
 
 	t.Run("a missing one is created", func(t *testing.T) {
 		reset()
 		require.NoError(t, startCache(t, conf))
-		require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "name_1": true}, indexes())
+		require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "canon": false, "name_1": true}, indexes())
 	})
 
 	t.Run("a non-unique one stops it, nothing is dropped", func(t *testing.T) {

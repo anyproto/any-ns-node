@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -161,6 +162,17 @@ func cachedItem(t *testing.T, coll *mongo.Collection) *cache.NameDataItem {
 	return &item
 }
 
+// newRelease: a channel a blocked mock waits on, and its release. the release also runs at the
+// end of the test whatever happens (before the cache closes: cleanups run in reverse), so a
+// failed assertion can not leave the worker blocked
+func newRelease(t *testing.T) (<-chan struct{}, func()) {
+	ch := make(chan struct{})
+	var once sync.Once
+	release := func() { once.Do(func() { close(ch) }) }
+	t.Cleanup(release)
+	return ch, release
+}
+
 // eventually waits until the background (the worker) made cond true
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
@@ -265,7 +277,7 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 			FullName:    "Hello.any",
 		}, nil)
 		// the background refresh is held until the poll returned
-		release := make(chan struct{})
+		release, releaseNow := newRelease(t)
 		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, _ [32]byte, _ common.Hash) (common.Address, error) {
 				select {
@@ -281,7 +293,7 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		require.Equal(t, nsp.OperationState_Completed, resp.OperationState)
 		require.Less(t, time.Since(start), time.Second)
 		eventually(t, "the re-reads", func() bool { return len(cachedItem(t, coll).Rereads) == 2 })
-		close(release)
+		releaseNow()
 	})
 
 	t.Run("not cached, the registry does not have it yet: Pending, nothing is cached", func(t *testing.T) {
@@ -296,6 +308,7 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		completedOp(fx)
 		// the poll's retries, and the background's try
 		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).MinTimes(updateCacheRetryCount)
+		cm.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil).MinTimes(updateCacheRetryCount)
 
 		resp, err := getOperation(t, fx)
 		require.NoError(t, err)
@@ -347,10 +360,14 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		completedOp(fx)
 
 		// the poll does not wait for the refresh: it is blocked until the poll returned
-		release := make(chan struct{})
+		release, releaseNow := newRelease(t)
 		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(context.Context, [32]byte, common.Hash) (common.Address, error) {
-				<-release
+			func(ctx context.Context, _ [32]byte, _ common.Hash) (common.Address, error) {
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return common.Address{}, ctx.Err()
+				}
 				return common.HexToAddress(nameWrapper), nil
 			})
 		cm.EXPECT().GetNameExpires(gomock.Any(), opName, gomock.Any()).Return(big.NewInt(newExpires), nil)
@@ -364,7 +381,7 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		require.Equal(t, oldExpires, cachedItem(t, coll).NameExpires)
 		// the re-reads are stored in the background, without the refresh (it has not run yet)
 		eventually(t, "the re-reads", func() bool { return len(cachedItem(t, coll).Rereads) == 2 })
-		close(release)
+		releaseNow()
 
 		eventually(t, "the background refresh", func() bool { return cachedItem(t, coll).NameExpires == newExpires })
 		item := cachedItem(t, coll)
@@ -405,6 +422,7 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		completedOp(fx)
 		// no owner at the latest block (a lagging backend), registered at the finalized one
 		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
+		cm.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
 		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
 		cm.EXPECT().GetNameExpires(gomock.Any(), opName, gomock.Any()).Return(big.NewInt(oldExpires), nil)
 
