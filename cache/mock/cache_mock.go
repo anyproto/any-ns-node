@@ -22,6 +22,7 @@ import (
 type MockCacheService struct {
 	ctrl     *gomock.Controller
 	recorder *MockCacheServiceMockRecorder
+	isgomock struct{}
 }
 
 // MockCacheServiceMockRecorder is the mock recorder for MockCacheService.
@@ -114,6 +115,18 @@ func (mr *MockCacheServiceMockRecorder) Name() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockCacheService)(nil).Name))
 }
 
+// RefreshAfterOperation mocks base method.
+func (m *MockCacheService) RefreshAfterOperation(fullName string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RefreshAfterOperation", fullName)
+}
+
+// RefreshAfterOperation indicates an expected call of RefreshAfterOperation.
+func (mr *MockCacheServiceMockRecorder) RefreshAfterOperation(fullName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshAfterOperation", reflect.TypeOf((*MockCacheService)(nil).RefreshAfterOperation), fullName)
+}
+
 // UpdateInCache mocks base method.
 func (m *MockCacheService) UpdateInCache(ctx context.Context, in *nameserviceproto.NameAvailableRequest) error {
 	m.ctrl.T.Helper()
@@ -126,4 +139,18 @@ func (m *MockCacheService) UpdateInCache(ctx context.Context, in *nameservicepro
 func (mr *MockCacheServiceMockRecorder) UpdateInCache(ctx, in any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInCache", reflect.TypeOf((*MockCacheService)(nil).UpdateInCache), ctx, in)
+}
+
+// UpdateInCacheAfterOperation mocks base method.
+func (m *MockCacheService) UpdateInCacheAfterOperation(ctx context.Context, in *nameserviceproto.NameAvailableRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateInCacheAfterOperation", ctx, in)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateInCacheAfterOperation indicates an expected call of UpdateInCacheAfterOperation.
+func (mr *MockCacheServiceMockRecorder) UpdateInCacheAfterOperation(ctx, in any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInCacheAfterOperation", reflect.TypeOf((*MockCacheService)(nil).UpdateInCacheAfterOperation), ctx, in)
 }

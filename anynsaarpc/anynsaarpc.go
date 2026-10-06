@@ -162,20 +162,45 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 
 	// 2 - update cache (only once operation is completed)
 	if operationFound && status.OperationState == nsp.OperationState_Completed {
+		// the cache key and every contract read use the canonical spelling (the registration
+		// normalizes the name, the operation keeps it as the client sent it)
+		if name, err := contracts.NormalizeAnyName(op.FullName, arpc.conf.Ensip15Validation); err == nil {
+			op.FullName = name
+		} else {
+			log.Warn("can not normalize the name of the operation", zap.String("FullName", op.FullName), zap.Error(err))
+		}
+
 		// 2.1 - is info already is in the cache?
 		cacheRes, err := arpc.cache.IsNameAvailable(ctx, &nsp.NameAvailableRequest{
 			FullName: op.FullName,
 		})
 		if err == nil && !cacheRes.Available {
 			log.Info("name is already in cache", zap.String("FullName", op.FullName))
+			// Completed, as before. but the cached record can be older than the operation (a
+			// renewal moves nameExpires, a registration of a lapsed name changes the owner):
+			// the background stores its re-reads on it and refreshes it. never here: this poll
+			// waits neither for the contracts nor for a write
+			arpc.cache.RefreshAfterOperation(op.FullName)
 			return &out, nil
 		}
 
-		// 2.2 - if not -> read from smart contracts
+		// 2.2 - if not -> read from smart contracts (at the latest block; the same write
+		// schedules the re-reads)
 		log.Info("operation completed, updating cache", zap.String("FullName", op.FullName))
 		err = arpc.updateInCacheWithRetry(ctx, op.FullName)
 
+		// the registry confirmed the name, only its owner could not be read: the cache has it as
+		// taken (marked for a refresh), so the next poll would find it there and report Completed
+		if errors.Is(err, cache.ErrNameDataIncomplete) {
+			log.Warn("operation is completed, cached the name without its owner",
+				zap.String("FullName", op.FullName), zap.Error(err))
+			return &out, nil
+		}
+
 		if err != nil {
+			// the background tries again (and schedules the re-reads) whatever this poll reports
+			arpc.cache.RefreshAfterOperation(op.FullName)
+
 			// the operation is mined, but the name is still not visible in the registry,
 			// so nothing was written to the cache.
 			// never report Completed here: it is a terminal state for the payment node,
@@ -214,7 +239,7 @@ func (arpc *anynsAARpc) updateInCacheWithRetry(ctx context.Context, fullName str
 		}
 
 		log.Info("updating cache", zap.String("FullName", fullName), zap.Int("try", i))
-		err = arpc.cache.UpdateInCache(ctx, &nsp.NameAvailableRequest{
+		err = arpc.cache.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{
 			FullName: fullName,
 		})
 

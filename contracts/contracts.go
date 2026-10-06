@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -18,13 +19,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	ac "github.com/anyproto/any-ns-node/anytype_crypto"
 	"github.com/anyproto/any-ns-node/config"
-	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
 )
 
 const CName = "any-ns.contracts"
@@ -83,12 +84,20 @@ type ContractsService interface {
 
 	// AA methods:
 	IsContractDeployed(ctx context.Context, address common.Address) (bool, error)
-	// will return .owner of the contract
-	GetScwOwner(ctx context.Context, address common.Address) (common.Address, error)
+	// will return .owner of the contract (at the block, a zero hash: the latest one)
+	GetScwOwner(ctx context.Context, address common.Address, block common.Hash) (common.Address, error)
 
-	// ENS methods
-	GetOwnerForNamehash(ctx context.Context, namehash [32]byte) (common.Address, error)
-	GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error)
+	// ENS methods.
+	// block pins a read to one block by its hash (EIP-1898; a zero hash: the latest block).
+	// all the reads of one cache refresh use the same block, so that they see one chain state
+	// (one fork too, even behind a load balancer) and can be ordered by it
+	LatestBlock(ctx context.Context) (*Block, error)
+	// FinalizedBlock is the newest block that can not be reorged away (the "finalized" tag, or
+	// "safe" if the provider does not know it)
+	FinalizedBlock(ctx context.Context) (*Block, error)
+	GetOwnerForNamehash(ctx context.Context, namehash [32]byte, block common.Hash) (common.Address, error)
+	GetNameExpires(ctx context.Context, fullName string, block common.Hash) (*big.Int, error)
+	GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string, block common.Hash) (ownerEthAddress string, ownerAnyAddress string, spaceID string, err error)
 
 	Commit(ctx context.Context, params *CommitParams) (*types.Transaction, error)
 	Register(ctx context.Context, params *RegisterParams) (*types.Transaction, error)
@@ -179,13 +188,23 @@ func (acontracts *anynsContracts) GetBalanceOf(ctx context.Context, tokenAddress
 }
 
 func (acontracts *anynsContracts) IsContractDeployed(ctx context.Context, address common.Address) (bool, error) {
-	client, err := acontracts.CreateEthConnection()
+	return acontracts.isContractDeployedAt(ctx, address, common.Hash{})
+}
+
+func (acontracts *anynsContracts) isContractDeployedAt(ctx context.Context, address common.Address, block common.Hash) (bool, error) {
+	client, err := acontracts.dial(ctx)
 	if err != nil {
 		log.Error("failed to create connection", zap.Error(err))
 		return false, err
 	}
+	defer client.Close()
 
-	bs, err := client.CodeAt(ctx, address, nil)
+	var bs []byte
+	if block == (common.Hash{}) {
+		bs, err = client.CodeAt(ctx, address, nil)
+	} else {
+		bs, err = client.CodeAtHash(ctx, address, block)
+	}
 	if err != nil {
 		log.Error("failed to get code", zap.Error(err))
 		return false, err
@@ -199,30 +218,86 @@ func (acontracts *anynsContracts) IsContractDeployed(ctx context.Context, addres
 	return true, nil
 }
 
-func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, nh [32]byte) (common.Address, error) {
-	reg, err := acontracts.ConnectToRegistryContract()
+// Block identifies a block of the chain
+type Block struct {
+	Number int64
+	Hash   common.Hash
+	// the block timestamp (unix seconds)
+	Time uint64
+}
+
+func (acontracts *anynsContracts) LatestBlock(ctx context.Context) (*Block, error) {
+	return acontracts.blockByTag(ctx, "latest")
+}
+
+func (acontracts *anynsContracts) FinalizedBlock(ctx context.Context) (*Block, error) {
+	b, err := acontracts.blockByTag(ctx, "finalized")
+	if err == nil || ctx.Err() != nil {
+		return b, err
+	}
+	log.Warn("failed to get the finalized block, trying the safe one", zap.Error(err))
+	return acontracts.blockByTag(ctx, "safe")
+}
+
+// blockByTag reads the number, hash and timestamp as the node reports them. the hash is never
+// recomputed from the header: this go-ethereum does not know the newest header fields (e.g.
+// requestsHash, Prague), so types.Header.Hash() would be wrong for the current Sepolia blocks
+func (acontracts *anynsContracts) blockByTag(ctx context.Context, tag string) (*Block, error) {
+	client, err := acontracts.dial(ctx)
+	if err != nil {
+		log.Error("failed to create connection", zap.Error(err))
+		return nil, err
+	}
+	defer client.Close()
+
+	var head *struct {
+		Number    *hexutil.Big   `json:"number"`
+		Hash      *common.Hash   `json:"hash"`
+		Timestamp hexutil.Uint64 `json:"timestamp"`
+	}
+	if err = client.Client().CallContext(ctx, &head, "eth_getBlockByNumber", tag, false); err != nil {
+		return nil, err
+	}
+	if head == nil || head.Number == nil || head.Hash == nil || *head.Hash == (common.Hash{}) {
+		return nil, fmt.Errorf("no %s block: %w", tag, ethereum.NotFound)
+	}
+	return &Block{Number: head.Number.ToInt().Int64(), Hash: *head.Hash, Time: uint64(head.Timestamp)}, nil
+}
+
+// pinned: call options of a read at the block (a zero hash: the latest one)
+func pinned(ctx context.Context, block common.Hash) *bind.CallOpts {
+	// without an explicit Context go-ethereum falls back to context.Background(),
+	// so the caller could neither cancel nor time out this call
+	return &bind.CallOpts{Context: ctx, BlockHash: block}
+}
+
+func (acontracts *anynsContracts) GetNameExpires(ctx context.Context, fullName string, block common.Hash) (*big.Int, error) {
+	return acontracts.getExpirationDate(ctx, fullName, block)
+}
+
+func (acontracts *anynsContracts) GetOwnerForNamehash(ctx context.Context, nh [32]byte, block common.Hash) (common.Address, error) {
+	reg, conn, err := bindContract(ctx, acontracts, acontracts.config.AddrRegistry, ac.NewENSRegistry)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return common.Address{}, err
 	}
+	defer conn.Close()
 
-	// without an explicit Context go-ethereum falls back to context.Background(),
-	// so the caller could neither cancel nor time out this call
-	callOpts := bind.CallOpts{Context: ctx}
-	own, err := reg.Owner(&callOpts, nh)
+	own, err := reg.Owner(pinned(ctx, block), nh)
 
 	return own, err
 }
 
-func (acontracts *anynsContracts) GetScwOwner(ctx context.Context, scwAddress common.Address) (common.Address, error) {
-	client, err := acontracts.CreateEthConnection()
+func (acontracts *anynsContracts) GetScwOwner(ctx context.Context, scwAddress common.Address, block common.Hash) (common.Address, error) {
+	client, err := acontracts.dial(ctx)
 	if err != nil {
 		log.Error("failed to create connection", zap.Error(err))
 		return common.Address{}, err
 	}
+	defer client.Close()
 
 	// 1 - check if address is a smart contract
-	isDeployed, err := acontracts.IsContractDeployed(ctx, scwAddress)
+	isDeployed, err := acontracts.isContractDeployedAt(ctx, scwAddress, block)
 	if err != nil {
 		log.Error("failed to check if contract is deployed", zap.Error(err))
 		return common.Address{}, err
@@ -230,7 +305,7 @@ func (acontracts *anynsContracts) GetScwOwner(ctx context.Context, scwAddress co
 
 	if !isDeployed {
 		log.Info("address is not a smart contract")
-		return common.Address{}, errors.New("address is not a smart contract")
+		return common.Address{}, ErrNotAContract
 	}
 
 	scw, err := acontracts.ConnectToSCW(client, scwAddress)
@@ -240,8 +315,7 @@ func (acontracts *anynsContracts) GetScwOwner(ctx context.Context, scwAddress co
 	}
 
 	// 2.2 - call contract's method
-	callOpts := bind.CallOpts{}
-	owner, err := scw.Owner(&callOpts)
+	owner, err := scw.Owner(pinned(ctx, block))
 	if err != nil {
 		log.Error("failed to get Owner", zap.Error(err))
 		return common.Address{}, err
@@ -250,10 +324,9 @@ func (acontracts *anynsContracts) GetScwOwner(ctx context.Context, scwAddress co
 	return owner, nil
 }
 
-func (acontracts *anynsContracts) GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string) (ownerEthAddress string, ownerAnyAddress string, spaceId string, expiration *big.Int, err error) {
-	var res nsp.NameAvailableResponse
-	res.Available = false
-
+// GetAdditionalNameInfo reads the owner (asks the NameWrapper if it holds the name), the
+// owner's AnyID (content hash) and the space ID of a registered name
+func (acontracts *anynsContracts) GetAdditionalNameInfo(ctx context.Context, currentOwner common.Address, fullName string, block common.Hash) (ownerEthAddress string, ownerAnyAddress string, spaceID string, err error) {
 	// 1 - if current owner is the NW contract - then ask it again about the "real owner"
 	nwAddress := acontracts.config.AddrNameWrapper
 	nwAddressBytes := common.HexToAddress(nwAddress)
@@ -261,50 +334,41 @@ func (acontracts *anynsContracts) GetAdditionalNameInfo(ctx context.Context, cur
 	if currentOwner == nwAddressBytes {
 		log.Info("address is owned by NameWrapper contract, ask it to retrieve real owner")
 
-		realOwner, err := acontracts.getRealOwner(fullName)
+		realOwner, err := acontracts.getRealOwner(ctx, fullName, block)
 		if err != nil {
 			log.Warn("failed to get real owner of the name", zap.Error(err))
-			// do not panic, try to continue
+			return "", "", "", err
 		}
-
-		if realOwner != nil {
-			ownerEthAddress = *realOwner
-		}
+		ownerEthAddress = *realOwner
 	} else {
 		// if NW is not the "owner" of the contract -> then it is the real owner
 		ownerEthAddress = currentOwner.Hex()
 	}
 
 	// 2 - get content hash and spaceID
-	owner, spaceID, err := acontracts.getAdditionalData(fullName)
+	owner, spaceIDOut, err := acontracts.getAdditionalData(ctx, fullName, block)
 	if err != nil {
 		log.Error("failed to get real additional data of the name", zap.Error(err))
-		return "", "", "", nil, err
+		return "", "", "", err
 	}
 	if owner != nil {
 		ownerAnyAddress = *owner
 	}
-	if spaceID != nil {
-		spaceId = *spaceID
+	if spaceIDOut != nil {
+		spaceID = *spaceIDOut
 	}
 
-	// 3 - get expiration date
-	expiration, err = acontracts.getExpirationDate(fullName)
-	if err != nil {
-		log.Error("failed to get expiration of the name", zap.Error(err))
-		return "", "", "", nil, err
-	}
-
-	return ownerEthAddress, ownerAnyAddress, spaceId, expiration, nil
+	return ownerEthAddress, ownerAnyAddress, spaceID, nil
 }
 
-func (acontracts *anynsContracts) getRealOwner(fullName string) (*string, error) {
+func (acontracts *anynsContracts) getRealOwner(ctx context.Context, fullName string, block common.Hash) (*string, error) {
 	// 1 - connect to contract
-	nw, err := acontracts.ConnectToNamewrapperContract()
+	nw, conn, err := bindContract(ctx, acontracts, acontracts.config.AddrNameWrapper, ac.NewAnytypeNameWrapper)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return nil, err
 	}
+	defer conn.Close()
 
 	// 2 - convert to name hash
 	nh, err := NameHash(fullName)
@@ -316,11 +380,9 @@ func (acontracts *anynsContracts) getRealOwner(fullName string) (*string, error)
 	// 3 - call contract's method
 	log.Info("getting real owner for name", zap.String("Full name", fullName))
 
-	callOpts := bind.CallOpts{}
-
 	// convert bytes32 -> uin256 (also 32 bytes long)
 	id := new(big.Int).SetBytes(nh[:])
-	addr, err := nw.OwnerOf(&callOpts, id)
+	addr, err := nw.OwnerOf(pinned(ctx, block), id)
 	if err != nil {
 		log.Error("failed to convert Owner", zap.Error(err))
 		return nil, err
@@ -334,13 +396,14 @@ func (acontracts *anynsContracts) getRealOwner(fullName string) (*string, error)
 	return &out, nil
 }
 
-func (acontracts *anynsContracts) getAdditionalData(fullName string) (*string, *string, error) {
+func (acontracts *anynsContracts) getAdditionalData(ctx context.Context, fullName string, block common.Hash) (*string, *string, error) {
 	// 1 - connect to contract
-	ar, err := acontracts.ConnectToResolver()
+	ar, conn, err := bindContract(ctx, acontracts, acontracts.config.AddrResolver, ac.NewAnytypeResolver)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return nil, nil, err
 	}
+	defer conn.Close()
 
 	// 2 - convert to name hash
 	nh, err := NameHash(fullName)
@@ -350,14 +413,14 @@ func (acontracts *anynsContracts) getAdditionalData(fullName string) (*string, *
 	}
 
 	// 3 - get content hash and space ID
-	callOpts := bind.CallOpts{}
-	hash, err := ar.Contenthash(&callOpts, nh)
+	callOpts := pinned(ctx, block)
+	hash, err := ar.Contenthash(callOpts, nh)
 	if err != nil {
 		log.Error("can not get contenthash", zap.Error(err))
 		return nil, nil, err
 	}
 
-	space, err := ar.SpaceId(&callOpts, nh)
+	space, err := ar.SpaceId(callOpts, nh)
 	if err != nil {
 		log.Error("can not get SpaceID", zap.Error(err))
 		return nil, nil, err
@@ -375,13 +438,14 @@ func (acontracts *anynsContracts) getAdditionalData(fullName string) (*string, *
 	return &ownerAnyAddressOut, &spaceIDOut, nil
 }
 
-func (acontracts *anynsContracts) getExpirationDate(fullName string) (*big.Int, error) {
+func (acontracts *anynsContracts) getExpirationDate(ctx context.Context, fullName string, block common.Hash) (*big.Int, error) {
 	// 1 - connect to contract
-	ar, err := acontracts.ConnectToRegistrar()
+	ar, conn, err := bindContract(ctx, acontracts, acontracts.config.AddrRegistrarImplementation, ac.NewAnytypeRegistrarImplementation)
 	if err != nil {
 		log.Error("failed to connect to contract", zap.Error(err))
 		return nil, err
 	}
+	defer conn.Close()
 
 	// 2 - convert to name hash
 	parts := strings.Split(fullName, ".")
@@ -395,8 +459,7 @@ func (acontracts *anynsContracts) getExpirationDate(fullName string) (*big.Int, 
 	nhAsTokenID := new(big.Int).SetBytes(labelHash[:])
 
 	// 3 - get content hash and space ID
-	callOpts := bind.CallOpts{}
-	out, err := ar.NameExpires(&callOpts, nhAsTokenID)
+	out, err := ar.NameExpires(pinned(ctx, block), nhAsTokenID)
 	if err != nil {
 		log.Error("can not get nameexpires", zap.Error(err))
 		return nil, err
@@ -405,9 +468,29 @@ func (acontracts *anynsContracts) getExpirationDate(fullName string) (*big.Int, 
 }
 
 func (acontracts *anynsContracts) CreateEthConnection() (*ethclient.Client, error) {
-	connStr := acontracts.config.GethUrl
-	conn, err := ethclient.Dial(connStr)
-	return conn, err
+	return acontracts.dial(context.Background())
+}
+
+// dial connects to the provider within ctx: ethclient.Dial waits for a ws/wss handshake without
+// any timeout, so a stalled provider would hang the caller (e.g. a cache refresh, and the
+// shutdown that waits for it). the client does not keep ctx, only the connection uses it
+func (acontracts *anynsContracts) dial(ctx context.Context) (*ethclient.Client, error) {
+	return ethclient.DialContext(ctx, acontracts.config.GethUrl)
+}
+
+// bindContract connects to the provider within ctx and binds the contract at addr.
+// the caller closes the connection
+func bindContract[T any](ctx context.Context, acontracts *anynsContracts, addr string, bindFn func(common.Address, bind.ContractBackend) (*T, error)) (*T, *ethclient.Client, error) {
+	conn, err := acontracts.dial(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	c, err := bindFn(common.HexToAddress(addr), conn)
+	if err != nil {
+		conn.Close()
+		return nil, nil, err
+	}
+	return c, conn, nil
 }
 
 func (acontracts *anynsContracts) ConnectToRegistryContract() (*ac.ENSRegistry, error) {
