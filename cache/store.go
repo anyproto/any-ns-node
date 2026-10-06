@@ -186,32 +186,17 @@ func readAt(d *NameDataItem) int64 {
 	return max(d.ObservedAt, d.ForkReadAt)
 }
 
-// carryOver fills what an incomplete observation could not read (see unreadFields) from the
-// stored record, only where the observation proves that it can not have changed:
-//   - only the wallet's owner (EOA) is unread: the NameWrapper returned the same wallet
-//   - the owner (and, if unread, AnyID and space ID): the registry owner is the same as the one
-//     the stored record was read with (records from before it was stored carry nothing)
-//
-// otherwise the fields stay empty. the record stays incomplete, it is retried after the backoff
+// carryOver fills what an incomplete observation could not read from the stored record only
+// where the observation proves that it can not have changed: the NameWrapper returned the same
+// wallet, only the wallet's owner (EOA) could not be read. when the owner itself was not read,
+// nothing is carried over (the registry owner of a wrapped name is the NameWrapper, whoever owns
+// the name): the fields stay empty, the record incomplete until the retry after the backoff
 func carryOver(obs *NameDataItem, stored *NameDataItem) {
-	if stored.Removed {
+	if stored.Removed || obs.unread != unreadEOA {
 		return
 	}
-	sameRegistryOwner := stored.RegistryOwner != "" && stored.RegistryOwner == obs.RegistryOwner
-	switch obs.unread {
-	case unreadEOA:
-		if obs.OwnerScwEthAddress != "" && strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
-			obs.OwnerEthAddress = stored.OwnerEthAddress
-		}
-	case unreadOwner:
-		if sameRegistryOwner {
-			obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
-		}
-	case unreadAll:
-		if sameRegistryOwner {
-			obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
-			obs.OwnerAnyAddress, obs.SpaceId = stored.OwnerAnyAddress, stored.SpaceId
-		}
+	if obs.OwnerScwEthAddress != "" && strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
+		obs.OwnerEthAddress = stored.OwnerEthAddress
 	}
 }
 
@@ -346,13 +331,6 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	}
 	item.Rereads = mergeRereads(before, rereads, item.ObservedAt)
 	item.RepairAt = repairAt(&item)
-	// a removal (confirmed at a finalized block) also retires the legacy records of the name under
-	// another spelling: without a block of their own, the chain is authoritative for the name
-	if item.Removed && !dry {
-		if err := cs.retireLegacyAliases(ctx, item.FullName); err != nil {
-			return nil, err
-		}
-	}
 	switch {
 	case dry:
 	case stored == nil:

@@ -39,13 +39,14 @@ func (cs *cacheService) ensureAliasIndex(ctx context.Context) {
 	}
 }
 
-// canonIndexName: the index of the alias check by the canonical spelling (non-unique, sparse)
-const canonIndexName = "canon"
+// canonIndexName: the index of the alias check by the canonical spelling (non-unique, sparse,
+// with aliasCollation: the check is one query with that collation)
+const canonIndexName = "canon_ci"
 
 func (cs *cacheService) ensureCanonIndex(ctx context.Context) {
 	_, err := cs.itemColl.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "canon", Value: 1}},
-		Options: options.Index().SetName(canonIndexName).SetSparse(true),
+		Options: options.Index().SetName(canonIndexName).SetSparse(true).SetCollation(aliasCollation),
 	})
 	if err != nil {
 		log.Warn("failed to create the canon index of the name cache", zap.Error(err))
@@ -57,31 +58,21 @@ func (cs *cacheService) ensureCanonIndex(ctx context.Context) {
 const aliasCandidates = 64
 
 // aliasesOf: the records whose name normalizes to canonical (the canonical record itself only
-// with withCanonical). filter narrows them (e.g. live ones). authoritative at the time of the call:
-//   - every record this version wrote (and every record -dedupe-cache migrated) has its
-//     canonical spelling in canon: one indexed query
-//   - a record without canon (written by an older node, not migrated yet): the collation
-//     fallback, checked by the normalization itself. it can miss a spelling the collation does
-//     not equate (e.g. punycode): -dedupe-cache -refresh-apply gives such records their canon
+// with withCanonical). filter narrows them (e.g. live ones).
+//
+// one query (aliasCollation, both branches indexed): a record matches by its canonical spelling
+// (canon: every record this version wrote or -dedupe-cache migrated) or by its name. one query,
+// so a migration in between can not make a record slip between two of them: a record renamed to
+// the canonical name or given its canon still matches the branch it matched before. the
+// collation is broader than the normalization (e.g. "tést" and "test"), the candidates are
+// checked by canon or by the normalization itself. a spelling the collation does not equate
+// (e.g. punycode) is found only once -dedupe-cache gave the record its canon
 func (cs *cacheService) aliasesOf(ctx context.Context, canonical string, filter bson.M, withCanonical bool) ([]NameDataItem, error) {
-	byCanon := bson.M{"canon": canonical}
+	query := bson.M{"$or": bson.A{bson.M{"canon": canonical}, bson.M{"name": canonical}}}
 	for k, v := range filter {
-		byCanon[k] = v
+		query[k] = v
 	}
-	cur, err := cs.itemColl.Find(ctx, byCanon)
-	if err != nil {
-		return nil, err
-	}
-	var out []NameDataItem
-	if err = cur.All(ctx, &out); err != nil {
-		return nil, err
-	}
-
-	legacy := bson.M{"name": canonical, "canon": bson.M{"$exists": false}}
-	for k, v := range filter {
-		legacy[k] = v
-	}
-	cur, err = cs.itemColl.Find(ctx, legacy, options.Find().SetCollation(aliasCollation).SetLimit(aliasCandidates))
+	cur, err := cs.itemColl.Find(ctx, query, options.Find().SetCollation(aliasCollation).SetLimit(aliasCandidates))
 	if err != nil {
 		return nil, err
 	}
@@ -89,21 +80,20 @@ func (cs *cacheService) aliasesOf(ctx context.Context, canonical string, filter 
 	if err = cur.All(ctx, &candidates); err != nil {
 		return nil, err
 	}
-	for i := range candidates {
-		// the collation is broader than the normalization (e.g. "tést" and "test"): only a record
-		// whose name normalizes to the requested one counts
-		if c, err := cs.canonical(candidates[i].FullName); err == nil && c == canonical {
-			out = append(out, candidates[i])
+	var out []NameDataItem
+	for _, d := range candidates {
+		if d.FullName == canonical && !withCanonical {
+			continue
+		}
+		if d.Canon == canonical {
+			out = append(out, d)
+			continue
+		}
+		if c, err := cs.canonical(d.FullName); err == nil && c == canonical {
+			out = append(out, d)
 		}
 	}
-
-	aliases := out[:0]
-	for _, d := range out {
-		if withCanonical || d.FullName != canonical {
-			aliases = append(aliases, d)
-		}
-	}
-	return aliases, nil
+	return out, nil
 }
 
 // liveAlias: a live (not a tombstone) record whose name normalizes to canonical, nil if there is
@@ -117,27 +107,6 @@ func (cs *cacheService) liveAlias(ctx context.Context, canonical string) (*NameD
 		return nil, err
 	}
 	return &aliases[0], nil
-}
-
-// retireLegacyAliases deletes the live records of the name under another spelling that have no
-// block of their own (legacy): called with a removal confirmed at a finalized block, in its
-// transaction. an alias read at a block (newer data than "unknown") stays
-func (cs *cacheService) retireLegacyAliases(ctx context.Context, canonical string) error {
-	aliases, err := cs.aliasesOf(ctx, canonical, bson.M{"removed": bson.M{"$ne": true}}, false)
-	if err != nil {
-		return err
-	}
-	for _, a := range aliases {
-		if a.ObservedBlock != 0 {
-			continue
-		}
-		log.Info("a removal retires a legacy record of the name under another spelling",
-			zap.String("FullName", a.FullName), zap.String("canonical", canonical))
-		if _, err := cs.itemColl.DeleteOne(ctx, bson.M{"_id": a.ID}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // scanAliases: the non-canonical names of the cache, by canonical name
@@ -172,6 +141,15 @@ func (cs *cacheService) warnAliases(ctx context.Context) {
 	if n > 0 {
 		log.Warn("the name cache has records without a canonical spelling (canon): records under another "+
 			"spelling keep their names taken, run -dedupe-cache -refresh-apply to migrate them", zap.Int64("records", n))
+	}
+	aliases, err := cs.itemColl.CountDocuments(ctx, bson.M{"canon": bson.M{"$exists": true}, "$expr": bson.M{"$ne": bson.A{"$canon", "$name"}}})
+	if err != nil {
+		log.Warn("failed to count the records under a non-canonical spelling", zap.Error(err))
+		return
+	}
+	if aliases > 0 {
+		log.Warn("the name cache has records under a non-canonical spelling that -dedupe-cache kept: they keep "+
+			"their names taken until an operator resolves them (see the README)", zap.Int64("records", aliases))
 	}
 }
 
@@ -291,13 +269,6 @@ func (cs *cacheService) migrateAlias(ctx context.Context, alias, canonical strin
 			}})
 		}
 		return "renamed", err
-	case c.Removed && a.ObservedBlock == 0:
-		// the canonical name was removed at a finalized block, the alias has no block of its own
-		// (legacy): the chain is authoritative for the name
-		if apply {
-			_, err = cs.itemColl.DeleteOne(ctx, bson.M{"_id": a.ID})
-		}
-		return "deleted", err
 	case c.ObservedBlock > 0 && !c.Removed && !c.Incomplete && c.ObservedBlock >= a.ObservedBlock:
 		// the canonical record was read from the chain (it has its block), is live, complete and
 		// at least as new

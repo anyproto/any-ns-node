@@ -78,8 +78,9 @@ chain confirmed it. When unsure, the cached record is served as taken and refres
   an older observation can not replace it. Otherwise the record stays as it is.
 - **Changes** (a new registration, another owner, a renewal) are read again at +5 and +30
   minutes, whoever wrote them. A read whose enrichment failed keeps the owner fields of the
-  previous record only if the registry owner (or the wallet) is the same; it never replaces a
-  complete record of the same block. Every record stores its canonical spelling (`canon`).
+  previous record only where it read the same wallet (the EOA owner of that wallet); otherwise
+  they stay empty until the retry. It never replaces a complete record of the same block. Every
+  record stores its canonical spelling (`canon`).
 - **Lookups** never read the contracts and never write. A record that can be stale (expired,
   lapsed, incomplete, an old tombstone) is served as it is and handed to a background worker through
   a non-blocking in-memory queue (dropped when full).
@@ -119,10 +120,15 @@ Maintenance (one-off runs of the node binary; all are dry runs unless `-refresh-
   listed (`kept:`) for an operator or a later run. Until then the node warns at start, a live alias
   keeps its name taken (every lookup without a live canonical record checks for one, through a
   case- and accent-insensitive index `name_ci` the node creates; the candidates are checked by the normalization), reverse lookups prefer the canonical record,
-  and the background refreshes the canonical name instead of the alias. A removal confirmed at a
-  finalized block retires the aliases of the name that have no block of their own (legacy).
+  and the background refreshes the canonical name instead of the alias.
   `-dedupe-cache -refresh-apply` also gives every record its `canon`: the alias check finds an
   alias by it (e.g. a punycode spelling, which the collation can not equate).
+  Aliases are never deleted automatically except by the rule above (a canonical record read from
+  the chain, live, complete and at least as new). Every other alias stays and keeps its name
+  taken (the safe direction): `-dedupe-cache` lists them (`kept:`), `-refresh-cache` counts
+  them (`non-canonical=N`), the node warns at start. An operator resolves them by hand: check the
+  name on chain (e.g. `-refresh-cache` for the canonical name), then delete the alias record
+  (`db.cache.deleteOne({name: "<alias spelling>"})`) if the canonical record is right.
 - `-refresh-cache`: re-reads every cached name (tombstones too) with the same decisions as the node.
   `-refresh-interval` is the delay between two names (default 1s). Exits 1 if any name failed,
   including names whose finalized block could not be read. `not-final` (the finalized block does not

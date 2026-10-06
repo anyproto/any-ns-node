@@ -813,14 +813,14 @@ func TestCacheService_NameIndexAtStart(t *testing.T) {
 				Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName(name)})
 			require.NoError(t, err)
 			require.NoError(t, startCache(t, conf))
-			require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "canon": false, name: true}, indexes())
+			require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "canon_ci": false, name: true}, indexes())
 		}
 	})
 
 	t.Run("a missing one is created", func(t *testing.T) {
 		reset()
 		require.NoError(t, startCache(t, conf))
-		require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "canon": false, "name_1": true}, indexes())
+		require.Equal(t, map[string]bool{"_id_": false, "repair_at": false, "name_ci": false, "canon_ci": false, "name_1": true}, indexes())
 	})
 
 	t.Run("a non-unique one stops it, nothing is dropped", func(t *testing.T) {

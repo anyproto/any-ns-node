@@ -111,21 +111,23 @@ func TestCacheService_IncompleteReads(t *testing.T) {
 		require.True(t, byAnyID(t, fx, testAnyID).Found)
 	})
 
-	t.Run("a newer block, the enrichment fails, the same registry owner: the fields are carried over", func(t *testing.T) {
+	t.Run("a wrapped name transferred, the enrichment fails: nothing of the old owner is carried over", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
 		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
 
+		// the registry owner is the NameWrapper before and after the transfer
 		infoFails(fx, nameWrapper)
 		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
 		item := cachedItem(t, fx)
 		require.True(t, item.Incomplete)
 		require.True(t, item.RefreshNeeded)
-		require.Equal(t, testEoa, item.OwnerEthAddress)
-		require.Equal(t, testScw, item.OwnerScwEthAddress)
-		require.Equal(t, testAnyID, item.OwnerAnyAddress)
-		require.True(t, byAnyID(t, fx, testAnyID).Found)
+		require.Empty(t, item.OwnerEthAddress)
+		require.Empty(t, item.OwnerScwEthAddress)
+		require.Empty(t, item.OwnerAnyAddress)
+		require.False(t, byAnyID(t, fx, testAnyID).Found, "the old owner does not resolve")
+		require.False(t, isNameAvailable(t, fx.cacheService).Available)
 	})
 
 	t.Run("another registry owner (or none known): nothing is carried over", func(t *testing.T) {
@@ -181,38 +183,32 @@ func TestCacheService_ChangedStateSchedulesRereads(t *testing.T) {
 	require.Len(t, cachedItem(t, fx).Rereads, 1)
 }
 
-// e: a removal confirmed at a finalized block retires the legacy aliases of the name
-func TestCacheService_RemovalRetiresLegacyAliases(t *testing.T) {
-	t.Run("in the refresh transaction: a legacy alias goes, an alias with a newer block stays", func(t *testing.T) {
-		for _, aliasBlock := range []int64{0, 5000} {
-			fx := newFixture(t)
-			seedItem(t, fx, lapsed, 10, 0)
-			insertRaw(t, fx, aliasDoc(testAnyID, aliasBlock))
+// e: aliases are never deleted automatically next to a tombstone: they keep the name taken and
+// are reported
+func TestCacheService_AliasesNextToTombstonesStay(t *testing.T) {
+	t.Run("a confirmed removal leaves a legacy alias, the name stays taken", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, lapsed, 10, 0)
+		insertRaw(t, fx, aliasDoc(testAnyID, 0))
 
-			fx.setHead(300, time.Now())
-			fx.setFinalized(290, time.Now())
-			expectLapsed(fx.contracts)
-			require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
-			require.True(t, cachedItem(t, fx).Removed)
-			if aliasBlock == 0 {
-				require.Zero(t, aliasCount(t, fx))
-				require.True(t, isNameAvailable(t, fx.cacheService).Available)
-			} else {
-				require.EqualValues(t, 1, aliasCount(t, fx))
-				require.False(t, isNameAvailable(t, fx.cacheService).Available)
-			}
-			fx.finish(t)
-		}
+		fx.setHead(300, time.Now())
+		fx.setFinalized(290, time.Now())
+		expectLapsed(fx.contracts)
+		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
+		require.True(t, cachedItem(t, fx).Removed)
+		require.EqualValues(t, 1, aliasCount(t, fx))
+		require.False(t, isNameAvailable(t, fx.cacheService).Available)
 	})
 
-	t.Run("in the migration: a canonical tombstone retires a legacy alias", func(t *testing.T) {
+	t.Run("dedupe keeps a legacy alias next to a tombstone and reports it", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		insertRaw(t, fx, aliasDoc(testAnyID, 0))
 		insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": int64(10)})
+		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}, Canon: 2}, migrate(t, fx, true))
+		require.EqualValues(t, 1, aliasCount(t, fx))
 		require.False(t, isNameAvailable(t, fx.cacheService).Available)
-		require.Equal(t, AliasStats{Aliases: 1, Deleted: 1, Canon: 1}, migrate(t, fx, true))
-		require.True(t, isNameAvailable(t, fx.cacheService).Available)
 	})
 }
 
@@ -227,6 +223,22 @@ func TestCacheService_CanonField(t *testing.T) {
 		require.NoError(t, err)
 		return out
 	}
+
+	t.Run("a migration that gives the alias its canon between the lookup's miss and the alias check: taken", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": int64(10), "canon": testFullName})
+		insertRaw(t, fx, aliasDoc(testAnyID, 20))
+		hookBeforeAliasCheck = func() {
+			stats := migrate(t, fx, true)
+			require.Equal(t, []string{testAlias}, stats.Kept)
+		}
+		defer func() { hookBeforeAliasCheck = nil }()
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+		var alias NameDataItem
+		require.NoError(t, fx.itemColl.FindOne(ctx, bson.M{"name": testAlias}).Decode(&alias))
+		require.Equal(t, testFullName, alias.Canon)
+	})
 
 	t.Run("every write stores canon", func(t *testing.T) {
 		fx := newFixture(t)
