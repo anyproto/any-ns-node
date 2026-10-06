@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -389,7 +390,10 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		require.Len(t, item.Rereads, 2)
 		require.Equal(t, oldEoa, item.OwnerEthAddress, "the data stays, the name is still taken")
 		require.Greater(t, item.RefreshNextAt, time.Now().UnixMilli(), "after a backoff")
-		require.Equal(t, item.RefreshNextAt, item.RepairAt)
+		// the scan takes it after the backoff (or, on a standalone Mongo, where the background
+		// schedule and the mark are not ordered, at the first re-read at the latest)
+		require.NotZero(t, item.RepairAt)
+		require.LessOrEqual(t, item.RepairAt, slices.Min(item.Rereads))
 	})
 
 	t.Run("cached, the latest block says not registered (lagging provider): Completed, nothing is removed", func(t *testing.T) {
