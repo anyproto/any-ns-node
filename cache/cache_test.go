@@ -162,8 +162,8 @@ func newFixture(t *testing.T) *fixture {
 		Connect:  testMongoURI(),
 		Database: testDbName,
 	}
-	// the tests run on a standalone Mongo too (see testMongoURI)
-	fx.config.Cache = config.Cache{AllowUnsafeStandalone: true}
+	// the tests run on a standalone Mongo too (see testMongoURI), and they run the repair by hand
+	fx.config.Cache = config.Cache{AllowUnsafeStandalone: true, RepairIntervalSec: -1}
 
 	fx.a.Register(fx.ts).
 		Register(fx.config).
@@ -171,6 +171,8 @@ func newFixture(t *testing.T) *fixture {
 		Register(fx.cacheService)
 
 	require.NoError(t, fx.a.Start(ctx))
+	// the tests run the background refresh by hand (see runQueued): the requests stay queued
+	fx.stopBackground()
 
 	// TODO: mock Mongo!
 	uri := testMongoURI()
@@ -199,6 +201,30 @@ func newFixture(t *testing.T) *fixture {
 	require.NoError(t, err)
 
 	return fx
+}
+
+// stopBackground stops the background worker: what lookups request stays in the queue
+func (fx *fixture) stopBackground() {
+	if fx.stopWorker != nil {
+		fx.stopWorker()
+		<-fx.workerDone
+		fx.stopWorker = nil
+	}
+}
+
+// runQueued runs what is in the queue of the background worker, as it would. returns how many
+func (fx *fixture) runQueued() int {
+	n := 0
+	for {
+		select {
+		case r := <-fx.queue.ch:
+			fx.queue.done(r)
+			fx.handle(ctx, r)
+			n++
+		default:
+			return n
+		}
+	}
 }
 
 // setNameData writes the record as it is (an upsert by the name), like a node older than GO-7567

@@ -51,6 +51,12 @@ func majorityWrite(timeout time.Duration) *writeconcern.WriteConcern {
 	return &writeconcern.WriteConcern{W: "majority", WTimeout: timeout}
 }
 
+// boundedCtx: a single Mongo write outside of a transaction (a lease, a backoff) never waits
+// longer than storeTimeout
+func boundedCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, storeTimeout)
+}
+
 // withTx runs fn in a transaction (on the primary, majority read and write concern) and
 // returns within storeTimeout, whatever Mongo does.
 // fn can run more than once: a transaction that conflicts with another one is retried.
@@ -229,6 +235,7 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	if item.RefreshNeeded && stored != nil {
 		mergeConfirmedOwner(&item, stored)
 	}
+	item.RepairAt = repairAt(&item)
 	switch {
 	case dry:
 	case stored == nil:

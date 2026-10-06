@@ -127,6 +127,8 @@ func (cs *cacheService) readNameData(ctx context.Context, fullName string) (*Nam
 		log.Warn("name is registered, but its owner could not be read",
 			zap.String("FullName", fullName), zap.Error(cause))
 		obs.RefreshNeeded = true
+		// re-read in the background, after a backoff
+		obs.RefreshNextAt = cs.now().Add(refreshFailureBackoff).UnixMilli()
 		return obs, fmt.Errorf("%w: %w", ErrNameDataIncomplete, cause)
 	}
 

@@ -62,6 +62,12 @@ type NameDataItem struct {
 	// which fork was read last (see newer)
 	ForkReadAt int64 `bson:"fork_read_at,omitempty"`
 
+	// no background refresh takes the record before this (unix ms): a refresh in progress (a
+	// lease) or a failed one (a backoff)
+	RefreshNextAt int64 `bson:"refresh_next_at,omitempty"`
+	// when the periodic scan takes the record (unix ms, see repairAt). indexed
+	RepairAt int64 `bson:"repair_at,omitempty"`
+
 	// a tombstone: the name is not registered (or has lapsed) at ObservedBlock, a finalized
 	// block. it keeps the block, so that an older read can not bring the name back. lookups
 	// serve it as "not in the cache"
@@ -114,6 +120,13 @@ type cacheService struct {
 	// Mongo is a replica set (or a sharded cluster): cache writes run in transactions
 	txSupported bool
 
+	// the background refresh (see worker): the queue lookups hand names to, and the periodic
+	// scan (0: off)
+	queue          *refreshQueue
+	repairInterval time.Duration
+	stopWorker     context.CancelFunc
+	workerDone     chan struct{}
+
 	// the local clock. a field so that tests can move it
 	now func() time.Time
 }
@@ -128,6 +141,13 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 	cs.confContracts = conf.GetContracts()
 	cs.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	cs.now = time.Now
+	cs.queue = newRefreshQueue(refreshQueueSize)
+	switch {
+	case conf.Cache.RepairIntervalSec == 0:
+		cs.repairInterval = defaultRepairInterval
+	case conf.Cache.RepairIntervalSec > 0:
+		cs.repairInterval = time.Duration(conf.Cache.RepairIntervalSec) * time.Second
+	}
 
 	// connect to mongo
 	uri := cs.confMongo.Connect
@@ -172,12 +192,27 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 		return err
 	}
 
-	log.Info("mongo for cache connected!", zap.String("unique name index", status))
+	cs.ensureRepairIndex(initCtx)
+
+	log.Info("mongo for cache connected!", zap.String("unique name index", status), zap.Duration("repairInterval", cs.repairInterval))
 
 	return nil
 }
 
+// the background refresh runs with the app
+var _ app.ComponentRunnable = (*cacheService)(nil)
+
+func (cs *cacheService) Run(_ context.Context) error {
+	cs.startWorker()
+	return nil
+}
+
 func (cs *cacheService) Close(ctx context.Context) (err error) {
+	if cs.stopWorker != nil {
+		cs.stopWorker()
+		<-cs.workerDone
+		cs.stopWorker = nil
+	}
 	if cs.itemColl != nil {
 		err = cs.itemColl.Database().Client().Disconnect(ctx)
 		cs.itemColl = nil
@@ -192,8 +227,16 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
 	}
+	if item == nil {
+		return &nsp.NameAvailableResponse{Available: true}, nil
+	}
+	// the record is served as it is. one that can be stale (expired: renewed since?, lapsed,
+	// incomplete, an old tombstone) is handed to the background refresh, never refreshed here
+	if needsRefresh(item, cs.now()) {
+		cs.requestRefresh(refreshRequest{name: item.FullName})
+	}
 	// a tombstone: a finalized block confirmed that the name is free
-	if item == nil || item.Removed {
+	if item.Removed {
 		return &nsp.NameAvailableResponse{Available: true}, nil
 	}
 
@@ -249,6 +292,9 @@ func (cs *cacheService) reverseLookup(ctx context.Context, filter bson.M) (*nsp.
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
 	}
+	if needsRefresh(item, cs.now()) {
+		cs.requestRefresh(refreshRequest{name: item.FullName})
+	}
 	return &nsp.NameByAddressResponse{Found: true, Name: item.FullName}, nil
 }
 
@@ -264,6 +310,11 @@ type refreshOpts struct {
 	// decide exactly the same (the reads, the finality confirmation, the order of the records),
 	// but write nothing (the dry run of the backfill)
 	dry bool
+	// the background refresh: a tombstone is confirmed again (and rewritten at a newer
+	// finalized block) when the latest block still says that the name is not registered. a
+	// request never does: it does not read the finalized block for a name that is not cached
+	// as taken
+	background bool
 }
 
 // refresh reads the name from the contracts at the latest block and stores what the chain
@@ -279,7 +330,7 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 	obs, readErr := cs.readNameData(ctx, fullName)
 	if errors.Is(readErr, ErrNameNotRegistered) {
 		// a destructive change: only a finalized block can decide it
-		obs, readErr = cs.confirmNotRegistered(ctx, fullName)
+		obs, readErr = cs.confirmNotRegistered(ctx, fullName, o)
 	}
 	if obs == nil {
 		// nothing to store
@@ -321,15 +372,16 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 // available. it reads the registry again at the finalized block:
 //   - a tombstone at that block and ErrNameNotRegistered: confirmed
 //   - nil and ErrNameNotRegistered: the cache has no registration of the name, nothing to remove
+//     (in the background a tombstone is confirmed again, see refreshOpts)
 //   - nil and errNotFinal: the finalized block still has the name registered: the cache must
 //     stay as it is (for now)
 //   - nil and another error: the confirmation failed (e.g. the finalized block could not be read)
-func (cs *cacheService) confirmNotRegistered(ctx context.Context, fullName string) (*NameDataItem, error) {
+func (cs *cacheService) confirmNotRegistered(ctx context.Context, fullName string, o refreshOpts) (*NameDataItem, error) {
 	stored, err := cs.getNameData(ctx, fullName)
 	if err != nil {
 		return nil, err
 	}
-	if stored == nil || stored.Removed {
+	if stored == nil || (stored.Removed && !o.background) {
 		return nil, ErrNameNotRegistered
 	}
 
