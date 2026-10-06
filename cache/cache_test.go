@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/mock/gomock"
@@ -170,35 +169,16 @@ func newFixture(t *testing.T) *fixture {
 		Register(fx.contracts).
 		Register(fx.cacheService)
 
+	// a clean test database. like prod, the cache then has a unique index on the name (name_1:
+	// Init creates it) and the repair index
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(testMongoURI()))
+	require.NoError(t, err)
+	defer func() { _ = client.Disconnect(ctx) }()
+	require.NoError(t, client.Database(testDbName).Drop(ctx))
+
 	require.NoError(t, fx.a.Start(ctx))
 	// the tests run the background refresh by hand (see runQueued): the requests stay queued
 	fx.stopBackground()
-
-	// TODO: mock Mongo!
-	uri := testMongoURI()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	require.NoError(t, err)
-
-	defer func() { _ = client.Disconnect(ctx) }()
-
-	// drop the test database
-	err = client.Database(testDbName).Drop(ctx)
-	if err != nil {
-		// sleep 1 second
-		time.Sleep(1 * time.Second)
-	}
-
-	// like prod: a unique index on the name (default name, name_1)
-	for i := 0; ; i++ {
-		_, err = fx.itemColl.Indexes().CreateOne(ctx, mongo.IndexModel{
-			Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true)})
-		if err == nil || i == 20 {
-			break
-		}
-		// the drop can still be in progress
-		time.Sleep(100 * time.Millisecond)
-	}
-	require.NoError(t, err)
 
 	return fx
 }

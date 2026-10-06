@@ -129,6 +129,8 @@ type cacheService struct {
 	confContracts config.Contracts
 	contracts     contracts.ContractsService
 
+	// a one-off maintenance run (see NewMaintainer): no index changes at start, no background
+	maintenance bool
 	// Mongo is a replica set (or a sharded cluster): cache writes run in transactions
 	txSupported bool
 	// the transactions that withTx stopped waiting for (or not yet): Close lets them end (abort
@@ -156,7 +158,9 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 	cs.confContracts = conf.GetContracts()
 	cs.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	cs.now = time.Now
-	cs.queue = newRefreshQueue(refreshQueueSize)
+	if !cs.maintenance {
+		cs.queue = newRefreshQueue(refreshQueueSize)
+	}
 	switch {
 	case conf.Cache.RepairIntervalSec == 0:
 		cs.repairInterval = defaultRepairInterval
@@ -201,13 +205,14 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 			"concurrent refreshes can store an older chain state (cache.allowUnsafeStandalone)")
 	}
 
-	// 3 - one record per name
-	status, err := cs.ensureNameIndex(initCtx, true)
-	if err != nil {
-		return err
+	// 3 - one record per name (a maintenance run reports it: -dedupe-cache)
+	status := "not checked"
+	if !cs.maintenance {
+		if status, err = cs.ensureNameIndex(initCtx, true); err != nil {
+			return err
+		}
+		cs.ensureRepairIndex(initCtx)
 	}
-
-	cs.ensureRepairIndex(initCtx)
 
 	log.Info("mongo for cache connected!", zap.String("unique name index", status), zap.Duration("repairInterval", cs.repairInterval))
 
@@ -218,6 +223,9 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 var _ app.ComponentRunnable = (*cacheService)(nil)
 
 func (cs *cacheService) Run(_ context.Context) error {
+	if cs.maintenance {
+		return nil
+	}
 	cs.startWorker()
 	return nil
 }
