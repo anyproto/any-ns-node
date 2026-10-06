@@ -2,13 +2,11 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"sort"
-	"sync"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 )
 
@@ -16,26 +14,54 @@ import (
 // "Foo.any": a node older than GO-7567 cached an operation's name as the client sent it). every
 // read and write of this version uses the canonical spelling, so such a record is never
 // refreshed or removed. until -dedupe-cache -refresh-apply migrates them:
-//   - a live alias keeps its canonical name taken (lookups never answer available because of it)
+//   - a live alias keeps its canonical name taken (see liveAlias: checked on every lookup that
+//     finds no live canonical record, nothing is remembered)
 //   - reverse lookups prefer the canonical record, an alias only counts when there is none
 //   - the background refresh of an alias refreshes the canonical name and settles the alias
-//
-// the node knows them from a scan of the names (at start, then every aliasRescanInterval)
 
-// aliasRescanInterval: how often the worker scans the names for aliases again (only an old node
-// in the mixed window of an upgrade can write new ones)
-const aliasRescanInterval = 10 * time.Minute
+// the collation of the alias check: case- and width-insensitive (strength 2 ignores tertiary
+// differences), so every spelling that the normalization maps to the canonical one matches (the
+// candidates are then checked by the normalization itself)
+var aliasCollation = &options.Collation{Locale: "en", Strength: 2}
 
-type aliasIndex struct {
-	mu          sync.RWMutex
-	byCanonical map[string][]string
-	scannedAt   time.Time
+// aliasIndexName: the index of the alias check (non-unique, with aliasCollation). a failure to
+// create it only makes the check a scan of the cache (a few thousand records)
+const aliasIndexName = "name_ci"
+
+func (cs *cacheService) ensureAliasIndex(ctx context.Context) {
+	_, err := cs.itemColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "name", Value: 1}},
+		Options: options.Index().SetName(aliasIndexName).SetCollation(aliasCollation),
+	})
+	if err != nil {
+		log.Warn("failed to create the alias index of the name cache", zap.Error(err))
+	}
 }
 
-func (a *aliasIndex) of(canonical string) []string {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return a.byCanonical[canonical]
+// aliasCandidates bounds the records the alias check looks at (one per spelling of a name)
+const aliasCandidates = 16
+
+// liveAlias: a live (not a tombstone) record whose name normalizes to canonical, nil if there is
+// none. authoritative: one query of the collection at the time of the lookup (it also finds a
+// record renamed to the canonical name in between, or written by an old node a moment ago)
+func (cs *cacheService) liveAlias(ctx context.Context, canonical string) (*NameDataItem, error) {
+	cur, err := cs.itemColl.Find(ctx, bson.M{"name": canonical, "removed": bson.M{"$ne": true}},
+		options.Find().SetCollation(aliasCollation).SetLimit(aliasCandidates))
+	if err != nil {
+		return nil, err
+	}
+	var items []NameDataItem
+	if err = cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	for i := range items {
+		// the collation is broader than the normalization (e.g. "ss" and "ß"): only a record
+		// whose name normalizes to the requested one counts
+		if c, err := cs.canonical(items[i].FullName); err == nil && c == canonical {
+			return &items[i], nil
+		}
+	}
+	return nil, nil
 }
 
 // scanAliases: the non-canonical names of the cache, by canonical name
@@ -59,36 +85,17 @@ func (cs *cacheService) scanAliases(ctx context.Context) (map[string][]string, e
 	return out, nil
 }
 
-// loadAliases scans the names for aliases; it warns while there are any
-func (cs *cacheService) loadAliases(ctx context.Context) {
+// warnAliases logs how many names have aliases (a hint for the operator, nothing depends on it)
+func (cs *cacheService) warnAliases(ctx context.Context) {
 	m, err := cs.scanAliases(ctx)
 	if err != nil {
 		log.Warn("failed to scan the name cache for non-canonical names", zap.Error(err))
 		return
 	}
-	cs.aliases.mu.Lock()
-	cs.aliases.byCanonical = m
-	cs.aliases.scannedAt = cs.now()
-	cs.aliases.mu.Unlock()
 	if n := len(m); n > 0 {
 		log.Warn("the name cache has records under a non-canonical spelling: they keep their names taken, "+
 			"run -dedupe-cache -refresh-apply to migrate them", zap.Int("names", n))
 	}
-}
-
-// liveAlias: a live (not a tombstone) record cached under another spelling of the canonical name,
-// nil if there is none. one indexed query, only if there are aliases of the name
-func (cs *cacheService) liveAlias(ctx context.Context, canonical string) (*NameDataItem, error) {
-	names := cs.aliases.of(canonical)
-	if len(names) == 0 {
-		return nil, nil
-	}
-	item := &NameDataItem{}
-	err := cs.itemColl.FindOne(ctx, bson.M{"name": bson.M{"$in": names}, "removed": bson.M{"$ne": true}}).Decode(item)
-	if err != nil {
-		return nil, ignoreNoDocuments(err)
-	}
-	return item, nil
 }
 
 // settleAlias takes an alias out of the periodic scan (its canonical name is what is refreshed)
@@ -105,13 +112,6 @@ func (cs *cacheService) settleAlias(ctx context.Context, alias string) {
 	}
 }
 
-func ignoreNoDocuments(err error) error {
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return nil
-	}
-	return err
-}
-
 // AliasStats is what MigrateAliases did (or would do, in a dry run)
 type AliasStats struct {
 	// records under a non-canonical spelling
@@ -119,9 +119,10 @@ type AliasStats struct {
 	// renamed to the canonical name (there was no canonical record), kept as they are, marked
 	// for a refresh
 	Renamed int
-	// deleted: the canonical record is live, complete and at least as new
+	// deleted: the canonical record has its block, is live, complete and at least as new
 	Deleted int
-	// left as they are (the canonical record is a tombstone, incomplete or older): for an operator
+	// left as they are (the canonical record has no block, is a tombstone, incomplete or older),
+	// the canonical record marked for a refresh: for an operator, or a later run
 	Kept []string
 }
 
@@ -186,11 +187,20 @@ func (cs *cacheService) migrateAlias(ctx context.Context, alias, canonical strin
 			}})
 		}
 		return "renamed", err
-	case !c.Removed && !c.RefreshNeeded && c.ObservedBlock >= a.ObservedBlock:
+	case c.ObservedBlock > 0 && !c.Removed && !c.RefreshNeeded && c.ObservedBlock >= a.ObservedBlock:
+		// the canonical record was read from the chain (it has its block), is live, complete and
+		// at least as new
 		if apply {
 			_, err = cs.itemColl.DeleteOne(ctx, bson.M{"_id": a.ID})
 		}
 		return "deleted", err
 	}
-	return "kept", nil
+	// unknown or conflicting freshness (e.g. two legacy records without a block): both stay, the
+	// canonical one is refreshed as soon as possible, a later run decides
+	if apply {
+		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": c.ID}, bson.M{"$set": bson.M{
+			"refresh_needed": true, "repair_at": max(int64(1), c.RefreshNextAt),
+		}})
+	}
+	return "kept", err
 }

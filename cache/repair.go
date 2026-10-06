@@ -104,7 +104,7 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 		return err
 	}
 	times := cs.rereadTimes()
-	_, err = withTx(ctx, cs, func(ctx context.Context) (struct{}, error) {
+	_, exited, err := withTxExit(ctx, cs, func(ctx context.Context) (struct{}, error) {
 		stored, err := cs.getNameData(ctx, name)
 		if err != nil || stored == nil {
 			return struct{}{}, err
@@ -124,6 +124,9 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, update)
 		return struct{}{}, err
 	})
+	// the caller holds a scheduling slot: it is given back only when the transaction really
+	// ended (a commit can outlive the wait), so the cap holds for the transactions themselves
+	<-exited
 	return err
 }
 
@@ -379,12 +382,7 @@ func (cs *cacheService) worker(ctx context.Context) {
 			if _, err := cs.repairOnce(ctx, repairBatch); err != nil && ctx.Err() == nil {
 				log.Warn("cache repair failed", zap.Error(err))
 			}
-			cs.aliases.mu.RLock()
-			rescan := cs.now().Sub(cs.aliases.scannedAt) >= aliasRescanInterval
-			cs.aliases.mu.RUnlock()
-			if rescan {
-				cs.loadAliases(ctx)
-			}
+
 		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/anyproto/any-ns-node/config"
@@ -137,11 +138,11 @@ type cacheService struct {
 	txSupported bool
 	// names are normalized like the registration does (config: ensip15validation)
 	ensip15 bool
-	// records under a non-canonical spelling (see alias.go)
-	aliases aliasIndex
 	// the transactions that withTx stopped waiting for (or not yet): Close lets them end (abort
 	// or commit) before it disconnects, so that none is left open on the server
 	inflight sync.WaitGroup
+	// running transactions (a gauge, for tests)
+	txActive atomic.Int64
 	// the background re-read schedules (see scheduleRereadsAsync): Close waits for them
 	asyncMu    sync.Mutex
 	closed     bool
@@ -225,7 +226,8 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 			return err
 		}
 		cs.ensureRepairIndex(initCtx)
-		cs.loadAliases(initCtx)
+		cs.ensureAliasIndex(initCtx)
+		cs.warnAliases(initCtx)
 	}
 
 	log.Info("mongo for cache connected!", zap.String("unique name index", status), zap.Duration("repairInterval", cs.repairInterval))
@@ -281,6 +283,9 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 	}
 	// no live canonical record: a record under another spelling still keeps the name taken
 	if item == nil || item.Removed {
+		if hookBeforeAliasCheck != nil {
+			hookBeforeAliasCheck()
+		}
 		canonical, cerr := cs.canonical(in.FullName)
 		if cerr != nil {
 			canonical = in.FullName
@@ -353,26 +358,22 @@ func (cs *cacheService) GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdR
 	return cs.reverseLookup(ctx, bson.M{"owner_any_address": in.AnyAddress})
 }
 
-// reverseLookupLimit: how many matching records a reverse lookup considers (one per name; more
-// than one only with records under a non-canonical spelling)
-const reverseLookupLimit = 16
+// reverseLookupAliases bounds the aliases a reverse lookup keeps while it looks for a canonical
+// record (one per name otherwise)
+const reverseLookupAliases = 64
 
 // reverseLookup finds a name by an owner field. tombstones never match. a record under a
-// non-canonical spelling (see alias.go) counts only if its name has no canonical record; the
-// name is answered in its canonical spelling
+// non-canonical spelling (see alias.go) counts only if no canonical record matches and its name
+// has no canonical record; the name is answered in its canonical spelling
 func (cs *cacheService) reverseLookup(ctx context.Context, filter bson.M) (*nsp.NameByAddressResponse, error) {
 	filter["removed"] = bson.M{"$ne": true}
 
-	cur, err := cs.itemColl.Find(ctx, filter, options.Find().SetLimit(reverseLookupLimit))
+	cur, err := cs.itemColl.Find(ctx, filter)
 	if err != nil {
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
 	}
-	var items []NameDataItem
-	if err = cur.All(ctx, &items); err != nil {
-		log.Error("failed to get item from DB", zap.Error(err))
-		return nil, err
-	}
+	defer func() { _ = cur.Close(ctx) }()
 
 	found := func(item *NameDataItem, name string) (*nsp.NameByAddressResponse, error) {
 		if needsRefresh(item, cs.now()) {
@@ -380,25 +381,35 @@ func (cs *cacheService) reverseLookup(ctx context.Context, filter bson.M) (*nsp.
 		}
 		return &nsp.NameByAddressResponse{Found: true, Name: name}, nil
 	}
-	// 1 - a canonical record
-	var aliases []int
-	for i := range items {
-		canonical, err := cs.canonical(items[i].FullName)
-		if err != nil || canonical == items[i].FullName {
-			return found(&items[i], items[i].FullName)
+	// 1 - the first canonical record, whatever number of aliases match before it
+	var aliases []NameDataItem
+	for cur.Next(ctx) {
+		var item NameDataItem
+		if err = cur.Decode(&item); err != nil {
+			return nil, err
 		}
-		aliases = append(aliases, i)
+		canonical, err := cs.canonical(item.FullName)
+		if err != nil || canonical == item.FullName {
+			return found(&item, item.FullName)
+		}
+		if len(aliases) < reverseLookupAliases {
+			aliases = append(aliases, item)
+		}
+	}
+	if err = cur.Err(); err != nil {
+		log.Error("failed to get item from DB", zap.Error(err))
+		return nil, err
 	}
 	// 2 - an alias whose name has no canonical record
-	for _, i := range aliases {
-		canonical, _ := cs.canonical(items[i].FullName)
+	for i := range aliases {
+		canonical, _ := cs.canonical(aliases[i].FullName)
 		c, err := cs.getNameData(ctx, canonical)
 		if err != nil {
 			log.Error("failed to get item from DB", zap.Error(err))
 			return nil, err
 		}
 		if c == nil {
-			return found(&items[i], canonical)
+			return found(&aliases[i], canonical)
 		}
 	}
 	return &nsp.NameByAddressResponse{Found: false}, nil

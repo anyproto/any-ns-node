@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -56,8 +57,6 @@ func TestCacheService_Aliases(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		insertRaw(t, fx, aliasDoc(testAnyID, 0))
-		fx.loadAliases(ctx)
-		require.Equal(t, map[string][]string{testFullName: {testAlias}}, fx.aliases.byCanonical)
 
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
 		require.Equal(t, &nsp.NameByAddressResponse{Found: true, Name: testFullName}, byAnyID(t, fx, testAnyID))
@@ -85,7 +84,6 @@ func TestCacheService_Aliases(t *testing.T) {
 		defer fx.finish(t)
 		insertRaw(t, fx, aliasDoc(testAnyID, 20))
 		insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": 10})
-		fx.loadAliases(ctx)
 
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
 		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, true))
@@ -98,7 +96,6 @@ func TestCacheService_Aliases(t *testing.T) {
 		defer fx.finish(t)
 		insertRaw(t, fx, aliasDoc(testAnyID, 5))
 		insertRaw(t, fx, canonicalDoc(otherAnyID, 5))
-		fx.loadAliases(ctx)
 
 		// the alias' old owner does not resolve, the canonical owner does
 		require.False(t, byAnyID(t, fx, testAnyID).Found)
@@ -118,6 +115,65 @@ func TestCacheService_Aliases(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			require.Equal(t, &nsp.NameByAddressResponse{Found: true, Name: testFullName}, byAnyID(t, fx, testAnyID))
 		}
+	})
+
+	t.Run("an alias written after the node started (an old node) is seen at once", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		require.True(t, isNameAvailable(t, fx.cacheService).Available)
+		insertRaw(t, fx, aliasDoc(testAnyID, 0))
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+	})
+
+	t.Run("a migration that renames the alias between the canonical miss and the alias check: taken", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		insertRaw(t, fx, aliasDoc(testAnyID, 0))
+		hookBeforeAliasCheck = func() {
+			require.Equal(t, AliasStats{Aliases: 1, Renamed: 1}, migrate(t, fx, true))
+		}
+		defer func() { hookBeforeAliasCheck = nil }()
+
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+		require.Zero(t, aliasCount(t, fx))
+	})
+
+	t.Run("the collation is broader than the normalization: another name never counts", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		// "strasse" and "straße" are equal at strength 2, but they are different names
+		_, err := fx.itemColl.InsertOne(ctx, bson.M{"name": "strasse.any", "owner_eth_address": testEoa, "name_expires": notExpired})
+		require.NoError(t, err)
+		out, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: "straße.any"})
+		require.NoError(t, err)
+		require.True(t, out.Available)
+	})
+
+	t.Run("two legacy records without a block (unknown freshness): both kept, the canonical one marked", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		insertRaw(t, fx, aliasDoc(testAnyID, 0))
+		insertRaw(t, fx, bson.M{"name": testFullName, "owner_eth_address": otherEoa, "owner_any_address": otherAnyID, "name_expires": notExpired})
+
+		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, false))
+		require.False(t, cachedItem(t, fx).RefreshNeeded, "a dry run writes nothing")
+		require.Equal(t, AliasStats{Aliases: 1, Kept: []string{testAlias}}, migrate(t, fx, true))
+		require.EqualValues(t, 1, aliasCount(t, fx))
+		item := cachedItem(t, fx)
+		require.True(t, item.RefreshNeeded)
+		require.Equal(t, int64(1), item.RepairAt)
+	})
+
+	t.Run("a reverse lookup finds the canonical match behind many ineligible aliases", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		for i := 0; i < 20; i++ {
+			// an alias of the owner whose name has a canonical record (of someone else)
+			insertRaw(t, fx, bson.M{"name": fmt.Sprintf("Name%02d.any", i), "owner_any_address": testAnyID, "name_expires": notExpired, "observed_block": int64(1)})
+			insertRaw(t, fx, bson.M{"name": fmt.Sprintf("name%02d.any", i), "owner_any_address": otherAnyID, "name_expires": notExpired, "observed_block": int64(1)})
+		}
+		insertRaw(t, fx, bson.M{"name": "target.any", "owner_any_address": testAnyID, "name_expires": notExpired, "observed_block": int64(1)})
+		require.Equal(t, &nsp.NameByAddressResponse{Found: true, Name: "target.any"}, byAnyID(t, fx, testAnyID))
 	})
 
 	t.Run("migration keeps the alias when the canonical record is incomplete or older", func(t *testing.T) {
@@ -140,7 +196,6 @@ func TestCacheService_Aliases(t *testing.T) {
 			doc := aliasDoc(testAnyID, 0)
 			doc["repair_at"] = int64(1)
 			insertRaw(t, fx, doc)
-			fx.loadAliases(ctx)
 
 			if registered {
 				expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)

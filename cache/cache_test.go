@@ -233,7 +233,7 @@ func TestCacheService_IsNameAvailable(t *testing.T) {
 		assert.True(t, out.Available)
 	})
 
-	t.Run("find nothing if capitalization is different", func(t *testing.T) {
+	t.Run("another capitalization of a cached name is taken (it normalizes to the same name)", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
@@ -249,7 +249,8 @@ func TestCacheService_IsNameAvailable(t *testing.T) {
 		// 2 - call IsNameAvailable
 		out, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: "TEST.any"})
 		require.NoError(t, err)
-		assert.True(t, out.Available)
+		assert.False(t, out.Available)
+		assert.Equal(t, "owner", out.OwnerEthAddress)
 	})
 
 	t.Run("find one", func(t *testing.T) {

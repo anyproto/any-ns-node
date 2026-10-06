@@ -749,4 +749,38 @@ func TestCacheService_Rereads(t *testing.T) {
 		within(t, "the schedule", fx.async.Wait)
 		require.Less(t, time.Since(start), stallBlock-time.Second, "bounded by scheduleTimeout")
 	})
+
+	t.Run("the scheduling cap holds for the transactions themselves (stalled commits)", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		requireReplicaSet(t, fx)
+		const names, slots = 12, 2
+		for i := 0; i < names; i++ {
+			insertRaw(t, fx, bson.M{"name": fmt.Sprintf("n%02d.any", i), "owner_eth_address": testEoa, "name_expires": notExpired, "observed_block": int64(1)})
+		}
+
+		oldStore, oldSchedule := storeTimeout, scheduleTimeout
+		storeTimeout, scheduleTimeout = 200*time.Millisecond, 200*time.Millisecond
+		defer func() { storeTimeout, scheduleTimeout = oldStore, oldSchedule }()
+		fx.scheduling = make(chan struct{}, slots)
+		// every commit stalls well past the callers' waits
+		failCommand(t, bson.M{
+			"failCommands":    []string{"commitTransaction"},
+			"blockConnection": true,
+			"blockTimeMS":     1500,
+		}, bson.M{"times": names})
+
+		var peak int64
+		deadline := time.Now().Add(4 * time.Second)
+		for i := 0; time.Now().Before(deadline); i++ {
+			if i < names*10 {
+				fx.RefreshAfterOperation(fmt.Sprintf("n%02d.any", i%names))
+			}
+			peak = max(peak, fx.txActive.Load())
+			time.Sleep(10 * time.Millisecond)
+		}
+		within(t, "the schedules", fx.async.Wait)
+		require.LessOrEqual(t, peak, int64(slots))
+		require.Positive(t, peak)
+	})
 }

@@ -17,6 +17,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// test hook, nil in production: runs in a lookup between the canonical miss and the alias check
+var hookBeforeAliasCheck func()
+
 // test hook, nil in production: runs in the write transaction of an observation, after the
 // record of the name was read
 var hookAfterRead func(obs *NameDataItem)
@@ -68,13 +71,23 @@ func boundedCtx(ctx context.Context) (context.Context, context.CancelFunc) {
 // the caller stops waiting for it after storeTimeout. a commit that is late still lands, and
 // that is fine: every write is ordered by its chain block, it can not overwrite a newer one
 func withTx[T any](ctx context.Context, cs *cacheService, fn func(ctx context.Context) (T, error)) (T, error) {
+	v, _, err := withTxExit(ctx, cs, fn)
+	return v, err
+}
+
+// withTxExit is withTx that also returns a channel closed when the transaction (and its
+// session) actually ended: withTx can stop waiting for it earlier
+func withTxExit[T any](ctx context.Context, cs *cacheService, fn func(ctx context.Context) (T, error)) (T, <-chan struct{}, error) {
+	exited := make(chan struct{})
 	// read once: the transaction can outlive this call
 	timeout := storeTimeout
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if !cs.txSupported {
-		return fn(ctx)
+		defer close(exited)
+		v, err := fn(ctx)
+		return v, exited, err
 	}
 
 	type result struct {
@@ -84,18 +97,21 @@ func withTx[T any](ctx context.Context, cs *cacheService, fn func(ctx context.Co
 	// buffered: the goroutine never blocks on a caller that is gone
 	done := make(chan result, 1)
 	cs.inflight.Add(1)
+	cs.txActive.Add(1)
 	go func() {
 		defer cs.inflight.Done()
+		defer close(exited)
+		defer cs.txActive.Add(-1)
 		v, err := runTx(ctx, cs.itemColl.Database().Client(), timeout, fn)
 		done <- result{v, err}
 	}()
 
 	select {
 	case r := <-done:
-		return r.v, r.err
+		return r.v, exited, r.err
 	case <-ctx.Done():
 		var zero T
-		return zero, fmt.Errorf("cache transaction: %w", ctx.Err())
+		return zero, exited, fmt.Errorf("cache transaction: %w", ctx.Err())
 	}
 }
 
@@ -326,14 +342,29 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	return &item, nil
 }
 
-// nameIndex: is there an index on exactly {name: 1}, and is it unique? ("" if there is none)
+// nameIndex: is there an index on exactly {name: 1} (with the simple collation: the alias index
+// name_ci has the same key), and is it unique? ("" if there is none)
 func (cs *cacheService) nameIndex(ctx context.Context) (name string, unique bool, err error) {
-	specs, err := cs.itemColl.Indexes().ListSpecifications(ctx)
+	cur, err := cs.itemColl.Indexes().List(ctx)
 	if err != nil {
 		return "", false, err
 	}
+	var specs []struct {
+		Name      string   `bson:"name"`
+		Key       bson.Raw `bson:"key"`
+		Unique    bool     `bson:"unique"`
+		Collation bson.Raw `bson:"collation"`
+	}
+	if err = cur.All(ctx, &specs); err != nil {
+		return "", false, err
+	}
 	for _, spec := range specs {
-		elems, err := spec.KeysDocument.Elements()
+		if spec.Collation != nil {
+			if locale, ok := spec.Collation.Lookup("locale").StringValueOK(); !ok || locale != "simple" {
+				continue
+			}
+		}
+		elems, err := spec.Key.Elements()
 		if err != nil {
 			return "", false, err
 		}
@@ -343,7 +374,7 @@ func (cs *cacheService) nameIndex(ctx context.Context) (name string, unique bool
 		if dir, ok := elems[0].Value().AsInt64OK(); !ok || dir != 1 {
 			continue
 		}
-		return spec.Name, spec.Unique != nil && *spec.Unique, nil
+		return spec.Name, spec.Unique, nil
 	}
 	return "", false, nil
 }
