@@ -340,8 +340,6 @@ func TestAnynsRpc_GetOperation(t *testing.T) {
 
 		// Completed, and the cached record is refreshed in the background (never in the poll)
 		fx.cache.EXPECT().RefreshAfterOperation("hello.any").Times(1)
-		// a failed schedule write is only logged
-		fx.cache.EXPECT().ScheduleRereads(gomock.Any(), "hello.any").Return(errors.New("mongo is slow")).Times(1)
 
 		fx.aa.EXPECT().GetOperation(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, opID string) (status *accountabstraction.OperationInfo, err error) {
 			return &accountabstraction.OperationInfo{

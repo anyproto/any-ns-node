@@ -59,33 +59,70 @@ const (
 	maxRereads = 8
 )
 
-// scheduleTimeout bounds the write of ScheduleRereads: a GetOperation poll waits for it.
+// scheduleTimeout bounds the background write of the re-reads (see scheduleRereads).
 // a var only so that tests can shrink it
 var scheduleTimeout = 2 * time.Second
 
-// ScheduleRereads adds the re-reads of a name changed by an operation completed now to its record
-// (if there is one), in one update outside of a transaction, bounded by scheduleTimeout: durable,
-// so that a dropped background request or a restart does not lose the refresh. the periodic scan
-// runs them (not before the record's lease or backoff)
-func (cs *cacheService) ScheduleRereads(ctx context.Context, fullName string) error {
+// maxScheduling: at most this many re-read schedules run at once (each bounded by
+// scheduleTimeout); more are skipped (the in-memory request still runs the refresh)
+const maxScheduling = 64
+
+// scheduleRereadsAsync stores the re-reads of a name changed by an operation completed now on its
+// record, in the background: the caller (a GetOperation poll) never waits for the write. tracked,
+// Close waits for it
+func (cs *cacheService) scheduleRereadsAsync(fullName string) {
+	cs.asyncMu.Lock()
+	defer cs.asyncMu.Unlock()
+	if cs.closed || cs.itemColl == nil {
+		return
+	}
+	select {
+	case cs.scheduling <- struct{}{}:
+	default:
+		log.Warn("too many re-read schedules in flight, skipping one", zap.String("FullName", fullName))
+		return
+	}
+	cs.async.Add(1)
+	go func() {
+		defer cs.async.Done()
+		defer func() { <-cs.scheduling }()
+		ctx, cancel := context.WithTimeout(context.Background(), scheduleTimeout)
+		defer cancel()
+		if err := cs.scheduleRereads(ctx, fullName); err != nil {
+			log.Warn("failed to schedule the re-reads of a name", zap.String("FullName", fullName), zap.Error(err))
+		}
+	}()
+}
+
+// scheduleRereads adds the re-reads (see rereadDelays) to the record of the name, if there is
+// one, in one transaction: merged with the pending ones (coalesced, at most maxRereads, see
+// mergeRereads), so repeated polls of an operation can not grow it. the periodic scan runs them
+// (never before the record's lease or backoff)
+func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) error {
 	name, err := cs.canonical(fullName)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, scheduleTimeout)
-	defer cancel()
-
 	times := cs.rereadTimes()
-	add := bson.A{}
-	for _, t := range times {
-		add = append(add, t)
-	}
-	first := slices.Min(times)
-	_, err = cs.itemColl.UpdateOne(ctx, bson.M{"name": name}, mongo.Pipeline{
-		{{Key: "$set", Value: bson.M{
-			"rereads": bson.M{"$setUnion": bson.A{bson.M{"$ifNull": bson.A{"$rereads", bson.A{}}}, add}},
-		}}},
-		dueBy(first),
+	_, err = withTx(ctx, cs, func(ctx context.Context) (struct{}, error) {
+		stored, err := cs.getNameData(ctx, name)
+		if err != nil || stored == nil {
+			return struct{}{}, err
+		}
+		rereads := mergeRereads(stored.Rereads, times, 0)
+		if slices.Equal(rereads, stored.Rereads) {
+			return struct{}{}, nil
+		}
+		stored.Rereads = rereads
+		stored.RepairAt = repairAt(stored)
+		set, unset := bson.M{"rereads": rereads}, bson.M{}
+		setOrUnset(set, unset, "repair_at", stored.RepairAt, stored.RepairAt == 0)
+		update := bson.M{"$set": set}
+		if len(unset) > 0 {
+			update["$unset"] = unset
+		}
+		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, update)
+		return struct{}{}, err
 	})
 	return err
 }
@@ -227,7 +264,6 @@ func repairAt(d *NameDataItem) int64 {
 		due = 1
 	} else {
 		if len(d.Rereads) > 0 {
-			// the earliest (an update outside of a transaction appends unsorted, see ScheduleRereads)
 			due = slices.Min(d.Rereads)
 		}
 		if !d.Removed && d.NameExpires > 0 {

@@ -127,20 +127,6 @@ func (mr *MockCacheServiceMockRecorder) RefreshAfterOperation(fullName any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshAfterOperation", reflect.TypeOf((*MockCacheService)(nil).RefreshAfterOperation), fullName)
 }
 
-// ScheduleRereads mocks base method.
-func (m *MockCacheService) ScheduleRereads(ctx context.Context, fullName string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ScheduleRereads", ctx, fullName)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ScheduleRereads indicates an expected call of ScheduleRereads.
-func (mr *MockCacheServiceMockRecorder) ScheduleRereads(ctx, fullName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScheduleRereads", reflect.TypeOf((*MockCacheService)(nil).ScheduleRereads), ctx, fullName)
-}
-
 // UpdateInCache mocks base method.
 func (m *MockCacheService) UpdateInCache(ctx context.Context, in *nameserviceproto.NameAvailableRequest) error {
 	m.ctrl.T.Helper()

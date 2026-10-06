@@ -178,12 +178,8 @@ func (arpc *anynsAARpc) GetOperation(ctx context.Context, in *nsp.GetOperationSt
 			log.Info("name is already in cache", zap.String("FullName", op.FullName))
 			// Completed, as before. but the cached record can be older than the operation (a
 			// renewal moves nameExpires, a registration of a lapsed name changes the owner):
-			// its re-reads are stored on it first (one short bounded write: a dropped request
-			// or a restart can not lose them; a failure only costs that durability), then it is
-			// refreshed in the background. never here: this poll does not wait for the contracts
-			if err := arpc.cache.ScheduleRereads(ctx, op.FullName); err != nil {
-				log.Warn("failed to schedule the re-reads of a cached name", zap.String("FullName", op.FullName), zap.Error(err))
-			}
+			// the background stores its re-reads on it and refreshes it. never here: this poll
+			// waits neither for the contracts nor for a write
 			arpc.cache.RefreshAfterOperation(op.FullName)
 			return &out, nil
 		}

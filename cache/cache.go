@@ -115,12 +115,10 @@ type CacheService interface {
 	// rereadDelays) in the same write, to pick up a lagging provider or a reorg
 	UpdateInCacheAfterOperation(ctx context.Context, in *nsp.NameAvailableRequest) (err error)
 	// RefreshAfterOperation hands a name that a completed operation changed to the background:
-	// a refresh at the latest block and the re-reads, or (if the refresh fails) the record is
-	// marked refresh_needed with the re-reads. it never blocks (dropped if the queue is full)
+	// its re-reads are stored on its record (durable: a dropped request or a restart does not lose
+	// them), and a refresh at the latest block runs (if it fails, the record is marked
+	// refresh_needed). it never blocks and never waits for a write
 	RefreshAfterOperation(fullName string)
-	// ScheduleRereads stores the re-reads (see rereadDelays) of a name that a completed operation
-	// changed on its cached record, durably, with one short bounded write (scheduleTimeout)
-	ScheduleRereads(ctx context.Context, fullName string) error
 
 	app.Component
 }
@@ -141,6 +139,11 @@ type cacheService struct {
 	// the transactions that withTx stopped waiting for (or not yet): Close lets them end (abort
 	// or commit) before it disconnects, so that none is left open on the server
 	inflight sync.WaitGroup
+	// the background re-read schedules (see scheduleRereadsAsync): Close waits for them
+	asyncMu    sync.Mutex
+	closed     bool
+	async      sync.WaitGroup
+	scheduling chan struct{}
 
 	// the background refresh (see worker): the queue lookups hand names to, and the periodic
 	// scan (0: off)
@@ -164,6 +167,7 @@ func (cs *cacheService) Init(a *app.App) (err error) {
 	cs.contracts = a.MustComponent(contracts.CName).(contracts.ContractsService)
 	cs.now = time.Now
 	cs.ensip15 = conf.Ensip15Validation
+	cs.scheduling = make(chan struct{}, maxScheduling)
 	if !cs.maintenance {
 		cs.queue = newRefreshQueue(refreshQueueSize)
 	}
@@ -242,10 +246,14 @@ func (cs *cacheService) Close(ctx context.Context) (err error) {
 		<-cs.workerDone
 		cs.stopWorker = nil
 	}
+	cs.asyncMu.Lock()
+	cs.closed = true
+	cs.asyncMu.Unlock()
 	if cs.itemColl != nil {
 		// bounded: every transaction ends within its storeTimeout, its session within another one
 		ended := make(chan struct{})
 		go func() {
+			cs.async.Wait()
 			cs.inflight.Wait()
 			close(ended)
 		}()
@@ -353,6 +361,7 @@ func (cs *cacheService) UpdateInCacheAfterOperation(ctx context.Context, in *nsp
 }
 
 func (cs *cacheService) RefreshAfterOperation(fullName string) {
+	cs.scheduleRereadsAsync(fullName)
 	cs.requestRefresh(refreshRequest{name: fullName, afterOp: true})
 }
 

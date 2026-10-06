@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"testing"
 	"time"
 
@@ -619,6 +620,8 @@ func TestCacheService_Rereads(t *testing.T) {
 
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
 		fx.RefreshAfterOperation(testFullName)
+		// the schedule first (a standalone Mongo does not order concurrent writes)
+		fx.async.Wait()
 		require.Equal(t, 1, fx.runQueued())
 
 		item := cachedItem(t, fx)
@@ -641,6 +644,8 @@ func TestCacheService_Rereads(t *testing.T) {
 
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired+100)
 		fx.RefreshAfterOperation(testFullName)
+		// the schedule first (a standalone Mongo does not order concurrent writes)
+		fx.async.Wait()
 		require.Equal(t, 1, fx.runQueued())
 		item := cachedItem(t, fx)
 		require.Equal(t, notExpired+100, item.NameExpires)
@@ -656,7 +661,7 @@ func TestCacheService_Rereads(t *testing.T) {
 				seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
 
 				start := time.Now()
-				require.NoError(t, fx.ScheduleRereads(ctx, testFullName))
+				require.NoError(t, fx.scheduleRereads(ctx, testFullName))
 				if c == "queue overflow" {
 					fx.queue = newRefreshQueue(1)
 					require.True(t, fx.queue.push(refreshRequest{name: "other.any"}))
@@ -696,11 +701,52 @@ func TestCacheService_Rereads(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, claimed)
 
-		require.NoError(t, fx.ScheduleRereads(ctx, testFullName))
-		require.NoError(t, fx.ScheduleRereads(ctx, testFullName))
+		require.NoError(t, fx.scheduleRereads(ctx, testFullName))
+		require.NoError(t, fx.scheduleRereads(ctx, testFullName))
 		item := cachedItem(t, fx)
 		require.Equal(t, item.RefreshNextAt, item.RepairAt, "not before the lease")
-		require.LessOrEqual(t, len(item.Rereads), 4)
-		require.Len(t, mergeRereads(item.Rereads, nil, 0), 2)
+		require.Len(t, item.Rereads, 2, "coalesced")
+	})
+
+	t.Run("sustained polling with the background held: the stored schedule stays bounded, the poll never waits", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+
+		// the worker is stopped (the fixture): nothing processes the queue. a poll every 2 minutes
+		// for 2 hours, then 50 more within a second
+		start := time.Now()
+		for i := 0; i < 60+50; i++ {
+			at := start.Add(time.Duration(min(i, 60)) * 2 * time.Minute)
+			fx.now = func() time.Time { return at }
+			within(t, "RefreshAfterOperation", func() { fx.RefreshAfterOperation(testFullName) })
+			fx.async.Wait()
+		}
+		item := cachedItem(t, fx)
+		require.LessOrEqual(t, len(item.Rereads), maxRereads)
+		require.NotEmpty(t, item.Rereads)
+		require.Equal(t, slices.Min(item.Rereads), item.RepairAt)
+	})
+
+	t.Run("a stalled schedule write is not waited for, Close waits for it (bounded)", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		requireReplicaSet(t, fx)
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+
+		old := scheduleTimeout
+		scheduleTimeout = 300 * time.Millisecond
+		defer func() { scheduleTimeout = old }()
+		failCommand(t, bson.M{
+			"failCommands":    []string{"find", "update", "commitTransaction"},
+			"blockConnection": true,
+			"blockTimeMS":     stallBlock.Milliseconds(),
+		}, bson.M{"times": 3})
+
+		start := time.Now()
+		fx.RefreshAfterOperation(testFullName)
+		require.Less(t, time.Since(start), 100*time.Millisecond)
+		within(t, "the schedule", fx.async.Wait)
+		require.Less(t, time.Since(start), stallBlock-time.Second, "bounded by scheduleTimeout")
 	})
 }
