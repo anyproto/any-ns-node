@@ -146,6 +146,13 @@ func (cs *cacheService) refreshOne(ctx context.Context, fullName string, apply b
 
 	switch {
 	case errors.Is(err, errNotFinal):
+		// the record stays as it is; with apply the periodic scan takes it again after the
+		// backoff (a legacy record has no repair_at: nothing else would)
+		if apply {
+			if err := cs.retryLater(ctx, fullName); err != nil {
+				return fmt.Errorf("schedule a retry: %w", err)
+			}
+		}
 		stats.NotFinal++
 		log.Info("refresh: name is not registered at the latest block, not final, keeping it",
 			zap.String("FullName", fullName), zap.Bool("apply", apply), zap.Error(err))

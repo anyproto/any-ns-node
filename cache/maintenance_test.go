@@ -116,6 +116,39 @@ func TestCacheService_RefreshAll(t *testing.T) {
 			require.False(t, cachedItem(t, fx).Removed)
 		})
 
+		t.Run(fmt.Sprintf("apply=%v: a not-final legacy record is retried by the periodic scan (apply only)", apply), func(t *testing.T) {
+			fx := newFixture(t)
+			defer fx.finish(t)
+			// a legacy record: no repair_at
+			_, err := fx.itemColl.InsertOne(ctx, bson.M{"name": testFullName, "owner_eth_address": testEoa, "name_expires": lapsed})
+			require.NoError(t, err)
+
+			fx.setHead(300, time.Now())
+			fx.setFinalized(290, time.Now())
+			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
+			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
+			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(notExpired), nil)
+			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
+			require.NoError(t, err)
+			require.Equal(t, RefreshStats{Total: 1, NotFinal: 1}, stats)
+			item := cachedItem(t, fx)
+			require.Equal(t, testEoa, item.OwnerEthAddress, "the data stays")
+			if !apply {
+				require.Zero(t, item.RepairAt)
+				return
+			}
+			require.Greater(t, item.RepairAt, time.Now().UnixMilli())
+
+			// finality catches up: the scan (no lookup) removes it after the backoff
+			later := time.Now().Add(refreshFailureBackoff + time.Second)
+			fx.now = func() time.Time { return later }
+			fx.setHead(320, time.Now())
+			fx.setFinalized(310, time.Now())
+			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
+			require.Equal(t, 1, repairRound(t, fx))
+			require.True(t, cachedItem(t, fx).Removed)
+		})
+
 		t.Run(fmt.Sprintf("apply=%v: lapsed at the latest block, the finalized block can not be read: failed, not not-final", apply), func(t *testing.T) {
 			fx := newFixture(t)
 			defer fx.finish(t)
