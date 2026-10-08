@@ -366,6 +366,9 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 		before = stored.Rereads
 	}
 	item.Rereads = mergeRereads(before, rereads, item.ObservedAt)
+	// a short hold after the write (the lease it replaces): polls of a completed operation (one
+	// refresh request each) do not read the chain again right away, the re-reads do it later
+	item.RefreshNextAt = max(item.RefreshNextAt, item.ObservedAt+refreshLease.Milliseconds())
 	item.RepairAt = repairAt(&item)
 	switch {
 	case dry:

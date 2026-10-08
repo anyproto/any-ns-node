@@ -113,9 +113,20 @@ func (cs *cacheService) scheduleRereadsAsync(fullName string) {
 // mergeRereads), so repeated polls of an operation can not grow it. the periodic scan runs them
 // (never before the record's lease or backoff)
 func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) error {
+	exited, err := cs.storeRereads(ctx, fullName)
+	// the caller holds a scheduling slot: it is given back only when the transaction really
+	// ended (a commit can outlive the wait), so the cap holds for the transactions themselves
+	<-exited
+	return err
+}
+
+// storeRereads is the write of scheduleRereads; exited is closed when its transaction ended
+func (cs *cacheService) storeRereads(ctx context.Context, fullName string) (<-chan struct{}, error) {
 	name, err := cs.canonical(fullName)
 	if err != nil {
-		return err
+		done := make(chan struct{})
+		close(done)
+		return done, err
 	}
 	times := cs.rereadTimes()
 	_, exited, err := withTxExit(ctx, cs, func(ctx context.Context) (struct{}, error) {
@@ -131,17 +142,10 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 		stored.RepairAt = repairAt(stored)
 		set, unset := bson.M{"rereads": rereads}, bson.M{}
 		setOrUnset(set, unset, "repair_at", stored.RepairAt, stored.RepairAt == 0)
-		update := bson.M{"$set": set}
-		if len(unset) > 0 {
-			update["$unset"] = unset
-		}
-		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, update)
+		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, updateDoc(set, unset))
 		return struct{}{}, err
 	})
-	// the caller holds a scheduling slot: it is given back only when the transaction really
-	// ended (a commit can outlive the wait), so the cap holds for the transactions themselves
-	<-exited
-	return err
+	return exited, err
 }
 
 // rereadTimes: the re-reads of a name changed by an operation completed now
@@ -394,14 +398,27 @@ func (cs *cacheService) refreshAfterOperation(ctx context.Context, fullName stri
 	o := refreshOpts{rereads: cs.rereadTimes()}
 	// the shared lease and the backoff apply here too (repeated polls during an incident must
 	// not multiply the reads): a held record is left to the holder and the scan, its re-reads are
-	// stored anyway (see scheduleRereadsAsync). a name that is not cached has nothing to lease
+	// stored anyway (here, and by scheduleRereadsAsync). a name that is not cached has nothing to
+	// lease
 	claimed, err := cs.claimRefresh(ctx, fullName, cs.now())
 	if err != nil {
 		log.Warn("failed to take the refresh lease after an operation", zap.String("FullName", fullName), zap.Error(err))
 		return
 	}
 	if !claimed {
-		if stored, err := cs.getNameData(ctx, fullName); err != nil || stored != nil {
+		stored, err := cs.getNameData(ctx, fullName)
+		if err != nil {
+			log.Warn("failed to read a name after its operation", zap.String("FullName", fullName), zap.Error(err))
+			return
+		}
+		if stored != nil {
+			// held by another refresh (or just written, or backing off): the operation's re-reads
+			// must be on the record anyway, also if the background schedule of the request was
+			// skipped or timed out. coalesced with it (nothing new: no write). bounded (withTx),
+			// and the worker does not wait for a late commit
+			if _, err := cs.storeRereads(ctx, fullName); err != nil {
+				log.Warn("failed to store the re-reads of a name after its operation", zap.String("FullName", fullName), zap.Error(err))
+			}
 			return
 		}
 	}

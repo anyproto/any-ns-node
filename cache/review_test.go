@@ -67,15 +67,67 @@ func TestCacheService_FailedRefreshRetriedAtTheBackoff(t *testing.T) {
 	_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$unset": bson.M{"rereads": ""}, "$set": bson.M{"repair_at": notExpired * 1000}})
 	require.NoError(t, err)
 
-	// the background: the registry can not be read
+	// the background, after the hold of the write: the registry can not be read
+	start := time.Now().Add(refreshLease + time.Second)
+	fx.now = func() time.Time { return start }
 	fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
-	start := time.Now()
 	require.True(t, fx.refreshLeased(ctx, testFullName))
 
 	item := cachedItem(t, fx)
 	require.Equal(t, 1, item.RefreshFailures)
-	require.GreaterOrEqual(t, item.RepairAt, start.Add(refreshFailureBackoff).UnixMilli())
-	require.LessOrEqual(t, item.RepairAt, time.Now().Add(refreshLease).UnixMilli(), "not at the cached expiry")
+	require.Equal(t, start.Add(refreshFailureBackoff).UnixMilli(), item.RepairAt, "not at the cached expiry")
+}
+
+// b3: polls of a completed operation of a cached name: one chain read, then a short hold; the
+// re-reads are on the record whatever the schedule of the request did
+func TestCacheService_OperationPolls(t *testing.T) {
+	t.Run("repeated polls read the chain once (the hold after the write)", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 10, 0)
+
+		// (one read: a second one fails the test)
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		for i := 0; i < 5; i++ {
+			fx.RefreshAfterOperation(testFullName)
+			fx.async.Wait()
+			require.Equal(t, 1, fx.runQueued())
+		}
+		item := cachedItem(t, fx)
+		require.Len(t, item.Rereads, 2)
+		require.Greater(t, item.RefreshNextAt, time.Now().UnixMilli())
+		require.Equal(t, item.Rereads[0], item.RepairAt)
+
+		// after the hold: read again
+		later := time.Now().Add(refreshLease + time.Second)
+		fx.now = func() time.Time { return later }
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		fx.RefreshAfterOperation(testFullName)
+		fx.async.Wait()
+		require.Equal(t, 1, fx.runQueued())
+	})
+
+	t.Run("held by another node and the request's schedule skipped: the worker stores the re-reads", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 10, 0)
+		other, _ := otherCacheService(t, fx, 1, time.Now())
+		claimed, err := other.claimRefresh(ctx, testFullName, time.Now())
+		require.NoError(t, err)
+		require.True(t, claimed)
+		// no free scheduling slot: scheduleRereadsAsync skips
+		fx.scheduling = make(chan struct{})
+
+		start := time.Now()
+		// (no contracts expectations: a read fails the test)
+		fx.RefreshAfterOperation(testFullName)
+		fx.async.Wait()
+		require.Empty(t, cachedItem(t, fx).Rereads, "skipped by the request")
+		require.Equal(t, 1, fx.runQueued())
+		item := cachedItem(t, fx)
+		require.Len(t, item.Rereads, 2)
+		require.GreaterOrEqual(t, item.Rereads[0], start.Add(5*time.Minute).UnixMilli())
+	})
 }
 
 // b2: the backoff of a record that keeps failing doubles with every failure in a row (up to a
