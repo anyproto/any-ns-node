@@ -85,8 +85,8 @@ func (arpc *anynsRpc) IsNameAvailable(ctx context.Context, in *nsp.NameAvailable
 			FullName: in.FullName,
 		})
 
-		// name is not in the registry -> the cache does not have it as taken (a cached
-		// registration stays until the background confirmed the removal at a finalized block).
+		// name is not in the registry -> nothing is cached for it, or the cached record stays as
+		// it is (a read never removes one: the name stays reserved for its owner).
 		// owner unknown -> the cache has it as taken, without the owner
 		if err != nil && !errors.Is(err, cache.ErrNameNotRegistered) && !errors.Is(err, cache.ErrNameDataIncomplete) {
 			log.Error("failed to update in cache", zap.Error(err))
@@ -187,6 +187,11 @@ func (arpc *anynsRpc) AdminNameRegisterSigned(ctx context.Context, in *nsp.NameR
 	err = verification.CheckRegisterParams(&nrr, useEnsip15)
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
+		return nil, err
+	}
+
+	// 3.1 - the name must not be reserved for another identity
+	if err = cache.CheckReservation(ctx, arpc.cache, nrr.FullName, nrr.OwnerAnyAddress, useEnsip15); err != nil {
 		return nil, err
 	}
 

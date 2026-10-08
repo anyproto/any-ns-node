@@ -671,6 +671,7 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 			//SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), &nsp.NameAvailableRequest{FullName: "hello.any"}).Return(&nsp.NameAvailableResponse{Available: true}, nil)
 		fx.aa.EXPECT().GetDataNameRegister(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (dataOut []byte, contextData []byte, err error) {
 			return []byte("data"), []byte("context"), nil
 		})
@@ -678,6 +679,50 @@ func TestAnynsRpc_GetDataNameRegister(t *testing.T) {
 		pctx := context.Background()
 		_, err := fx.GetDataNameRegister(pctx, &req)
 		assert.NoError(t, err)
+	})
+
+	t.Run("a name reserved for another identity (or cached without an owner) is not offered for signing", func(t *testing.T) {
+		for _, owner := range []string{"A-other", ""} {
+			fx := newFixture(t, "")
+
+			req := nsp.NameRegisterRequest{
+				FullName:        "Hello.any",
+				OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+				OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
+			}
+			fx.cache.EXPECT().IsNameAvailable(gomock.Any(), &nsp.NameAvailableRequest{FullName: "hello.any"}).Return(&nsp.NameAvailableResponse{OwnerAnyAddress: owner}, nil)
+			// (no aa expectations: no calldata is built)
+			_, err := fx.GetDataNameRegister(context.Background(), &req)
+			require.ErrorIs(t, err, cache.ErrNameReserved)
+			fx.finish(t)
+		}
+	})
+
+	t.Run("the same identity (a re-registration after a lapse) is", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+		req := nsp.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
+		}
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).Return(&nsp.NameAvailableResponse{OwnerAnyAddress: req.OwnerAnyAddress}, nil)
+		fx.aa.EXPECT().GetDataNameRegister(gomock.Any(), gomock.Any()).Return([]byte("data"), []byte("context"), nil)
+		_, err := fx.GetDataNameRegister(context.Background(), &req)
+		require.NoError(t, err)
+	})
+
+	t.Run("the cache can not be read: rejected", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+		req := nsp.NameRegisterRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
+		}
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).Return(nil, errors.New("mongo is down"))
+		_, err := fx.GetDataNameRegister(context.Background(), &req)
+		require.Error(t, err)
 	})
 }
 
@@ -741,6 +786,7 @@ func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
 		}
 
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), &nsp.NameAvailableRequest{FullName: "hello.any"}).Return(&nsp.NameAvailableResponse{Available: true}, nil)
 		fx.aa.EXPECT().GetDataNameRegisterForSpace(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (dataOut []byte, contextData []byte, err error) {
 			return []byte("data"), []byte("context"), nil
 		})
@@ -748,6 +794,20 @@ func TestAnynsRpc_GetDataNameRegisterForSpace(t *testing.T) {
 		pctx := context.Background()
 		_, err := fx.GetDataNameRegisterForSpace(pctx, &req)
 		assert.NoError(t, err)
+	})
+
+	t.Run("a name reserved for another identity is not offered for signing", func(t *testing.T) {
+		fx := newFixture(t, "")
+		defer fx.finish(t)
+		req := nsp.NameRegisterForSpaceRequest{
+			FullName:        "hello.any",
+			OwnerEthAddress: "0xe595e2BA3f0cE990d8037e07250c5C78ce40f8fF",
+			OwnerAnyAddress: "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65",
+			SpaceId:         "bafybeibs62gqtignuckfqlcr7lhhihgzh2vorxtmc5afm6uxh4zdcmuwuu",
+		}
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), gomock.Any()).Return(&nsp.NameAvailableResponse{OwnerAnyAddress: "A-other"}, nil)
+		_, err := fx.GetDataNameRegisterForSpace(context.Background(), &req)
+		require.ErrorIs(t, err, cache.ErrNameReserved)
 	})
 }
 

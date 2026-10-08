@@ -12,6 +12,7 @@ import (
 
 	"github.com/anyproto/any-sync/app"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
+	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -154,6 +155,52 @@ func TestAnynsRpc_IsNameAvailable_LapsedName(t *testing.T) {
 			byID, err := fx.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{AnyAddress: testAnyID})
 			require.NoError(t, err)
 			require.True(t, byID.Found)
+		})
+	}
+}
+
+// the reservation check of a registration on the real cache: any record of the name reserves
+// it for its owner (a lapsed one, a 0.7.1 tombstone, one under another spelling); none: allowed
+func TestAnynsRpc_AdminNameRegisterSigned_RealCache(t *testing.T) {
+	const anytypeID = "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+	pctx := peer.CtxWithPeerId(context.Background(), "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+	lapsed := time.Now().Add(-100 * 24 * time.Hour).Unix()
+
+	for _, c := range []struct {
+		name    string
+		record  bson.M
+		allowed bool
+	}{
+		{"lapsed, another identity", bson.M{"owner_any_address": "A-other", "name_expires": lapsed, "lapsed": true}, false},
+		{"lapsed, the same identity", bson.M{"owner_any_address": anytypeID, "name_expires": lapsed, "lapsed": true}, true},
+		{"a 0.7.1 tombstone", bson.M{"removed": true, "observed_block": int64(10)}, false},
+		{"under another spelling, another identity", bson.M{"name": "HELLO.any", "owner_any_address": "A-other", "name_expires": lapsed}, false},
+		{"none", nil, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fx := newFixture(t, true)
+			defer fx.finish(t)
+			cs, _, coll := newRealCache(t)
+			fx.anynsRpc.cache = cs
+			if c.record != nil {
+				doc := bson.M{"name": "hello.any"}
+				for k, v := range c.record {
+					doc[k] = v
+				}
+				_, err := coll.InsertOne(ctx, doc)
+				require.NoError(t, err)
+			}
+			if c.allowed {
+				fx.aa.EXPECT().AdminNameRegister(gomock.Any(), gomock.Any()).Return("operation-id", nil)
+				fx.db.EXPECT().SaveOperation(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			}
+
+			_, err := fx.AdminNameRegisterSigned(pctx, adminRegisterRequest(t, anytypeID))
+			if c.allowed {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, cache.ErrNameReserved)
+			}
 		})
 	}
 }

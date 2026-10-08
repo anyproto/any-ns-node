@@ -371,6 +371,10 @@ func (arpc *anynsAARpc) GetDataNameRegister(ctx context.Context, in *nsp.NameReg
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, errors.New("invalid parameters")
 	}
+	// a name reserved for another identity is never offered for signing (see CheckReservation)
+	if err = cache.CheckReservation(ctx, arpc.cache, in.FullName, in.OwnerAnyAddress, useEnsip15); err != nil {
+		return nil, err
+	}
 
 	// 2 - get data to sign
 	dataOut, contextData, err := arpc.aa.GetDataNameRegister(ctx, in)
@@ -396,6 +400,9 @@ func (arpc *anynsAARpc) GetDataNameRegisterForSpace(ctx context.Context, in *nsp
 	if err != nil {
 		log.Error("invalid parameters", zap.Error(err))
 		return nil, errors.New("invalid parameters")
+	}
+	if err = cache.CheckReservation(ctx, arpc.cache, in.FullName, in.OwnerAnyAddress, useEnsip15); err != nil {
+		return nil, err
 	}
 
 	// 2 - get data to sign

@@ -46,6 +46,10 @@ var errLapsed = errors.New("the name has lapsed")
 // cached and the record is marked refresh_needed, so lookups keep reporting the name as taken
 var ErrNameDataIncomplete = errors.New("name is registered, but its owner could not be read")
 
+// ErrNameReserved is returned by CheckReservation for a registration of a name that the cache has
+// for another identity
+var ErrNameReserved = errors.New("the name is reserved for another identity")
+
 var log = logger.NewNamed(CName)
 
 type NameDataItem struct {
@@ -472,6 +476,32 @@ func (cs *cacheService) UpdateInCacheAfterOperation(ctx context.Context, in *nsp
 func (cs *cacheService) RefreshAfterOperation(fullName string) {
 	cs.scheduleRereadsAsync(fullName)
 	cs.requestRefresh(refreshRequest{name: fullName, afterOp: true})
+}
+
+// CheckReservation checks that the identity ownerAnyID may register the name: a name stays reserved to the
+// identity that registered it, even after it lapsed on chain: the cache is the record of who holds
+// a name (every registration goes through an operation of ours), so any record of the name (a
+// lapsed one, a 0.7.1 tombstone, one under another spelling) reserves it. no record, or the same
+// owner (a re-registration after a lapse, the payment node's renew-past-grace fallback): nil.
+// a record without an owner (a tombstone, an incomplete read): ErrNameReserved. a cache that can
+// not be read: an error too (fail closed, the caller retries). moving a name to another identity
+// is a support action (-release-name)
+func CheckReservation(ctx context.Context, cs CacheService, fullName, ownerAnyID string, ensip15 bool) error {
+	name, err := contracts.NormalizeAnyName(fullName, ensip15)
+	if err != nil {
+		return fmt.Errorf("normalize the name %q: %w", fullName, err)
+	}
+	cached, err := cs.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: name})
+	if err != nil {
+		log.Error("failed to check the name in the cache", zap.String("FullName", name), zap.Error(err))
+		return fmt.Errorf("check the name in the cache: %w", err)
+	}
+	if cached.Available || (ownerAnyID != "" && cached.OwnerAnyAddress == ownerAnyID) {
+		return nil
+	}
+	log.Warn("a registration of a name reserved for another identity", zap.String("FullName", name),
+		zap.String("owner", cached.OwnerAnyAddress), zap.String("requested for", ownerAnyID))
+	return fmt.Errorf("%w: %s", ErrNameReserved, name)
 }
 
 // canonical is the spelling of the name that the registration uses (and the cache key)
