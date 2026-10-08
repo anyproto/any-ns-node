@@ -49,14 +49,27 @@ func (cs *cacheService) observation(fullName string, block *contracts.Block) *Na
 	}
 }
 
+// registration: what the registrar says about the name at a block
+type registration int
+
+const (
+	// never registered (no registry owner, no expiry)
+	regNotRegistered registration = iota
+	// registered (in the grace period too)
+	regRegistered
+	// expired and past the grace period: the registrar would let anyone register it again
+	regLapsed
+)
+
 // readRegistration: is the name registered (not available at the registrar) at the block?
 // returns the registry owner (zero: a reserved name, see below) and nameExpires if it is
-func (cs *cacheService) readRegistration(ctx context.Context, fullName string, nh [32]byte, block *contracts.Block) (owner common.Address, expires int64, registered bool, err error) {
+// registered or lapsed
+func (cs *cacheService) readRegistration(ctx context.Context, fullName string, nh [32]byte, block *contracts.Block) (owner common.Address, expires int64, state registration, err error) {
 	addr, err := cs.contracts.GetOwnerForNamehash(ctx, nh, block.Hash)
 	if err != nil {
 		if err.Error() != "not found" {
 			log.Error("can not get owner", zap.Error(err))
-			return common.Address{}, 0, false, err
+			return common.Address{}, 0, regNotRegistered, err
 		}
 		// the registry has nothing for that name: the same as a zero owner
 		addr = common.Address{}
@@ -67,47 +80,45 @@ func (cs *cacheService) readRegistration(ctx context.Context, fullName string, n
 	exp, err := cs.contracts.GetNameExpires(ctx, fullName, block.Hash)
 	if err != nil {
 		log.Error("failed to get expiration of the name", zap.Error(err))
-		return common.Address{}, 0, false, err
+		return common.Address{}, 0, regNotRegistered, err
 	}
 	noExpiry := exp == nil || exp.Sign() <= 0
 
-	if (addr == common.Address{}) {
-		if noExpiry {
-			// never registered (right after a registration this can also mean that the
-			// provider has simply not caught up yet: not necessarily a free name)
-			log.Warn("registry has no owner for the name", zap.String("FullName", fullName), zap.Int64("block", block.Number))
-			return common.Address{}, 0, false, nil
-		}
-		if isLapsed(exp.Int64(), time.Unix(int64(block.Time), 0)) {
-			return common.Address{}, 0, false, nil
-		}
-		log.Info("the name has no registry owner, but the registrar still reserves it",
-			zap.String("FullName", fullName), zap.Int64("NameExpires", exp.Int64()), zap.Int64("block", block.Number))
-		return common.Address{}, exp.Int64(), true, nil
-	}
-
 	// the registry has an owner, the registrar has no expiry: the two reads disagree (e.g. a
 	// label hashed in another spelling). never a lapse: nothing is concluded from it
-	if noExpiry {
+	if (addr != common.Address{}) && noExpiry {
 		log.Error("the registry has an owner, but the registrar has no expiry", zap.String("FullName", fullName), zap.Int64("block", block.Number))
-		return common.Address{}, 0, false, fmt.Errorf("%w: %s at block %d", errInconsistentRegistry, fullName, block.Number)
+		return common.Address{}, 0, regNotRegistered, fmt.Errorf("%w: %s at block %d", errInconsistentRegistry, fullName, block.Number)
+	}
+	if noExpiry {
+		// never registered (right after a registration this can also mean that the
+		// provider has simply not caught up yet: not necessarily a free name)
+		log.Warn("registry has no owner for the name", zap.String("FullName", fullName), zap.Int64("block", block.Number))
+		return common.Address{}, 0, regNotRegistered, nil
 	}
 
-	// a lapsed name stays in the registry (owned by the NameWrapper), but the registrar
-	// lets anyone register it again: it is free, whatever the previous owner was
+	// a lapsed name stays in the registry (owned by the NameWrapper, or reclaimed to zero), the
+	// registrar would let anyone register it again. the cache keeps it reserved for its owner
 	if isLapsed(exp.Int64(), time.Unix(int64(block.Time), 0)) {
 		log.Info("name has lapsed (expired and past the grace period)",
 			zap.String("FullName", fullName), zap.Int64("NameExpires", exp.Int64()), zap.Int64("block", block.Number))
-		return common.Address{}, 0, false, nil
+		return addr, exp.Int64(), regLapsed, nil
 	}
-	return addr, exp.Int64(), true, nil
+	if (addr == common.Address{}) {
+		log.Info("the name has no registry owner, but the registrar still reserves it",
+			zap.String("FullName", fullName), zap.Int64("NameExpires", exp.Int64()), zap.Int64("block", block.Number))
+	}
+	return addr, exp.Int64(), regRegistered, nil
 }
 
 // readNameData reads everything we cache about the name from the contracts at the latest block:
 // the block header is fetched once, and every read is pinned to it by its hash. it writes nothing.
 //   - nil and an error: nothing could be confirmed
-//   - an observation and ErrNameNotRegistered: the name is free at the latest block (no owner in
-//     the registry, or lapsed). a single read, not final
+//   - an observation and ErrNameNotRegistered: the name was never registered at the latest block
+//     (no owner in the registry, no expiry). a single read
+//   - a lapsed observation (Lapsed: the expiry, the registry owner and the block, nothing else)
+//     and errLapsed: after a lapse the NameWrapper no longer reports the owner, so the owner,
+//     AnyID and space ID are not read (they would fail forever): the cache keeps its own
 //   - an incomplete observation (RefreshNeeded) and ErrNameDataIncomplete: registered, the owner
 //     could not be read
 //   - an observation and nil
@@ -131,15 +142,19 @@ func (cs *cacheService) readNameData(ctx context.Context, fullName string) (*Nam
 	obs := cs.observation(fullName, head)
 
 	log.Info("getting owner for name", zap.String("FullName", fullName), zap.Int64("block", head.Number))
-	addr, exp, registered, err := cs.readRegistration(confirmCtx, fullName, nh, head)
+	addr, exp, state, err := cs.readRegistration(confirmCtx, fullName, nh, head)
 	if err != nil {
 		return nil, err
 	}
-	if !registered {
+	if state == regNotRegistered {
 		return obs, ErrNameNotRegistered
 	}
 	obs.NameExpires = exp
 	obs.RegistryOwner = strings.ToLower(addr.Hex())
+	if state == regLapsed {
+		obs.Lapsed = true
+		return obs, errLapsed
+	}
 	if (addr == common.Address{}) {
 		// reserved without a registry owner: taken, nobody owns it (complete as it is)
 		return obs, nil

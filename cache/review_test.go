@@ -28,7 +28,7 @@ func TestCacheService_ReservedWithoutRegistryOwner(t *testing.T) {
 		seedItem(t, fx, notExpired, 10, 0)
 
 		noOwner(fx, notExpired, 1)
-		require.NoError(t, fx.updateConfirmed())
+		require.NoError(t, fx.refreshName())
 		item := cachedItem(t, fx)
 		require.False(t, item.Removed)
 		require.False(t, item.Incomplete)
@@ -62,26 +62,89 @@ func TestCacheService_ReservedWithoutRegistryOwner(t *testing.T) {
 func TestCacheService_FailedRefreshRetriedAtTheBackoff(t *testing.T) {
 	fx := newFixture(t)
 	defer fx.finish(t)
-	// a renewal (a year) that was reorged away: cached, its scan at the expiry
 	expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
 	require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
 	_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$unset": bson.M{"rereads": ""}, "$set": bson.M{"repair_at": notExpired * 1000}})
 	require.NoError(t, err)
 
-	// the background: no owner at the latest block, the finalized block is behind: not final
-	fx.setHead(2000, time.Now())
-	fx.setFinalized(1000, time.Now())
-	fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(2000)).Return(common.Address{}, nil)
-	fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(2000)).Return(big.NewInt(0), nil)
-	fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(1000)).Return(common.HexToAddress(nameWrapper), nil)
-	fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(1000)).Return(big.NewInt(notExpired), nil)
+	// the background: the registry can not be read
+	fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
 	start := time.Now()
 	require.True(t, fx.refreshLeased(ctx, testFullName))
 
 	item := cachedItem(t, fx)
-	require.False(t, item.Removed)
+	require.Equal(t, 1, item.RefreshFailures)
 	require.GreaterOrEqual(t, item.RepairAt, start.Add(refreshFailureBackoff).UnixMilli())
 	require.LessOrEqual(t, item.RepairAt, time.Now().Add(refreshLease).UnixMilli(), "not at the cached expiry")
+}
+
+// b2: the backoff of a record that keeps failing doubles with every failure in a row (up to a
+// day); a successful write resets it
+func TestCacheService_FailureBackoffGrowsAndResets(t *testing.T) {
+	t.Run("failed background refreshes", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 10, 0)
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"refresh_needed": true, "repair_at": int64(1)}})
+		require.NoError(t, err)
+		// a short lease: what holds the record is the backoff
+		old := refreshLease
+		refreshLease = time.Millisecond
+		defer func() { refreshLease = old }()
+
+		at := time.Now()
+		for i, want := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute} {
+			fx.now = func() time.Time { return at }
+			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
+			require.Equal(t, 1, repairRound(t, fx), "failure %d", i+1)
+			item := cachedItem(t, fx)
+			require.Equal(t, i+1, item.RefreshFailures)
+			require.Equal(t, at.Add(want).UnixMilli(), item.RefreshNextAt, "failure %d", i+1)
+			require.Equal(t, item.RefreshNextAt, item.RepairAt)
+			// not before the backoff
+			fx.now = func() time.Time { return at.Add(want - time.Second) }
+			require.Zero(t, repairRound(t, fx))
+			at = at.Add(want + time.Second)
+		}
+
+		// a success resets it
+		fx.now = func() time.Time { return at }
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.Equal(t, 1, repairRound(t, fx))
+		item := cachedItem(t, fx)
+		require.Zero(t, item.RefreshFailures)
+		require.False(t, item.RefreshNeeded)
+		_, ok := rawItem(t, fx, testFullName)["refresh_failures"]
+		require.False(t, ok)
+	})
+
+	t.Run("failed refreshes after operations (markRefreshNeeded), capped at a day", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 10, 0)
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"refresh_failures": 20}})
+		require.NoError(t, err)
+		at := time.Now()
+		fx.now = func() time.Time { return at }
+		require.NoError(t, fx.markRefreshNeeded(ctx, testFullName, nil))
+		item := cachedItem(t, fx)
+		require.Equal(t, 21, item.RefreshFailures)
+		require.Equal(t, at.Add(maxFailureBackoff).UnixMilli(), item.RefreshNextAt)
+	})
+
+	t.Run("incomplete reads in a row back off too", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		for i, want := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute} {
+			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
+			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(notExpired), nil)
+			fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), testFullName, gomock.Any()).Return("", "", "", errors.New("rpc is down"))
+			require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+			item := cachedItem(t, fx)
+			require.Equal(t, i+1, item.RefreshFailures)
+			require.Equal(t, item.ObservedAt+want.Milliseconds(), item.RefreshNextAt)
+		}
+	})
 }
 
 // c: completeness (what orders two reads of one block) is separate from the retry flag; an
@@ -159,9 +222,9 @@ func TestCacheService_IncompleteReads(t *testing.T) {
 func TestCacheService_ChangedStateSchedulesRereads(t *testing.T) {
 	fx := newFixture(t)
 	defer fx.finish(t)
-	_, err := fx.applyObservation(ctx, &NameDataItem{FullName: testFullName, Removed: true,
-		ObservedBlock: 500, ObservedBlockHash: blockHash(500).Hex(), ObservedAt: time.Now().Add(-time.Hour).UnixMilli()}, refreshOpts{})
-	require.NoError(t, err)
+	// a 0.7.1 tombstone
+	insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": int64(500),
+		"observed_block_hash": blockHash(500).Hex(), "observed_at": time.Now().Add(-time.Hour).UnixMilli()})
 	require.Empty(t, cachedItem(t, fx).Rereads)
 
 	start := time.Now()
@@ -183,20 +246,19 @@ func TestCacheService_ChangedStateSchedulesRereads(t *testing.T) {
 	require.Len(t, cachedItem(t, fx).Rereads, 1)
 }
 
-// e: aliases are never deleted automatically next to a tombstone: they keep the name taken and
-// are reported
+// e: aliases are never deleted automatically next to a lapsed record or a tombstone: they keep
+// the name taken and are reported
 func TestCacheService_AliasesNextToTombstonesStay(t *testing.T) {
-	t.Run("a confirmed removal leaves a legacy alias, the name stays taken", func(t *testing.T) {
+	t.Run("a lapse leaves a legacy alias, the name stays taken", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seedItem(t, fx, lapsed, 10, 0)
 		insertRaw(t, fx, aliasDoc(testAnyID, 0))
 
 		fx.setHead(300, time.Now())
-		fx.setFinalized(290, time.Now())
 		expectLapsed(fx.contracts)
-		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
-		require.True(t, cachedItem(t, fx).Removed)
+		require.NoError(t, fx.refreshName())
+		require.True(t, cachedItem(t, fx).Lapsed)
 		require.EqualValues(t, 1, aliasCount(t, fx))
 		require.False(t, isNameAvailable(t, fx.cacheService).Available)
 	})
@@ -254,11 +316,15 @@ func TestCacheService_CanonField(t *testing.T) {
 		// the canonical name was removed at block 10; the alias was read at a later block 20
 		insertRaw(t, fx, bson.M{"name": canonical, "removed": true, "observed_block": int64(10), "canon": canonical})
 		insertRaw(t, fx, bson.M{"name": puny, "owner_eth_address": testEoa, "name_expires": notExpired, "observed_block": int64(20)})
-		require.True(t, lookup(fx).Available, "no canon yet: the collation fallback can not see it")
+		// no canon yet: the collation fallback can not see the alias, the tombstone keeps the name
+		// taken (without an owner)
+		out := lookup(fx)
+		require.False(t, out.Available)
+		require.Empty(t, out.OwnerEthAddress)
 
 		stats := migrate(t, fx, true)
 		require.Equal(t, []string{puny}, stats.Kept)
-		out := lookup(fx)
+		out = lookup(fx)
 		require.False(t, out.Available)
 		require.Equal(t, testEoa, out.OwnerEthAddress)
 	})

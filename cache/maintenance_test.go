@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestCacheService_RefreshAll(t *testing.T) {
 		for _, n := range []struct {
 			name    string
 			expires int64
-		}{{"renewed.any", inGrace}, {"lapsed.any", lapsed}, {"broken.any", inGrace}} {
+		}{{"renewed.any", inGrace}, {"lapsed.any", inGrace}, {"broken.any", inGrace}, {"ghost.any", notExpired}} {
 			require.NoError(t, fx.setNameData(ctx, &NameDataItem{
 				FullName: n.name, OwnerEthAddress: testEoa, OwnerScwEthAddress: testScw, OwnerAnyAddress: testAnyID,
 				NameExpires: n.expires,
@@ -34,14 +35,21 @@ func TestCacheService_RefreshAll(t *testing.T) {
 		}
 	}
 
+	// one read per name, at the latest block: no finalized read, no enrichment for a lapse
+	ghost, err := contracts.NameHash("ghost.any")
+	require.NoError(t, err)
+	// never registered on chain (first: the other owner reads match any name)
+	expectGhost := func(fx *fixture) {
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), ghost, gomock.Any()).Return(common.Address{}, nil)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), "ghost.any", gomock.Any()).Return(big.NewInt(0), nil)
+	}
 	expectContracts := func(fx *fixture) {
-		// the lapsed name is read again at the finalized block before it is removed (or before
-		// the dry run says it would be)
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(4)
+		expectGhost(fx)
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(3)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), "renewed.any", gomock.Any()).Return(big.NewInt(notExpired), nil)
 		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), "renewed.any", gomock.Any()).Return(testScw, testAnyID, "", nil)
 		fx.contracts.EXPECT().GetScwOwner(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(testEoa), nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), "lapsed.any", gomock.Any()).Return(big.NewInt(lapsed), nil).Times(2)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), "lapsed.any", gomock.Any()).Return(big.NewInt(lapsed), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), "broken.any", gomock.Any()).Return(nil, errors.New("rpc is down"))
 	}
 
@@ -59,14 +67,14 @@ func TestCacheService_RefreshAll(t *testing.T) {
 
 		stats, err := fx.RefreshAll(ctx, false, time.Millisecond)
 		require.NoError(t, err)
-		require.Equal(t, RefreshStats{Total: 3, Updated: 1, Removed: 1, Failed: 1}, stats)
+		require.Equal(t, RefreshStats{Total: 4, Updated: 1, Lapsed: 1, NotOnChain: 1, Failed: 1}, stats)
 
 		require.Equal(t, inGrace, get(t, fx, "renewed.any").NameExpires)
-		require.False(t, get(t, fx, "lapsed.any").Removed)
+		require.False(t, get(t, fx, "lapsed.any").Lapsed)
 		require.Zero(t, get(t, fx, "renewed.any").ObservedBlock)
 	})
 
-	t.Run("apply: stale records updated, lapsed ones become tombstones", func(t *testing.T) {
+	t.Run("apply: stale records updated, lapsed ones marked (the owner stays), nothing removed", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seed(t, fx)
@@ -74,19 +82,30 @@ func TestCacheService_RefreshAll(t *testing.T) {
 
 		stats, err := fx.RefreshAll(ctx, true, time.Millisecond)
 		require.NoError(t, err)
-		require.Equal(t, RefreshStats{Total: 3, Updated: 1, Removed: 1, Failed: 1}, stats)
+		require.Equal(t, RefreshStats{Total: 4, Updated: 1, Lapsed: 1, NotOnChain: 1, Failed: 1}, stats)
 
 		renewed := get(t, fx, "renewed.any")
 		require.Equal(t, notExpired, renewed.NameExpires)
 		require.NotZero(t, renewed.ObservedBlock)
-		// the backfill schedules the scan of legacy records (a changed one: its re-reads first)
+		// a changed one: its re-reads
 		require.Len(t, renewed.Rereads, 2)
 		require.Equal(t, renewed.Rereads[0], renewed.RepairAt)
-		require.True(t, get(t, fx, "lapsed.any").Removed)
-		// a failed read leaves the record as it was
+		l := get(t, fx, "lapsed.any")
+		require.True(t, l.Lapsed)
+		require.Equal(t, lapsed, l.NameExpires)
+		require.Equal(t, testAnyID, l.OwnerAnyAddress)
+		require.Zero(t, l.RepairAt)
+		// a failed read, a name the chain never had: the records as they were
 		require.Equal(t, inGrace, get(t, fx, "broken.any").NameExpires)
+		ghost := get(t, fx, "ghost.any")
+		require.Equal(t, testAnyID, ghost.OwnerAnyAddress)
+		require.Zero(t, ghost.RepairAt)
+		n, err := fx.itemColl.CountDocuments(ctx, bson.M{})
+		require.NoError(t, err)
+		require.EqualValues(t, 4, n)
 
-		// a second run: the tombstone is unchanged (no finalized read for it)
+		// a second run: the lapsed one is kept lapsed, the rest unchanged
+		expectGhost(fx)
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(3)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), "renewed.any", gomock.Any()).Return(big.NewInt(notExpired), nil)
 		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), "renewed.any", gomock.Any()).Return(testScw, testAnyID, "", nil)
@@ -97,120 +116,10 @@ func TestCacheService_RefreshAll(t *testing.T) {
 		fx.contracts.EXPECT().GetScwOwner(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(testEoa), nil)
 		stats, err = fx.RefreshAll(ctx, true, time.Millisecond)
 		require.NoError(t, err)
-		require.Equal(t, RefreshStats{Total: 3, Unchanged: 3}, stats)
+		require.Equal(t, RefreshStats{Total: 4, Unchanged: 2, Lapsed: 1, NotOnChain: 1}, stats)
 	})
 
 	for _, apply := range []bool{false, true} {
-		t.Run(fmt.Sprintf("apply=%v: lapsed at the latest block, registered at the finalized one: not final, kept", apply), func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
-			seedItem(t, fx, inGrace, 10, 0)
-
-			fx.setHead(300, time.Now())
-			fx.setFinalized(290, time.Now())
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(300)).Return(big.NewInt(lapsed), nil)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(inGrace), nil)
-
-			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
-			require.NoError(t, err)
-			require.Equal(t, RefreshStats{Total: 1, NotFinal: 1}, stats)
-			require.False(t, cachedItem(t, fx).Removed)
-		})
-
-		t.Run(fmt.Sprintf("apply=%v: a not-final legacy record is retried by the periodic scan (apply only)", apply), func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
-			// a legacy record: no repair_at
-			_, err := fx.itemColl.InsertOne(ctx, bson.M{"name": testFullName, "owner_eth_address": testEoa, "name_expires": lapsed})
-			require.NoError(t, err)
-
-			fx.setHead(300, time.Now())
-			fx.setFinalized(290, time.Now())
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), blockHash(300)).Return(big.NewInt(0), nil)
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(notExpired), nil)
-			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
-			require.NoError(t, err)
-			require.Equal(t, RefreshStats{Total: 1, NotFinal: 1}, stats)
-			item := cachedItem(t, fx)
-			require.Equal(t, testEoa, item.OwnerEthAddress, "the data stays")
-			if !apply {
-				require.Zero(t, item.RepairAt)
-				return
-			}
-			require.Greater(t, item.RepairAt, time.Now().UnixMilli())
-			require.Equal(t, item.RefreshNextAt, item.RepairAt, "backing off: no lookup or scan takes it before")
-			require.Zero(t, repairRound(t, fx))
-
-			// finality catches up: the scan (no lookup) removes it after the backoff
-			later := time.Now().Add(refreshFailureBackoff + time.Second)
-			fx.now = func() time.Time { return later }
-			fx.setHead(320, time.Now())
-			fx.setFinalized(310, time.Now())
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil).Times(2)
-			require.Equal(t, 1, repairRound(t, fx))
-			require.True(t, cachedItem(t, fx).Removed)
-		})
-
-		t.Run(fmt.Sprintf("apply=%v: a not-final record that was already overdue backs off too", apply), func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
-			seedItem(t, fx, inGrace, 10, 0)
-			_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"repair_at": int64(1)}})
-			require.NoError(t, err)
-
-			fx.setHead(300, time.Now())
-			fx.setFinalized(290, time.Now())
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(300)).Return(big.NewInt(lapsed), nil)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(inGrace), nil)
-			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
-			require.NoError(t, err)
-			require.Equal(t, RefreshStats{Total: 1, NotFinal: 1}, stats)
-
-			item := cachedItem(t, fx)
-			if !apply {
-				require.Equal(t, int64(1), item.RepairAt)
-				return
-			}
-			require.Greater(t, item.RefreshNextAt, time.Now().Add(refreshFailureBackoff-10*time.Second).UnixMilli())
-			require.Equal(t, item.RefreshNextAt, item.RepairAt)
-			require.Zero(t, repairRound(t, fx), "not before the backoff")
-			require.False(t, needsRefresh(item, time.Now()), "nor a lookup")
-		})
-
-		t.Run(fmt.Sprintf("apply=%v: lapsed at the latest block, the finalized block can not be read: failed, not not-final", apply), func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
-			seedItem(t, fx, inGrace, 10, 0)
-
-			fx.setFinalizedErr(errors.New("unknown block tag"))
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil)
-
-			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
-			require.NoError(t, err)
-			require.Equal(t, RefreshStats{Total: 1, Failed: 1}, stats)
-			require.False(t, cachedItem(t, fx).Removed)
-		})
-
-		t.Run(fmt.Sprintf("apply=%v: a lagging provider: a removal older than the cached registration is not final", apply), func(t *testing.T) {
-			fx := newFixture(t)
-			defer fx.finish(t)
-			seedItem(t, fx, notExpired, 200, 0)
-			fx.setHead(150, time.Now())
-			fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
-			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil).Times(2)
-
-			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
-			require.NoError(t, err)
-			require.Equal(t, RefreshStats{Total: 1, NotFinal: 1}, stats)
-			require.Equal(t, int64(200), cachedItem(t, fx).ObservedBlock)
-		})
-
 		t.Run(fmt.Sprintf("apply=%v: the owner can not be read: failed", apply), func(t *testing.T) {
 			fx := newFixture(t)
 			defer fx.finish(t)
@@ -312,53 +221,183 @@ func TestCacheService_VerifyNameIndex(t *testing.T) {
 	})
 }
 
-func TestCacheService_PurgeTombstones(t *testing.T) {
+func TestCacheService_ReleaseName(t *testing.T) {
 	seed := func(t *testing.T, fx *fixture) {
-		_, err := fx.itemColl.InsertMany(ctx, []interface{}{
-			NameDataItem{FullName: "a.any", Removed: true, ObservedBlock: 10},
-			NameDataItem{FullName: "b.any", Removed: true, ObservedBlock: 11},
-			NameDataItem{FullName: "c.any", OwnerEthAddress: testEoa, NameExpires: notExpired, ObservedBlock: 12},
-			// marked after a failed refresh, its data is complete: an old node serves it fine
-			NameDataItem{FullName: "d.any", OwnerEthAddress: testEoa, NameExpires: notExpired, RefreshNeeded: true},
-		})
-		require.NoError(t, err)
+		seedItem(t, fx, lapsed, 10, 0)
+		insertRaw(t, fx, bson.M{"name": "other.any", "owner_any_address": otherAnyID, "name_expires": notExpired})
+		insertRaw(t, fx, aliasDoc(otherAnyID, 0))
 	}
-	count := func(t *testing.T, fx *fixture, filter bson.M) int64 {
-		n, err := fx.itemColl.CountDocuments(ctx, filter)
+	count := func(t *testing.T, fx *fixture) int64 {
+		n, err := fx.itemColl.CountDocuments(ctx, bson.M{})
 		require.NoError(t, err)
 		return n
 	}
 
-	t.Run("dry run counts, apply deletes the tombstones only", func(t *testing.T) {
+	t.Run("dry run: the record and the aliases are reported, nothing is deleted", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seed(t, fx)
 
-		stats, err := fx.PurgeTombstones(ctx, false)
+		stats, err := fx.ReleaseName(ctx, "TEST.any", false)
 		require.NoError(t, err)
-		require.Equal(t, PurgeStats{Tombstones: 2}, stats)
-		require.EqualValues(t, 4, count(t, fx, bson.M{}))
-
-		stats, err = fx.PurgeTombstones(ctx, true)
-		require.NoError(t, err)
-		require.Equal(t, PurgeStats{Tombstones: 2}, stats)
-		require.EqualValues(t, 2, count(t, fx, bson.M{}))
-		require.Zero(t, count(t, fx, bson.M{"removed": true}))
+		require.Equal(t, testFullName, stats.Name)
+		require.Equal(t, testAnyID, stats.Record.OwnerAnyAddress)
+		require.Equal(t, []string{testAlias}, stats.Aliases)
+		require.False(t, stats.Deleted)
+		require.EqualValues(t, 3, count(t, fx))
 	})
 
-	t.Run("refused while a record has no owner (an old node would serve it so forever)", func(t *testing.T) {
+	t.Run("apply deletes exactly that record: the name can be registered again", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seed(t, fx)
-		_, err := fx.itemColl.InsertOne(ctx, NameDataItem{FullName: "e.any", OwnerScwEthAddress: testScw, NameExpires: notExpired, RefreshNeeded: true})
-		require.NoError(t, err)
 
-		for _, apply := range []bool{false, true} {
-			stats, err := fx.PurgeTombstones(ctx, apply)
-			require.ErrorIs(t, err, ErrIncompleteRecords)
-			require.Equal(t, []string{"e.any"}, stats.Incomplete)
+		stats, err := fx.ReleaseName(ctx, testFullName, true)
+		require.NoError(t, err)
+		require.True(t, stats.Deleted)
+		require.Nil(t, cachedItem(t, fx))
+		require.EqualValues(t, 2, count(t, fx))
+		require.EqualValues(t, 1, aliasCount(t, fx), "an alias is never deleted")
+		// (the alias still keeps the name taken: for the operator)
+		require.False(t, isNameAvailable(t, fx.cacheService).Available)
+
+		require.NoError(t, fx.itemColl.Database().Collection(fx.itemColl.Name()).FindOneAndDelete(ctx, bson.M{"name": testAlias}).Err())
+		require.True(t, isNameAvailable(t, fx.cacheService).Available)
+	})
+
+	t.Run("not cached: ErrNameNotCached, nothing deleted", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seed(t, fx)
+		stats, err := fx.ReleaseName(ctx, "nobody.any", true)
+		require.ErrorIs(t, err, ErrNameNotCached)
+		require.Nil(t, stats.Record)
+		require.EqualValues(t, 3, count(t, fx))
+	})
+}
+
+func TestCacheService_RestoreTombstones(t *testing.T) {
+	// a mongoexport of the cache before 0.7.1 wiped the tombstones: canonical and relaxed
+	// Extended JSON, an owner in another case, a record without an owner, a tombstone already
+	export := strings.Join([]string{
+		`{"_id":{"$oid":"6700000000000000000000a1"},"name":"a.any","owner_eth_address":"0xAA","owner_scw_eth_address":"0xBB","owner_any_address":"A-owner","space_id":"space-a","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a2"},"name":"b.any","owner_eth_address":"0xcc","owner_scw_eth_address":"","owner_any_address":"B-owner","space_id":"","name_expires":` + fmt.Sprint(notExpired) + `}`,
+		``,
+		`{"_id":{"$oid":"6700000000000000000000a3"},"name":"c.any","owner_eth_address":"","owner_any_address":"","name_expires":{"$numberLong":"0"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a4"},"name":"d.any","removed":true,"observed_block":{"$numberLong":"5"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a5"},"name":"e.any","owner_eth_address":"0xee","owner_any_address":"E-owner","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+	}, "\n")
+	seed := func(t *testing.T, fx *fixture) {
+		for _, name := range []string{"a.any", "b.any", "c.any", "d.any", "missing.any"} {
+			insertRaw(t, fx, bson.M{"name": name, "removed": true, "observed_block": int64(700),
+				"observed_block_hash": blockHash(700).Hex(), "owner_eth_address": "", "owner_any_address": "", "name_expires": int64(0)})
 		}
-		require.EqualValues(t, 2, count(t, fx, bson.M{"removed": true}))
+		// not a tombstone (any more): never touched
+		insertRaw(t, fx, bson.M{"name": "e.any", "owner_any_address": "E-new", "name_expires": notExpired, "observed_block": int64(800)})
+	}
+	get := func(t *testing.T, fx *fixture, name string) *NameDataItem {
+		item, err := fx.getNameData(ctx, name)
+		require.NoError(t, err)
+		return item
+	}
+	wantMissing := []string{"c.any", "d.any", "missing.any"}
+
+	t.Run("dry run: counts, writes nothing", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seed(t, fx)
+		var before []bson.M
+		cur, err := fx.itemColl.Find(ctx, bson.M{})
+		require.NoError(t, err)
+		require.NoError(t, cur.All(ctx, &before))
+
+		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), false)
+		require.NoError(t, err)
+		require.Equal(t, RestoreStats{Tombstones: 5, Restored: 2, Missing: wantMissing}, stats)
+
+		var after []bson.M
+		cur, err = fx.itemColl.Find(ctx, bson.M{})
+		require.NoError(t, err)
+		require.NoError(t, cur.All(ctx, &after))
+		require.Equal(t, before, after)
+	})
+
+	t.Run("apply: owners restored (lapsed or marked for one read), missing ones listed and left", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seed(t, fx)
+
+		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), true)
+		require.NoError(t, err)
+		require.Equal(t, RestoreStats{Tombstones: 5, Restored: 2, Missing: wantMissing}, stats)
+
+		a := get(t, fx, "a.any")
+		require.False(t, a.Removed)
+		require.True(t, a.Lapsed)
+		require.False(t, a.RefreshNeeded)
+		require.Equal(t, "0xaa", a.OwnerEthAddress)
+		require.Equal(t, "0xbb", a.OwnerScwEthAddress)
+		require.Equal(t, "A-owner", a.OwnerAnyAddress)
+		require.Equal(t, "space-a", a.SpaceId)
+		require.Equal(t, lapsed, a.NameExpires)
+		require.Equal(t, "a.any", a.Canon)
+		require.Equal(t, int64(700), a.ObservedBlock, "the block of the tombstone stays")
+		require.Zero(t, a.RepairAt, "lapsed: no chain read")
+		require.True(t, byAnyID(t, fx, "A-owner").Found)
+
+		// not lapsed: renewed since? the background reads it once
+		b := get(t, fx, "b.any")
+		require.False(t, b.Removed)
+		require.False(t, b.Lapsed)
+		require.True(t, b.RefreshNeeded)
+		require.Equal(t, int64(1), b.RepairAt)
+		require.Equal(t, "B-owner", b.OwnerAnyAddress)
+		require.Equal(t, notExpired, b.NameExpires)
+
+		for _, name := range []string{"c.any", "d.any", "missing.any"} {
+			item := get(t, fx, name)
+			require.True(t, item.Removed, name)
+			require.Empty(t, item.OwnerAnyAddress, name)
+		}
+		e := get(t, fx, "e.any")
+		require.Equal(t, "E-new", e.OwnerAnyAddress)
+		require.Equal(t, notExpired, e.NameExpires)
+
+		// a second run: nothing left to restore
+		stats, err = fx.RestoreTombstones(ctx, strings.NewReader(export), true)
+		require.NoError(t, err)
+		require.Equal(t, RestoreStats{Tombstones: 3, Missing: wantMissing}, stats)
+	})
+
+	t.Run("a record that is not removed any more when it is written is not touched", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seed(t, fx)
+		// a registration read replaces the tombstone between the scan of the tombstones and the write
+		hookBeforeRestore = func(name string) {
+			if name == "a.any" {
+				_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": "a.any"}, bson.M{
+					"$set": bson.M{"owner_any_address": "A-chain"}, "$unset": bson.M{"removed": ""}})
+				require.NoError(t, err)
+			}
+		}
+		defer func() { hookBeforeRestore = nil }()
+
+		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), true)
+		require.NoError(t, err)
+		require.Equal(t, RestoreStats{Tombstones: 5, Restored: 1, Missing: wantMissing}, stats)
+		a := get(t, fx, "a.any")
+		require.Equal(t, "A-chain", a.OwnerAnyAddress)
+		require.False(t, a.Lapsed)
+	})
+
+	t.Run("an export that can not be parsed: an error, nothing written", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seed(t, fx)
+		_, err := fx.RestoreTombstones(ctx, strings.NewReader(export+"\n{not json"), true)
+		require.Error(t, err)
+		require.True(t, get(t, fx, "a.any").Removed)
 	})
 }
 

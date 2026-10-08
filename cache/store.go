@@ -208,9 +208,21 @@ func setOrUnset(set, unset bson.M, key string, value interface{}, empty bool) {
 	}
 }
 
+// updateDoc: the $set and $unset of an update, the empty ones left out
+func updateDoc(set, unset bson.M) bson.M {
+	update := bson.M{}
+	if len(set) > 0 {
+		update["$set"] = set
+	}
+	if len(unset) > 0 {
+		update["$unset"] = unset
+	}
+	return update
+}
+
 // markRefreshNeeded marks the record of the name (if there is one) for a refresh by the periodic
-// scan after the backoff, and adds the re-reads to it. the data stays as it is: the name is still
-// served as it was (a registration as taken)
+// scan after the backoff (it grows with the failures in a row, see failureBackoff), and adds the
+// re-reads to it. the data stays as it is: the name is still served as it was (taken)
 func (cs *cacheService) markRefreshNeeded(ctx context.Context, fullName string, rereads []int64) error {
 	_, err := withTx(ctx, cs, func(ctx context.Context) (struct{}, error) {
 		stored, err := cs.getNameData(ctx, fullName)
@@ -218,14 +230,16 @@ func (cs *cacheService) markRefreshNeeded(ctx context.Context, fullName string, 
 			return struct{}{}, err
 		}
 		stored.RefreshNeeded = true
-		stored.RefreshNextAt = max(stored.RefreshNextAt, cs.now().Add(refreshFailureBackoff).UnixMilli())
+		stored.RefreshFailures++
+		stored.RefreshNextAt = max(stored.RefreshNextAt, cs.now().Add(failureBackoff(stored.RefreshFailures)).UnixMilli())
 		stored.Rereads = mergeRereads(stored.Rereads, rereads, 0)
 		stored.RepairAt = repairAt(stored)
 		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, bson.M{"$set": bson.M{
-			"refresh_needed":  true,
-			"refresh_next_at": stored.RefreshNextAt,
-			"rereads":         stored.Rereads,
-			"repair_at":       stored.RepairAt,
+			"refresh_needed":   true,
+			"refresh_failures": stored.RefreshFailures,
+			"refresh_next_at":  stored.RefreshNextAt,
+			"rereads":          stored.Rereads,
+			"repair_at":        stored.RepairAt,
 		}})
 		return struct{}{}, err
 	})
@@ -252,7 +266,9 @@ func (cs *cacheService) applyObservation(ctx context.Context, obs *NameDataItem,
 // applyObservationTx is the body of the transaction: it can run more than once, it starts from
 // scratch every time and does not change obs.
 // o.dry: decide exactly the same, but write nothing (the dry run of the backfill).
-// o.rereads are scheduled on whatever record stays; the ones due before the read are done
+// o.rereads are scheduled on whatever record stays; the ones due before the read are done.
+// a lapsed observation never creates a record (nil: none) and never replaces one: it is stored
+// on the cached record in place (see applyLapse)
 func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataItem, o refreshOpts) (*NameDataItem, error) {
 	dry := o.dry
 	item := *obs
@@ -266,6 +282,9 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	}
 	if hookAfterRead != nil {
 		hookAfterRead(obs)
+	}
+	if item.Lapsed && stored == nil {
+		return nil, nil
 	}
 
 	if stored != nil && !newer(&item, stored) {
@@ -294,28 +313,30 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 			setOrUnset(set, unset, "repair_at", stored.RepairAt, stored.RepairAt == 0)
 		}
 		if !dry && len(set)+len(unset) > 0 {
-			update := bson.M{}
-			if len(set) > 0 {
-				update["$set"] = set
-			}
-			if len(unset) > 0 {
-				update["$unset"] = unset
-			}
-			if _, err := cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, update); err != nil {
+			if _, err := cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, updateDoc(set, unset)); err != nil {
 				return nil, err
 			}
 		}
 		return stored, nil
 	}
+	if item.Lapsed {
+		return cs.applyLapse(ctx, &item, stored, o)
+	}
 
 	item.Canon = item.FullName
-	if item.Incomplete && stored != nil {
-		carryOver(&item, stored)
+	if item.Incomplete {
+		if stored != nil {
+			carryOver(&item, stored)
+			item.RefreshFailures = stored.RefreshFailures
+		}
+		// an incomplete read is a failed one: its retry backs off like a failed refresh
+		item.RefreshFailures++
+		item.RefreshNextAt = max(item.RefreshNextAt, item.ObservedAt+failureBackoff(item.RefreshFailures).Milliseconds())
 	}
-	// a changed registration (a new one, another owner, a renewal; not a removal: that is final)
-	// is read again later, like after an operation: an unfinalized change can be reorged away
+	// a changed registration (a new one, another owner, a renewal, a registration of a lapsed
+	// name) is read again later, like after an operation: an unfinalized change can be reorged away
 	rereads := o.rereads
-	if !item.Removed && (stored == nil || !sameNameData(stored, &item)) {
+	if stored == nil || !sameNameData(stored, &item) {
 		rereads = append(append([]int64{}, rereads...), cs.rereadTimes()...)
 	}
 	// a replacement in the same fork keeps the latest read of that fork (the stored record's,
@@ -346,6 +367,56 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 		}
 	}
 	return &item, nil
+}
+
+// applyLapse stores a lapse observation (newer than the stored record, see applyObservationTx)
+// on the stored record in place: a name stays reserved to the identity that registered it, so
+// the owner fields, AnyID, space ID and canon are kept (a lapsed read has none of them). the
+// expiry, the registry owner and the block are the chain's; nothing more is to be read, so the
+// record is no longer incomplete or marked. removed (a 0.7.1 tombstone) is left as it is
+func (cs *cacheService) applyLapse(ctx context.Context, item *NameDataItem, stored *NameDataItem, o refreshOpts) (*NameDataItem, error) {
+	out := *stored
+	out.NameExpires = item.NameExpires
+	out.Lapsed = true
+	out.RegistryOwner = item.RegistryOwner
+	out.ObservedBlock, out.ObservedBlockHash, out.ObservedBlockTime = item.ObservedBlock, item.ObservedBlockHash, item.ObservedBlockTime
+	out.ObservedAt = item.ObservedAt
+	out.Incomplete, out.RefreshNeeded, out.RefreshFailures = false, false, 0
+	// the fork's latest read, as for a replacement (see applyObservationTx)
+	out.ForkReadAt = 0
+	if item.ObservedBlock == stored.ObservedBlock && item.ObservedBlockHash == stored.ObservedBlockHash {
+		if read := readAt(stored); read > item.ObservedAt {
+			out.ForkReadAt = read
+		}
+	}
+	if out.Canon == "" {
+		out.Canon = item.FullName
+	}
+	// a lapse is not an operation's change: no re-reads of its own, the due ones are done
+	out.Rereads = mergeRereads(stored.Rereads, o.rereads, item.ObservedAt)
+	out.RepairAt = repairAt(&out)
+	if o.dry {
+		return &out, nil
+	}
+
+	set := bson.M{
+		"name_expires":        out.NameExpires,
+		"lapsed":              true,
+		"registry_owner":      out.RegistryOwner,
+		"observed_block":      out.ObservedBlock,
+		"observed_block_hash": out.ObservedBlockHash,
+		"observed_block_time": out.ObservedBlockTime,
+		"observed_at":         out.ObservedAt,
+		"canon":               out.Canon,
+	}
+	unset := bson.M{"incomplete": "", "refresh_needed": "", "refresh_failures": ""}
+	setOrUnset(set, unset, "fork_read_at", out.ForkReadAt, out.ForkReadAt == 0)
+	setOrUnset(set, unset, "rereads", out.Rereads, len(out.Rereads) == 0)
+	setOrUnset(set, unset, "repair_at", out.RepairAt, out.RepairAt == 0)
+	if _, err := cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, updateDoc(set, unset)); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // nameIndex: is there an index on exactly {name: 1} (with the simple collation: the alias index

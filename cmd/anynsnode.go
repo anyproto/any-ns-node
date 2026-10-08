@@ -66,11 +66,14 @@ var (
 	params         = flag.String("params", "", "command params in json format")
 
 	// cache maintenance (one-off runs, see the "Name cache" section of the README)
-	flagDedupeCache     = flag.Bool("dedupe-cache", false, "verify the unique index on the name of the cache (an existing one is accepted whatever its name; a missing one is created with -refresh-apply; a non-unique one is an error, never dropped), and exit. runs before -purge-tombstones and -refresh-cache")
-	flagRefreshCache    = flag.Bool("refresh-cache", false, "re-read every cached name from the contracts and exit (1 if any name failed). a dry run unless -refresh-apply is set")
-	flagPurgeTombstones = flag.Bool("purge-tombstones", false, "delete the tombstones of the name cache and exit: before a rollback to a version older than GO-7567. a dry run unless -refresh-apply is set. runs before -refresh-cache")
-	flagRefreshApply    = flag.Bool("refresh-apply", false, "with -refresh-cache, -dedupe-cache or -purge-tombstones: write the changes")
-	flagRefreshInterval = flag.Duration("refresh-interval", time.Second, "with -refresh-cache: delay between two names")
+	flagDedupeCache       = flag.Bool("dedupe-cache", false, "verify the unique index on the name of the cache (an existing one is accepted whatever its name; a missing one is created with -refresh-apply; a non-unique one is an error, never dropped), and exit. runs before the other maintenance flags")
+	flagReleaseName       = flag.String("release-name", "", "support transfer: print the cache record of the name and, with -refresh-apply, delete it (the name can then be registered for another identity), and exit. records under other spellings are listed, not deleted")
+	flagRestoreTombstones = flag.Bool("restore-tombstones", false, "give the tombstones of 0.7.1 (removed records without an owner) their owner back from -restore-from, and exit (1 if any has no owner in the export). a dry run unless -refresh-apply is set. runs before -refresh-cache")
+	flagRestoreFrom       = flag.String("restore-from", "", "with -restore-tombstones: a mongoexport (JSON lines, Extended JSON) of the cache collection")
+	flagRefreshCache      = flag.Bool("refresh-cache", false, "re-read every cached name from the contracts and exit (1 if any name failed). never removes a record. a dry run unless -refresh-apply is set")
+	flagRefreshApply      = flag.Bool("refresh-apply", false, "with -refresh-cache, -dedupe-cache, -release-name or -restore-tombstones: write the changes")
+	flagRefreshInterval   = flag.Duration("refresh-interval", time.Second, "with -refresh-cache: delay between two names")
+	flagRPCURL            = flag.String("rpc-url", "", "cache maintenance runs only: the contracts provider URL for this process instead of contracts.gethUrl (e.g. another provider, so that a full -refresh-cache does not spend the quota of the live nodes)")
 )
 
 func main() {
@@ -129,13 +132,24 @@ func main() {
 		return
 	}
 
-	if *flagRefreshCache || *flagDedupeCache || *flagPurgeTombstones {
+	maintenance := *flagRefreshCache || *flagDedupeCache || *flagReleaseName != "" || *flagRestoreTombstones
+	if *flagRPCURL != "" {
+		// never for the live node: its provider is the one in the config
+		if !maintenance {
+			log.Fatal("-rpc-url is for the cache maintenance runs only (-refresh-cache, -dedupe-cache, -release-name, -restore-tombstones)")
+		}
+		conf.Contracts.GethUrl = *flagRPCURL
+		log.Info("cache maintenance: the contracts provider from -rpc-url", zap.String("host", rpcHost(*flagRPCURL)))
+	}
+	if maintenance {
 		os.Exit(runCacheMaintenance(ctx, a, cacheTask{
-			dedupe:   *flagDedupeCache,
-			purge:    *flagPurgeTombstones,
-			refresh:  *flagRefreshCache,
-			apply:    *flagRefreshApply,
-			interval: *flagRefreshInterval,
+			dedupe:      *flagDedupeCache,
+			release:     *flagReleaseName,
+			restore:     *flagRestoreTombstones,
+			restoreFrom: *flagRestoreFrom,
+			refresh:     *flagRefreshCache,
+			apply:       *flagRefreshApply,
+			interval:    *flagRefreshInterval,
 		}))
 	}
 

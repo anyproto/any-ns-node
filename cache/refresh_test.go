@@ -48,11 +48,11 @@ func expectRegistered(m *mock_contracts.MockContractsService, scw string, eoa st
 	m.EXPECT().GetScwOwner(gomock.Any(), common.HexToAddress(scw), gomock.Any()).Return(common.HexToAddress(eoa), nil)
 }
 
-// the contracts answer for a lapsed name: the registry still points to the NameWrapper.
-// read twice: at the latest block, then (a cached record is removed) at the finalized one
+// the contracts answer for a lapsed name: the registry still points to the NameWrapper. read
+// once, at the latest block: the owner, AnyID and space ID are not read after a lapse
 func expectLapsed(m *mock_contracts.MockContractsService) {
-	m.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
-	m.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil).Times(2)
+	m.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
+	m.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil)
 }
 
 // pause makes a mocked call block until release (or until the test ends)
@@ -237,18 +237,14 @@ func TestCacheService_UpdateInCache_PinnedRead(t *testing.T) {
 		require.Equal(t, inGrace, out.NameExpires)
 	})
 
-	t.Run("lapsed at the latest block: ErrNameNotRegistered, a single read never removes the record", func(t *testing.T) {
+	t.Run("lapsed at the latest block: the record stays with its owner, marked lapsed, served as taken", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-		seedItem(t, fx, lapsed, 0, 0)
+		seedItem(t, fx, inGrace, 0, 0)
 
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).AnyTimes()
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil).AnyTimes()
-		// only the finalized block could confirm it: not readable here
-		fx.setFinalizedErr(errors.New("no finalized block"))
-
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
-		require.Error(t, err)
+		expectLapsed(fx.contracts)
+		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+		require.True(t, cachedItem(t, fx).Lapsed)
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
 	})
 

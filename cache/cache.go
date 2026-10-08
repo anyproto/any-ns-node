@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,16 +25,21 @@ import (
 
 const CName = "any-ns.cache"
 
-// ErrNameNotRegistered is returned by UpdateInCache when the registry has no owner for the
-// name (or it has lapsed): the cache does not have it as a taken name.
+// ErrNameNotRegistered is returned by UpdateInCache when the chain does not have the name and the
+// cache has no record of it: "not registered (yet)".
 // it is not a transport error: callers should treat it as "not registered (yet)",
 // never as "the cache is up to date"
 var ErrNameNotRegistered = errors.New("name is not registered")
 
-// errNotFinal: the latest block says that the name is not registered, but a finalized block
-// does not confirm it (yet), so the cached record was left as it is. it is an
-// ErrNameNotRegistered for the callers of UpdateInCache: not registered at the latest block
-var errNotFinal = fmt.Errorf("%w at the latest block, not confirmed by a finalized one", ErrNameNotRegistered)
+// errNotOnChain: the latest block says that the name was never registered, but the cache has a
+// record of it: the record stays as it is (taken), nothing is concluded from a read. right after a
+// registration this is a lagging provider, the scheduled re-reads pick the name up. it is an
+// ErrNameNotRegistered for the callers of UpdateInCache, a settled refresh for the background
+var errNotOnChain = fmt.Errorf("%w on chain, the cached record is kept", ErrNameNotRegistered)
+
+// errLapsed: readNameData read a lapsed name (expired and past the grace period). the
+// observation carries the expiry and the block only (see refresh)
+var errLapsed = errors.New("the name has lapsed")
 
 // ErrNameDataIncomplete is returned by UpdateInCache when the registry confirmed the name
 // (it is registered and not lapsed), but its owner could not be read. the confirmed part is
@@ -74,10 +80,18 @@ type NameDataItem struct {
 	// rereadDelays. a read after one of them is done with it
 	Rereads []int64 `bson:"rereads,omitempty"`
 
-	// a tombstone: the name is not registered (or has lapsed) at ObservedBlock, a finalized
-	// block. it keeps the block, so that an older read can not bring the name back. lookups
-	// serve it as "not in the cache"
+	// a tombstone written by 0.7.1 (the name lapsed, its owner fields were wiped). never written
+	// any more: such a record is served as taken (with whatever owner fields it has), reverse
+	// lookups skip it. -restore-tombstones brings the owner back and clears it
 	Removed bool `bson:"removed,omitempty"`
+
+	// the chain lets this name lapse (expired and past the grace period) at ObservedBlock; the
+	// cache keeps it reserved for its owner: the owner fields stay, it is served as taken
+	Lapsed bool `bson:"lapsed,omitempty"`
+
+	// failed background refreshes in a row: the backoff of the next one grows with it (see
+	// failureBackoff). reset by a successful write of the record
+	RefreshFailures int `bson:"refresh_failures,omitempty"`
 
 	// the registry confirmed the name, but the enrichment (owner, AnyID, space ID) failed: the
 	// record holds what was confirmed, and what it could carry over from the previous record
@@ -121,19 +135,19 @@ func New() app.Component {
 type CacheService interface {
 	// call it before you want to check in smart contracts
 	// it will look up data in Mongo.
-	// a cached name is always reported as taken: only the contracts can prove that a name is
-	// available again, then the record becomes a tombstone (see UpdateInCache)
+	// a cached name is always reported as taken, whatever its expiry: a name stays reserved
+	// to the identity that registered it. only an operator removes a record (-release-name)
 	IsNameAvailable(ctx context.Context, in *nsp.NameAvailableRequest) (out *nsp.NameAvailableResponse, err error)
 	GetNameByAddress(ctx context.Context, in *nsp.NameByAddressRequest) (out *nsp.NameByAddressResponse, err error)
 	GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdRequest) (out *nsp.NameByAddressResponse, err error)
 
 	// call it when you need to read REAL data: smart contracts -> cache
 	// will return no error if name is found and data was updated
-	// will return ErrNameNotRegistered if the registry has no owner for the name, or if the
-	// name has lapsed (nameExpires + grace period has passed, it can be registered again).
-	// that is an expected answer, not a failure: the cache does not have the name as taken
-	// (a cached record becomes a tombstone only when a finalized block confirms it, until then
-	// it stays as it is), so callers must never treat it as "the cache is up to date"
+	// will return ErrNameNotRegistered if the chain does not have the name (never registered, or
+	// lapsed) and the cache has no record of it. a cached record is never removed or wiped by a
+	// read: a lapse is stored on the record (lapsed), "never registered" leaves it as it is (the
+	// error then wraps ErrNameNotRegistered too). callers must never treat it as "the cache is
+	// up to date"
 	// will return ErrNameDataIncomplete if the name is registered, but its owner could not be
 	// read: the cache has it as taken, without the owner (see ErrNameDataIncomplete)
 	// will return any other error if something went wrong
@@ -308,7 +322,8 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 		log.Error("failed to get item from DB", zap.Error(err))
 		return nil, err
 	}
-	// no live canonical record: a record under another spelling still keeps the name taken
+	// no canonical record, or a 0.7.1 tombstone (no owner): a record under another spelling keeps
+	// the name taken too, and a live one answers with its owner
 	if item == nil || item.Removed {
 		if hookBeforeAliasCheck != nil {
 			hookBeforeAliasCheck()
@@ -322,7 +337,7 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 			log.Error("failed to get item from DB", zap.Error(err))
 			return nil, err
 		}
-		if alias != nil {
+		if alias != nil && (item == nil || !alias.Removed) {
 			if needsRefresh(alias, cs.now()) {
 				cs.requestRefresh(refreshRequest{name: alias.FullName})
 			}
@@ -332,20 +347,17 @@ func (cs *cacheService) IsNameAvailable(ctx context.Context, in *nsp.NameAvailab
 	if item == nil {
 		return &nsp.NameAvailableResponse{Available: true}, nil
 	}
-	// the record is served as it is. one that can be stale (expired: renewed since?, lapsed,
-	// incomplete, an old tombstone) is handed to the background refresh, never refreshed here
+	// the record is served as it is. only an incomplete one (or one whose refresh after an
+	// operation failed) is handed to the background refresh, never refreshed here: an expired
+	// or lapsed name needs no chain read, it stays reserved for its owner
 	if needsRefresh(item, cs.now()) {
 		cs.requestRefresh(refreshRequest{name: item.FullName})
-	}
-	// a tombstone: a finalized block confirmed that the name is free
-	if item.Removed {
-		return &nsp.NameAvailableResponse{Available: true}, nil
 	}
 
 	log.Debug("found item in cache", zap.String("FullName", in.FullName))
 
-	// 2 - if found in the cache -> return false. an expired nameExpires is only a lower bound (a
-	// renewal elsewhere does not touch the cache), it never makes a name available on its own
+	// 2 - if found in the cache -> return false, whatever the expiry: clients can tell an
+	// expired name by NameExpires. a tombstone of 0.7.1 too (taken, without an owner)
 	return nameTaken(item), nil
 }
 
@@ -360,7 +372,7 @@ func nameTaken(item *NameDataItem) *nsp.NameAvailableResponse {
 	}
 }
 
-// getNameData returns the record of the name (a tombstone too), nil if there is none.
+// getNameData returns the record of the name (a removed one too), nil if there is none.
 // the unique index on the name keeps it at one record per name
 func (cs *cacheService) getNameData(ctx context.Context, fullName string) (*NameDataItem, error) {
 	item := &NameDataItem{}
@@ -389,7 +401,8 @@ func (cs *cacheService) GetNameByAnyId(ctx context.Context, in *nsp.NameByAnyIdR
 // record (one per name otherwise)
 const reverseLookupAliases = 64
 
-// reverseLookup finds a name by an owner field. tombstones never match. a record under a
+// reverseLookup finds a name by an owner field. 0.7.1 tombstones never match (their owner fields
+// are empty anyway). a record under a
 // non-canonical spelling (see alias.go) counts only if no canonical record matches and its name
 // has no canonical record; the name is answered in its canonical spelling
 func (cs *cacheService) reverseLookup(ctx context.Context, filter bson.M) (*nsp.NameByAddressResponse, error) {
@@ -472,28 +485,21 @@ func (cs *cacheService) canonical(fullName string) (string, error) {
 
 // refreshOpts: how a refresh stores what it read
 type refreshOpts struct {
-	// decide exactly the same (the reads, the finality confirmation, the order of the records),
-	// but write nothing (the dry run of the backfill)
+	// decide exactly the same (the reads, the order of the records), but write nothing (the dry
+	// run of the backfill)
 	dry bool
-	// the finalized block may be read to confirm the removal of a cached registration (the
-	// background refresh, the backfill). a request never waits for that read: it keeps the
-	// record as it is and hands the name to the background
-	confirm bool
-	// the background refresh: confirm, and a tombstone is also confirmed again (rewritten at a
-	// newer finalized block) when the latest block still says that the name is not registered
-	background bool
 	// re-reads to schedule on the record (unix ms, see rereadDelays), in the same write
 	rereads []int64
 }
 
 // refresh reads the name from the contracts at the latest block and stores what the chain
-// confirmed (see applyObservation). returns the record that is in the cache afterwards (nil:
-// none); it can be a newer one written by somebody else. the error follows that record:
-//   - nil: a complete registration
+// confirmed (see applyObservation). it never removes a record and never wipes its owner.
+// returns the record that is in the cache afterwards (nil: none); it can be a newer one written
+// by somebody else. the error follows that record:
+//   - nil: a complete registration, or a lapsed name kept for its owner (Lapsed)
 //   - ErrNameDataIncomplete: a registration without the owner
-//   - ErrNameNotRegistered: none, or a tombstone. errNotFinal: the latest block says that the
-//     name is not registered, but the cached registration stays (not confirmed by a finalized
-//     block, or the cache has a newer one)
+//   - ErrNameNotRegistered: the chain does not have the name (or it lapsed) and nothing is
+//     cached. errNotOnChain: the chain says never registered, the cached record stays
 //   - any other error: nothing was decided, nothing was written
 func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshOpts) (*NameDataItem, error) {
 	// every contract read and the cache key use the canonical spelling: a raw "Foo.any" would
@@ -505,11 +511,13 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 	}
 
 	obs, readErr := cs.readNameData(ctx, fullName)
-	if errors.Is(readErr, ErrNameNotRegistered) {
-		// a destructive change: only a finalized block can decide it
-		obs, readErr = cs.confirmNotRegistered(ctx, fullName, o)
-	}
-	if obs == nil {
+	switch {
+	case errors.Is(readErr, ErrNameNotRegistered):
+		return cs.notOnChain(ctx, obs, o)
+	case errors.Is(readErr, errLapsed):
+		// obs.Lapsed: stored on the cached record, if there is one (see applyObservationTx)
+		readErr = nil
+	case obs == nil:
 		// nothing to store
 		return nil, readErr
 	}
@@ -526,11 +534,10 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 	}
 
 	switch {
-	case obs.Removed && stored != nil && !stored.Removed:
-		// the confirmed removal is older than the cached registration: it stays
-		return stored, fmt.Errorf("%w: the cache has a registration at a later block %d", errNotFinal, stored.ObservedBlock)
-	case stored == nil || stored.Removed:
-		return stored, ErrNameNotRegistered
+	case stored == nil:
+		// a lapsed name that the cache does not have: never ours, or the cache lost it (an
+		// operator matter, -refresh-cache reports it). nothing is written
+		return nil, ErrNameNotRegistered
 	case stored.Incomplete:
 		if errors.Is(readErr, ErrNameDataIncomplete) {
 			return stored, readErr
@@ -540,56 +547,53 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 	return stored, nil
 }
 
-// confirmNotRegistered: the latest block says that the name is not registered. that makes a
-// cached name available, so it must be final (and it is decided in the background only, see
-// refreshOpts.confirm): a read of a block that is reorged away later (or
-// of another fork, or of a lagging backend behind a load balancer) would make a registered name
-// available. it reads the registry again at the finalized block:
-//   - a tombstone at that block and ErrNameNotRegistered: confirmed
-//   - nil and ErrNameNotRegistered: the cache has no registration of the name, nothing to remove
-//     (in the background a tombstone is confirmed again, see refreshOpts)
-//   - nil and errNotFinal: the finalized block still has the name registered: the cache must
-//     stay as it is (for now)
-//   - nil and another error: the confirmation failed (e.g. the finalized block could not be read)
-func (cs *cacheService) confirmNotRegistered(ctx context.Context, fullName string, o refreshOpts) (*NameDataItem, error) {
-	stored, err := cs.getNameData(ctx, fullName)
-	if err != nil {
-		return nil, err
+// notOnChain: the latest block says that the name was never registered (no registry owner, no
+// expiry). nothing cached: ErrNameNotRegistered. a cached record stays as it is (a lagging
+// provider right after a registration, or a record the chain never had: for an operator), only
+// its due re-reads are done by this read (the later ones stay), and a marked one backs off:
+// errNotOnChain
+func (cs *cacheService) notOnChain(ctx context.Context, obs *NameDataItem, o refreshOpts) (*NameDataItem, error) {
+	settle := func(ctx context.Context) (*NameDataItem, error) {
+		stored, err := cs.getNameData(ctx, obs.FullName)
+		if err != nil || stored == nil {
+			return stored, err
+		}
+		set, unset := bson.M{}, bson.M{}
+		// a marked record stays marked (it is incomplete, or restored for one read): it is
+		// retried after a backoff that grows with every such read, not at every lease
+		if stored.RefreshNeeded {
+			stored.RefreshFailures++
+			stored.RefreshNextAt = max(stored.RefreshNextAt, cs.now().Add(failureBackoff(stored.RefreshFailures)).UnixMilli())
+			set["refresh_failures"], set["refresh_next_at"] = stored.RefreshFailures, stored.RefreshNextAt
+		}
+		rereads := mergeRereads(stored.Rereads, o.rereads, obs.ObservedAt)
+		if len(set) == 0 && slices.Equal(rereads, stored.Rereads) {
+			return stored, nil
+		}
+		stored.Rereads = rereads
+		stored.RepairAt = repairAt(stored)
+		if o.dry {
+			return stored, nil
+		}
+		setOrUnset(set, unset, "rereads", rereads, len(rereads) == 0)
+		setOrUnset(set, unset, "repair_at", stored.RepairAt, stored.RepairAt == 0)
+		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, updateDoc(set, unset))
+		return stored, err
 	}
-	if stored == nil || (stored.Removed && !o.background) {
+	var stored *NameDataItem
+	var err error
+	if o.dry {
+		stored, err = settle(ctx)
+	} else {
+		stored, err = withTx(ctx, cs, settle)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store the name: %w", err)
+	}
+	if stored == nil {
 		return nil, ErrNameNotRegistered
 	}
-	if !o.confirm && !o.background {
-		// a request: the record stays (taken) until the background confirmed the removal
-		cs.requestRefresh(refreshRequest{name: fullName})
-		return nil, fmt.Errorf("%w: handed to the background refresh", errNotFinal)
-	}
-
-	nh, err := contracts.NameHash(fullName)
-	if err != nil {
-		return nil, err
-	}
-
-	confirmCtx, cancel := context.WithTimeout(ctx, confirmTimeout)
-	defer cancel()
-
-	fin, err := cs.contracts.FinalizedBlock(confirmCtx)
-	if err != nil {
-		// a failure, not errNotFinal: nothing says that the name is still registered there
-		log.Warn("can not get the finalized block", zap.String("FullName", fullName), zap.Error(err))
-		return nil, fmt.Errorf("the finalized block: %w", err)
-	}
-	_, _, registered, err := cs.readRegistration(confirmCtx, fullName, nh, fin)
-	if err != nil {
-		return nil, fmt.Errorf("the registry at the finalized block: %w", err)
-	}
-	if registered {
-		log.Info("the name is not registered at the latest block, but it is at the finalized one",
-			zap.String("FullName", fullName), zap.Int64("finalized", fin.Number))
-		return nil, errNotFinal
-	}
-
-	obs := cs.observation(fullName, fin)
-	obs.Removed = true
-	return obs, ErrNameNotRegistered
+	log.Warn("the chain does not have a cached name (never registered at the latest block), keeping the record",
+		zap.String("FullName", obs.FullName), zap.Int64("block", obs.ObservedBlock), zap.Int64("cached block", stored.ObservedBlock))
+	return stored, errNotOnChain
 }

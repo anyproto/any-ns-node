@@ -14,21 +14,25 @@ import (
 )
 
 // the background refresh of the cache. requests never wait for it: a lookup hands a record that
-// needs a refresh to it through an in-memory queue (dropped when full: the periodic scan finds
-// the record later), and every record that needs one is also due in Mongo (repair_at, indexed),
-// where the periodic scan of every node finds it. a lease in Mongo keeps the nodes from
-// refreshing the same name at once, a backoff keeps a failing name from taking every round.
+// needs a refresh (an incomplete one, or one whose refresh after an operation failed) to it
+// through an in-memory queue (dropped when full: the periodic scan finds the record later), and
+// every record that needs one is also due in Mongo (repair_at, indexed), where the periodic scan
+// of every node finds it. a lease in Mongo keeps the nodes from refreshing the same name at once,
+// a backoff keeps a failing name from taking every round.
+//
+// chain reads are driven by operations, never by lookups or time: the cache is the record of who
+// holds a name (every registration goes through an operation of ours), an expired or lapsed name
+// stays reserved for its owner and needs no read. the background reads only the re-reads after an
+// operation (see rereadDelays) and the records that need a refresh
 
 const (
-	// a lookup hands an expired record (or a tombstone) to the background refresh, but not more
-	// often than this: the record can have been renewed (or registered again) without the cache
-	// knowing
-	expiredRefreshInterval = 10 * time.Minute
-	// an expired record that the chain still has registered (the grace period) is re-read by the
-	// periodic scan once per this: a renewal elsewhere does not touch the cache
-	expiredRepairInterval = 24 * time.Hour
-	// after a failed refresh nobody (on any node) re-reads the name for this long
+	// after a failed refresh nobody (on any node) re-reads the name for this long; it doubles
+	// with every failure in a row, up to maxFailureBackoff (see failureBackoff)
 	refreshFailureBackoff = time.Minute
+	maxFailureBackoff     = 24 * time.Hour
+	// a record under a non-canonical spelling is not handed to the background again for this long
+	// (see settleAlias)
+	aliasSettleInterval = 10 * time.Minute
 
 	// the default interval of the periodic scan, and how many names it re-reads per round
 	defaultRepairInterval = time.Minute
@@ -38,9 +42,19 @@ const (
 	refreshQueueSize = 1024
 )
 
+// failureBackoff: the backoff after the failures-th failed refresh in a row (1: the first):
+// refreshFailureBackoff * 2^(failures-1), at most maxFailureBackoff
+func failureBackoff(failures int) time.Duration {
+	d := refreshFailureBackoff
+	for i := 1; i < failures && d < maxFailureBackoff; i++ {
+		d *= 2
+	}
+	return min(d, maxFailureBackoff)
+}
+
 // refreshLease is how long a claimed refresh blocks the other nodes (it must outlive the
-// refresh: the confirmation, the enrichment, the finalized read and the write are bounded by
-// 10 seconds each; it only matters if the claiming node dies in the middle).
+// refresh: the confirmation, the enrichment and the write are bounded by 10 seconds each; it
+// only matters if the claiming node dies in the middle).
 // a var only so that tests can shrink it
 var refreshLease = time.Minute
 
@@ -130,13 +144,6 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 	return err
 }
 
-// retryLater backs the cached registration of the name off (refresh_next_at, a longer lease
-// stays) and makes the periodic scan take it right after the backoff (repair_at follows it): a
-// removal that is not final yet (the backfill). the data stays as it is
-func (cs *cacheService) retryLater(ctx context.Context, fullName string) error {
-	return cs.retryAfterBackoff(ctx, bson.M{"name": fullName, "removed": bson.M{"$ne": true}})
-}
-
 // rereadTimes: the re-reads of a name changed by an operation completed now
 func (cs *cacheService) rereadTimes() []int64 {
 	now := cs.now()
@@ -219,66 +226,30 @@ func (cs *cacheService) requestRefresh(r refreshRequest) {
 	}
 }
 
-// needsRefresh: a record that a lookup hands to the background refresh
+// needsRefresh: a record that a lookup hands to the background refresh: an incomplete one, or
+// one whose refresh after an operation failed (not while it is leased or backing off). an expired,
+// lapsed or removed record is never handed to it: it needs no chain read
 func needsRefresh(item *NameDataItem, now time.Time) bool {
-	// somebody is refreshing it right now, or the last refresh failed
-	if now.UnixMilli() < item.RefreshNextAt {
-		return false
-	}
-	readAgo := now.Sub(time.UnixMilli(item.ObservedAt))
-	switch {
-	case item.RefreshNeeded:
-		return true
-	case item.Removed:
-		// the name could have been registered since
-		return readAgo >= expiredRefreshInterval
-	case now.Unix() < item.NameExpires:
-		return false
-	case isLapsed(item.NameExpires, now):
-		// only the contracts can say that a name is free
-		return true
-	}
-	// expired, in the grace period: was it renewed since we read it?
-	return readAgo >= expiredRefreshInterval
+	return item.RefreshNeeded && now.UnixMilli() >= item.RefreshNextAt
 }
 
 // repairAt: when the periodic scan takes the record (unix ms; 0: never, the field is unset):
 //   - an incomplete record (or one marked after a failed refresh): now (after its backoff)
 //   - a scheduled re-read (see rereadDelays)
-//   - a registration: when it expires (a renewal?); expired: when it lapses, and once per
-//     expiredRepairInterval (a renewal elsewhere)
 //
-// never before the record's lease or backoff (RefreshNextAt)
+// never before the record's lease or backoff (RefreshNextAt). an expiry is no reason to read the
+// chain: a renewal is an operation of ours, it schedules its own re-reads
 func repairAt(d *NameDataItem) int64 {
 	var due int64
-	if d.RefreshNeeded {
+	switch {
+	case d.RefreshNeeded:
 		due = 1
-	} else {
-		if len(d.Rereads) > 0 {
-			due = slices.Min(d.Rereads)
-		}
-		if !d.Removed && d.NameExpires > 0 {
-			if e := expiryCheckAt(d); due == 0 || e < due {
-				due = e
-			}
-		}
-	}
-	if due == 0 {
+	case len(d.Rereads) > 0:
+		due = slices.Min(d.Rereads)
+	default:
 		return 0
 	}
 	return max(due, d.RefreshNextAt)
-}
-
-func expiryCheckAt(d *NameDataItem) int64 {
-	expires := d.NameExpires * 1000
-	if expires > d.ObservedAt {
-		return expires
-	}
-	next := d.ObservedAt + expiredRepairInterval.Milliseconds()
-	if lapses := (d.NameExpires + gracePeriodSec + 1) * 1000; lapses > d.ObservedAt && lapses < next {
-		return lapses
-	}
-	return next
 }
 
 // claimRefresh atomically takes the refresh lease of the name (shared by all nodes through Mongo)
@@ -300,23 +271,37 @@ func (cs *cacheService) claimRefresh(ctx context.Context, fullName string, now t
 	return res.ModifiedCount > 0, nil
 }
 
-// backOff keeps every node from re-reading the name for refreshFailureBackoff.
-// it does not touch the data or the observation
+// backOff keeps every node from re-reading the name for its failure backoff (see
+// failureBackoff). it does not touch the data or the observation
 func (cs *cacheService) backOff(ctx context.Context, fullName string) {
 	if err := cs.retryAfterBackoff(ctx, bson.M{"name": fullName}); err != nil {
 		log.Warn("failed to store the refresh backoff", zap.String("FullName", fullName), zap.Error(err))
 	}
 }
 
-// retryAfterBackoff: nobody refreshes the matching record before now + refreshFailureBackoff (a
-// longer lease or backoff stays), and the periodic scan takes it right then: repair_at is set to
-// it, whatever it was (a distant expiry included), so a failed refresh is always retried
+// retryAfterBackoff counts a failed refresh of the matching record (refresh_failures): nobody
+// refreshes it before now + its backoff (a longer lease or backoff stays), and the periodic scan
+// takes it right then: repair_at is set to it, whatever it was, so a failed refresh is always
+// retried. one update: the nodes share the count
 func (cs *cacheService) retryAfterBackoff(ctx context.Context, filter bson.M) error {
 	ctx, cancel := boundedCtx(ctx)
 	defer cancel()
-	until := cs.now().Add(refreshFailureBackoff).UnixMilli()
+	now := cs.now().UnixMilli()
+	// refreshFailureBackoff * 2^(failures-1), at most maxFailureBackoff (the exponent is capped
+	// first: 2^11 minutes is more than a day already)
+	backoff := bson.M{"$min": bson.A{
+		maxFailureBackoff.Milliseconds(),
+		bson.M{"$multiply": bson.A{
+			refreshFailureBackoff.Milliseconds(),
+			bson.M{"$pow": bson.A{2, bson.M{"$min": bson.A{11, bson.M{"$subtract": bson.A{"$refresh_failures", 1}}}}}},
+		}},
+	}}
 	_, err := cs.itemColl.UpdateOne(ctx, filter, mongo.Pipeline{
-		{{Key: "$set", Value: bson.M{"refresh_next_at": bson.M{"$max": bson.A{bson.M{"$ifNull": bson.A{"$refresh_next_at", 0}}, until}}}}},
+		{{Key: "$set", Value: bson.M{"refresh_failures": bson.M{"$add": bson.A{bson.M{"$ifNull": bson.A{"$refresh_failures", 0}}, 1}}}}},
+		{{Key: "$set", Value: bson.M{"refresh_next_at": bson.M{"$max": bson.A{
+			bson.M{"$ifNull": bson.A{"$refresh_next_at", int64(0)}},
+			bson.M{"$toLong": bson.M{"$add": bson.A{now, backoff}}},
+		}}}}},
 		{{Key: "$set", Value: bson.M{"repair_at": "$refresh_next_at"}}},
 	})
 	return err
@@ -335,12 +320,11 @@ func holdUntil(until int64) mongo.Pipeline {
 	}}}}
 }
 
-// failed: the refresh did not settle the record (it stays as it was): try again after a backoff
+// failed: the refresh did not settle the record (it stays as it was): try again after a backoff.
+// "not registered" is settled: nothing is cached, or the cached record stays (errNotOnChain: the
+// scheduled re-reads pick up a lagging provider, never a retry loop)
 func failed(err error) bool {
-	if err == nil || errors.Is(err, ErrNameDataIncomplete) {
-		return false
-	}
-	return errors.Is(err, errNotFinal) || !errors.Is(err, ErrNameNotRegistered)
+	return err != nil && !errors.Is(err, ErrNameDataIncomplete) && !errors.Is(err, ErrNameNotRegistered)
 }
 
 // the repair index: the periodic scan reads it only (no collection scan, no in-memory sort).
@@ -407,7 +391,7 @@ func (cs *cacheService) refreshAfterOperation(ctx context.Context, fullName stri
 	if name, err := cs.canonical(fullName); err == nil {
 		fullName = name
 	}
-	o := refreshOpts{background: true, rereads: cs.rereadTimes()}
+	o := refreshOpts{rereads: cs.rereadTimes()}
 	// the shared lease and the backoff apply here too (repeated polls during an incident must
 	// not multiply the reads): a held record is left to the holder and the scan, its re-reads are
 	// stored anyway (see scheduleRereadsAsync). a name that is not cached has nothing to lease
@@ -440,7 +424,7 @@ func (cs *cacheService) refreshLeased(ctx context.Context, fullName string) bool
 	if canonical, err := cs.canonical(fullName); err == nil && canonical != fullName {
 		cs.settleAlias(ctx, fullName)
 		if c, err := cs.getNameData(ctx, canonical); err == nil && c == nil {
-			if _, err = cs.refresh(ctx, canonical, refreshOpts{background: true}); failed(err) {
+			if _, err = cs.refresh(ctx, canonical, refreshOpts{}); failed(err) {
 				log.Warn("cache repair: failed to re-read a name", zap.String("FullName", canonical), zap.Error(err))
 			}
 			return true
@@ -455,7 +439,7 @@ func (cs *cacheService) refreshLeased(ctx context.Context, fullName string) bool
 	if !claimed {
 		return false
 	}
-	if _, err = cs.refresh(ctx, fullName, refreshOpts{background: true}); failed(err) {
+	if _, err = cs.refresh(ctx, fullName, refreshOpts{}); failed(err) {
 		log.Warn("cache repair: failed to re-read a name", zap.String("FullName", fullName), zap.Error(err))
 		cs.backOff(ctx, fullName)
 	}
@@ -471,12 +455,17 @@ var repairOrder = bson.D{{Key: "repair_at", Value: 1}, {Key: "_id", Value: 1}}
 
 // repairOnce re-reads up to limit names that are due (see repairAt), the longest waiting first:
 // a record that keeps failing moves back with its backoff, it can not starve the others.
-// returns how many it re-read
+// a record whose repair_at was set under other rules (0.7.1 scheduled expiries, lapses and daily
+// re-reads) is not read: its repair_at is recomputed from its fields and stored, without a
+// contract call. returns how many it re-read
 func (cs *cacheService) repairOnce(ctx context.Context, limit int64) (int, error) {
 	findCtx, cancel := boundedCtx(ctx)
 	defer cancel()
-	cur, err := cs.itemColl.Find(findCtx, repairDue(cs.now()),
-		options.Find().SetLimit(limit).SetSort(repairOrder).SetProjection(bson.M{"name": 1}))
+	now := cs.now()
+	cur, err := cs.itemColl.Find(findCtx, repairDue(now),
+		options.Find().SetLimit(limit).SetSort(repairOrder).SetProjection(bson.M{
+			"name": 1, "repair_at": 1, "refresh_needed": 1, "refresh_next_at": 1, "rereads": 1,
+		}))
 	if err != nil {
 		return 0, err
 	}
@@ -490,9 +479,28 @@ func (cs *cacheService) repairOnce(ctx context.Context, limit int64) (int, error
 		if ctx.Err() != nil {
 			break
 		}
+		if due := repairAt(&d); due == 0 || due > now.UnixMilli() {
+			cs.reschedule(ctx, &d, due)
+			continue
+		}
 		if cs.refreshLeased(ctx, d.FullName) {
 			done++
 		}
 	}
 	return done, nil
+}
+
+// reschedule stores the repair_at of a record that the scan took by an outdated one (0: unset),
+// unless the record changed in between (then its writer set it)
+func (cs *cacheService) reschedule(ctx context.Context, d *NameDataItem, due int64) {
+	ctx, cancel := boundedCtx(ctx)
+	defer cancel()
+	set, unset := bson.M{}, bson.M{}
+	setOrUnset(set, unset, "repair_at", due, due == 0)
+	_, err := cs.itemColl.UpdateOne(ctx, bson.M{"_id": d.ID, "repair_at": d.RepairAt}, updateDoc(set, unset))
+	if err != nil {
+		log.Warn("cache repair: failed to reschedule a record", zap.String("FullName", d.FullName), zap.Error(err))
+		return
+	}
+	log.Debug("cache repair: not due, rescheduled without a read", zap.String("FullName", d.FullName), zap.Int64("repair_at", due))
 }
