@@ -299,6 +299,25 @@ func TestCacheService_Repair(t *testing.T) {
 		require.Zero(t, n)
 	})
 
+	t.Run("records due under the 0.7.1 rules do not starve a due re-read (they do not count toward the batch)", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		// 30 old-rule records, all due before the re-read
+		for i := 0; i < 30; i++ {
+			insertRaw(t, fx, bson.M{"name": fmt.Sprintf("old%02d.any", i), "name_expires": lapsed, "observed_block": int64(10), "repair_at": int64(1 + i)})
+		}
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"rereads": bson.A{int64(1000)}, "repair_at": int64(1000)}})
+		require.NoError(t, err)
+
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.Equal(t, 1, repairRound(t, fx))
+		require.NotContains(t, cachedItem(t, fx).Rereads, int64(1000), "the re-read was done in the first round")
+		n, err := fx.itemColl.CountDocuments(ctx, repairDue(time.Now()))
+		require.NoError(t, err)
+		require.Zero(t, n)
+	})
+
 	t.Run("an incomplete record is repaired after its backoff", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)

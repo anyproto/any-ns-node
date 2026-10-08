@@ -453,41 +453,68 @@ func repairDue(now time.Time) bson.M {
 
 var repairOrder = bson.D{{Key: "repair_at", Value: 1}, {Key: "_id", Value: 1}}
 
+// maxReschedules bounds the records one round of the scan reschedules without a read (see
+// repairOnce): after an upgrade from 0.7.1 they come in thousands, the first rounds work them off
+const maxReschedules = 500
+
 // repairOnce re-reads up to limit names that are due (see repairAt), the longest waiting first:
 // a record that keeps failing moves back with its backoff, it can not starve the others.
 // a record whose repair_at was set under other rules (0.7.1 scheduled expiries, lapses and daily
 // re-reads) is not read: its repair_at is recomputed from its fields and stored, without a
-// contract call. returns how many it re-read
+// contract call. such records do not count toward limit (they could fill every round and starve
+// the records that are really due): the scan pages on (by repair_at and _id), at most
+// maxReschedules of them per round. returns how many it re-read
 func (cs *cacheService) repairOnce(ctx context.Context, limit int64) (int, error) {
+	now := cs.now()
+	filter := repairDue(now)
+	done, reads, rescheduled := 0, int64(0), 0
+	for reads < limit && rescheduled < maxReschedules && ctx.Err() == nil {
+		docs, err := cs.repairPage(ctx, filter, limit)
+		if err != nil {
+			return done, err
+		}
+		for i := range docs {
+			d := &docs[i]
+			if ctx.Err() != nil || reads >= limit || rescheduled >= maxReschedules {
+				return done, nil
+			}
+			if due := repairAt(d); due == 0 || due > now.UnixMilli() {
+				cs.reschedule(ctx, d, due)
+				rescheduled++
+				continue
+			}
+			reads++
+			if cs.refreshLeased(ctx, d.FullName) {
+				done++
+			}
+		}
+		if int64(len(docs)) < limit {
+			break
+		}
+		// the next page: after the last record of this one, whatever happened to the records
+		last := docs[len(docs)-1]
+		filter = bson.M{"repair_at": bson.M{"$lte": now.UnixMilli()}, "$or": bson.A{
+			bson.M{"repair_at": bson.M{"$gt": last.RepairAt}},
+			bson.M{"repair_at": last.RepairAt, "_id": bson.M{"$gt": last.ID}},
+		}}
+	}
+	return done, nil
+}
+
+// repairPage: one page of the scan, served by the repair index
+func (cs *cacheService) repairPage(ctx context.Context, filter bson.M, limit int64) ([]NameDataItem, error) {
 	findCtx, cancel := boundedCtx(ctx)
 	defer cancel()
-	now := cs.now()
-	cur, err := cs.itemColl.Find(findCtx, repairDue(now),
+	cur, err := cs.itemColl.Find(findCtx, filter,
 		options.Find().SetLimit(limit).SetSort(repairOrder).SetProjection(bson.M{
 			"name": 1, "repair_at": 1, "refresh_needed": 1, "refresh_next_at": 1, "rereads": 1,
 		}))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	var docs []NameDataItem
-	if err = cur.All(findCtx, &docs); err != nil {
-		return 0, err
-	}
-
-	done := 0
-	for _, d := range docs {
-		if ctx.Err() != nil {
-			break
-		}
-		if due := repairAt(&d); due == 0 || due > now.UnixMilli() {
-			cs.reschedule(ctx, &d, due)
-			continue
-		}
-		if cs.refreshLeased(ctx, d.FullName) {
-			done++
-		}
-	}
-	return done, nil
+	err = cur.All(findCtx, &docs)
+	return docs, err
 }
 
 // reschedule stores the repair_at of a record that the scan took by an outdated one (0: unset),
