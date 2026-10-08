@@ -202,7 +202,7 @@ func TestCacheService_Aliases(t *testing.T) {
 		for _, registered := range []bool{true, false} {
 			fx := newFixture(t)
 			doc := aliasDoc(testAnyID, 0)
-			doc["repair_at"] = int64(1)
+			doc["refresh_needed"], doc["repair_at"] = true, int64(1)
 			insertRaw(t, fx, doc)
 
 			if registered {

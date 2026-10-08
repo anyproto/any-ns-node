@@ -80,10 +80,6 @@ func newRealCache(t *testing.T) (cache.CacheService, *mock_contracts.MockContrac
 		n := 1000 + block.Add(1)
 		return &contracts.Block{Number: n, Hash: common.BigToHash(big.NewInt(n)), Time: uint64(time.Now().Unix())}, nil
 	}).AnyTimes()
-	cm.EXPECT().FinalizedBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
-		n := 1000 + block.Load()
-		return &contracts.Block{Number: n, Hash: common.BigToHash(big.NewInt(n)), Time: uint64(time.Now().Unix())}, nil
-	}).AnyTimes()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(testMongoURI()))
 	require.NoError(t, err)
@@ -413,29 +409,41 @@ func TestAnynsRpc_GetOperation_RealCache(t *testing.T) {
 		require.LessOrEqual(t, item.RepairAt, slices.Min(item.Rereads))
 	})
 
-	t.Run("cached, the latest block says not registered (lagging provider): Completed, nothing is removed", func(t *testing.T) {
+	t.Run("cached, the latest block says not registered (lagging provider): Completed, nothing is removed or marked", func(t *testing.T) {
 		fx := newFixture(t, "")
 		defer fx.finish(t)
 		cs, cm, coll := newRealCache(t)
 		fx.anynsAARpc.cache = cs
 		seed(t, coll)
 		completedOp(fx)
-		// no owner at the latest block (a lagging backend), registered at the finalized one
+		// no owner and no expiry at the latest block (a lagging backend): one read, no finalized read
+		read := make(chan struct{})
 		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
-		cm.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
-		cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
-		cm.EXPECT().GetNameExpires(gomock.Any(), opName, gomock.Any()).Return(big.NewInt(oldExpires), nil)
+		cm.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, common.Hash) (*big.Int, error) {
+			close(read)
+			return big.NewInt(0), nil
+		})
 
+		start := time.Now()
 		resp, err := getOperation(t, fx)
 		require.NoError(t, err)
 		require.Equal(t, nsp.OperationState_Completed, resp.OperationState)
 
-		// not final: the record stays as it is, marked, with the re-reads
-		eventually(t, "the mark", func() bool { return cachedItem(t, coll).RefreshNeeded })
+		// settled: the record stays as it is, not marked (no backoff loop), the re-reads (+5,
+		// +30 min) are what reads it again
+		select {
+		case <-read:
+		case <-time.After(watchdog):
+			t.Fatal("the background refresh did not run")
+		}
+		eventually(t, "the re-reads", func() bool { return len(cachedItem(t, coll).Rereads) == 2 })
+		time.Sleep(100 * time.Millisecond)
 		item := cachedItem(t, coll)
 		require.False(t, item.Removed)
+		require.False(t, item.RefreshNeeded)
+		require.Zero(t, item.RefreshFailures)
 		require.Equal(t, oldEoa, item.OwnerEthAddress)
-		require.Len(t, item.Rereads, 2)
+		requireRereads(t, item, start)
 		out, err := cs.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: opName})
 		require.NoError(t, err)
 		require.False(t, out.Available)

@@ -38,12 +38,11 @@ func testService(coll *mongo.Collection, m contracts.ContractsService, txSupport
 	return &cacheService{itemColl: coll, contracts: m, txSupported: txSupported, now: time.Now}
 }
 
-// a second cache service on the same collection, with its own contracts and chain head (also
-// its finalized block): the other ns node, or another request on this one
+// a second cache service on the same collection, with its own contracts and chain head: the
+// other ns node, or another request on this one
 func otherCacheService(t *testing.T, fx *fixture, block int64, at time.Time) (*cacheService, *mock_contracts.MockContractsService) {
 	m := mock_contracts.NewMockContractsService(gomock.NewController(t))
 	m.EXPECT().LatestBlock(gomock.Any()).Return(testBlock(block, at), nil).AnyTimes()
-	m.EXPECT().FinalizedBlock(gomock.Any()).Return(testBlock(block, at), nil).AnyTimes()
 	return testService(fx.itemColl, m, fx.txSupported), m
 }
 
@@ -60,9 +59,6 @@ func serviceWithClient(t *testing.T, fx *fixture, opts *options.ClientOptions) (
 	m := mock_contracts.NewMockContractsService(gomock.NewController(t))
 	m.EXPECT().LatestBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
 		return fx.latestBlock(), nil
-	}).AnyTimes()
-	m.EXPECT().FinalizedBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
-		return fx.finalizedBlock()
 	}).AnyTimes()
 	coll := client.Database(testDbName).Collection("cache", options.Collection().SetWriteConcern(majorityWrite(storeTimeout)))
 	return testService(coll, m, fx.txSupported), m
@@ -119,10 +115,9 @@ func failCommand(t *testing.T, data bson.M, mode bson.M) {
 	})
 }
 
-// updateConfirmed is UpdateInCache as the background (and the backfill) runs it: a removal is
-// confirmed at the finalized block
-func (cs *cacheService) updateConfirmed() error {
-	_, err := cs.refresh(ctx, testFullName, refreshOpts{confirm: true})
+// refreshName refreshes testFullName as the background (and the backfill) does
+func (cs *cacheService) refreshName() error {
+	_, err := cs.refresh(ctx, testFullName, refreshOpts{})
 	return err
 }
 
@@ -141,10 +136,10 @@ func TestNewer(t *testing.T) {
 	incomplete := obsAt(11, "0xb", 1)
 	incomplete.RefreshNeeded = true
 	require.True(t, newer(incomplete, a))
-	tomb := &NameDataItem{FullName: testFullName, Removed: true, ObservedBlock: 9, ObservedBlockHash: "0x9", ObservedAt: 1000}
-	require.False(t, newer(tomb, a), "an older tombstone never replaces a newer registration")
-	require.False(t, newer(obsAt(8, "0x8", 2000), &NameDataItem{Removed: true, ObservedBlock: 9, ObservedBlockHash: "0x9"}),
-		"an older registration never replaces a newer tombstone")
+	lapse := &NameDataItem{FullName: testFullName, Lapsed: true, ObservedBlock: 9, ObservedBlockHash: "0x9", ObservedAt: 1000}
+	require.False(t, newer(lapse, a), "an older lapse never replaces a newer registration")
+	require.False(t, newer(obsAt(8, "0x8", 2000), &NameDataItem{Lapsed: true, ObservedBlock: 9, ObservedBlockHash: "0x9"}),
+		"an older registration never replaces a newer lapse")
 
 	// one height, two forks: the one read last
 	require.True(t, newer(obsAt(10, "0xb", 101), a))
@@ -191,14 +186,14 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- fx.updateConfirmed()
+			done <- fx.refreshName()
 		}()
 		p.Entered(t)
 
 		// node B: a new registration is cached at block 101
 		b, bContracts := otherCacheService(t, fx, 101, time.Now())
 		expectRegistered(bContracts, otherScw, otherEoa, otherAnyID, notExpired)
-		require.NoError(t, b.updateConfirmed())
+		require.NoError(t, b.refreshName())
 
 		p.Release()
 		select {
@@ -220,81 +215,86 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(200, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.updateConfirmed())
+		require.NoError(t, fx.refreshName())
 
 		lagging, laggingContracts := otherCacheService(t, fx, 150, time.Now())
 		expectRegistered(laggingContracts, testScw, testEoa, testAnyID, inGrace)
-		require.NoError(t, lagging.updateConfirmed())
+		require.NoError(t, lagging.refreshName())
 
 		require.Equal(t, notExpired, cachedItem(t, fx).NameExpires)
 	})
 
-	t.Run("lagging provider: a confirmed removal older than the cached registration is refused", func(t *testing.T) {
+	t.Run("lagging provider: a lapse read at an older block does not overwrite a newer registration", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
 		fx.setHead(200, time.Now())
 		expectRegistered(fx.contracts, otherScw, otherEoa, otherAnyID, notExpired)
-		require.NoError(t, fx.updateConfirmed())
+		require.NoError(t, fx.refreshName())
 
-		// a lagging provider: block 150 (latest and finalized), before the registration
+		// a lagging provider: block 150, before the registration (a re-registration after a lapse)
 		lagging, laggingContracts := otherCacheService(t, fx, 150, time.Now())
 		expectLapsed(laggingContracts)
-		err := lagging.updateConfirmed()
-		require.ErrorIs(t, err, errNotFinal)
+		require.NoError(t, lagging.refreshName())
 
 		item := cachedItem(t, fx)
-		require.False(t, item.Removed)
+		require.False(t, item.Lapsed)
 		require.Equal(t, int64(200), item.ObservedBlock)
-		require.False(t, isNameAvailable(t, fx.cacheService).Available)
+		require.Equal(t, notExpired, item.NameExpires)
+		require.Equal(t, otherEoa, isNameAvailable(t, fx.cacheService).OwnerEthAddress)
 	})
 
-	t.Run("a tombstone is not overwritten by an older observation", func(t *testing.T) {
+	t.Run("a lapse is not overwritten by an older observation, the owner stays", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seedItem(t, fx, inGrace, 10, 0)
 
-		// the lapse is confirmed at the finalized block 300: a tombstone
-		fx.setHead(310, time.Now())
-		fx.setFinalized(300, time.Now())
-		expectLapsed(fx.contracts)
-		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
-
-		// a backfill that read block 250 (still registered then) finishes after it
-		backfill, backfillContracts := otherCacheService(t, fx, 250, time.Now().Add(time.Hour))
-		expectRegistered(backfillContracts, testScw, testEoa, testAnyID, inGrace)
-		err := backfill.updateConfirmed()
-		require.ErrorIs(t, err, ErrNameNotRegistered)
-
-		item := cachedItem(t, fx)
-		require.True(t, item.Removed)
-		require.Equal(t, int64(300), item.ObservedBlock)
-		require.True(t, isNameAvailable(t, fx.cacheService).Available)
-
-		// the old owner does not resolve any more
-		res, err := fx.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{AnyAddress: testAnyID})
-		require.NoError(t, err)
-		require.False(t, res.Found)
-		res, err = fx.GetNameByAddress(ctx, &nsp.NameByAddressRequest{OwnerScwEthAddress: testScw})
-		require.NoError(t, err)
-		require.False(t, res.Found)
-	})
-
-	t.Run("a registration after a tombstone replaces it", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		seedItem(t, fx, lapsed, 10, 0)
-
+		// the lapse read at block 300
 		fx.setHead(300, time.Now())
 		expectLapsed(fx.contracts)
-		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
+		require.NoError(t, fx.refreshName())
 
-		fx.setHead(301, time.Now())
-		expectRegistered(fx.contracts, otherScw, otherEoa, otherAnyID, notExpired)
-		require.NoError(t, fx.updateConfirmed())
+		// a backfill that read block 250 (still in the grace period then) finishes after it
+		backfill, backfillContracts := otherCacheService(t, fx, 250, time.Now().Add(time.Hour))
+		expectRegistered(backfillContracts, testScw, testEoa, testAnyID, inGrace)
+		require.NoError(t, backfill.refreshName())
 
-		require.Equal(t, otherEoa, isNameAvailable(t, fx.cacheService).OwnerEthAddress)
-		require.EqualValues(t, 1, countRecords(t, fx))
+		item := cachedItem(t, fx)
+		require.True(t, item.Lapsed)
+		require.Equal(t, lapsed, item.NameExpires)
+		require.Equal(t, int64(300), item.ObservedBlock)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
+
+		// the owner still resolves: the name is reserved for it
+		require.True(t, byAnyID(t, fx, testAnyID).Found)
+		res, err := fx.GetNameByAddress(ctx, &nsp.NameByAddressRequest{OwnerScwEthAddress: testScw})
+		require.NoError(t, err)
+		require.True(t, res.Found)
+	})
+
+	t.Run("a registration after a lapse (or a 0.7.1 tombstone) replaces it", func(t *testing.T) {
+		for _, tombstone := range []bool{false, true} {
+			fx := newFixture(t)
+			if tombstone {
+				insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": int64(300), "observed_block_hash": blockHash(300).Hex()})
+			} else {
+				seedItem(t, fx, lapsed, 10, 0)
+				fx.setHead(300, time.Now())
+				expectLapsed(fx.contracts)
+				require.NoError(t, fx.refreshName())
+			}
+
+			fx.setHead(301, time.Now())
+			expectRegistered(fx.contracts, otherScw, otherEoa, otherAnyID, notExpired)
+			require.NoError(t, fx.refreshName())
+
+			item := cachedItem(t, fx)
+			require.False(t, item.Lapsed)
+			require.False(t, item.Removed)
+			require.Equal(t, otherEoa, isNameAvailable(t, fx.cacheService).OwnerEthAddress)
+			require.EqualValues(t, 1, countRecords(t, fx))
+			fx.finish(t)
+		}
 	})
 
 	t.Run("the same block: an incomplete read does not replace a complete record", func(t *testing.T) {
@@ -303,13 +303,13 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(400, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.updateConfirmed())
+		require.NoError(t, fx.refreshName())
 
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(notExpired), nil)
 		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), testFullName, gomock.Any()).Return("", "", "", errors.New("rpc is down"))
 		// the cache has the complete record of that block: that is what the caller gets
-		require.NoError(t, fx.updateConfirmed())
+		require.NoError(t, fx.refreshName())
 
 		item := cachedItem(t, fx)
 		require.False(t, item.RefreshNeeded)
@@ -330,7 +330,7 @@ func TestCacheService_ChainOrder(t *testing.T) {
 			fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(notExpired), nil)
 			fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), testFullName, gomock.Any()).Return(c.scw, testAnyID, "", nil)
 			fx.contracts.EXPECT().GetScwOwner(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, errors.New("rpc is down"))
-			require.ErrorIs(t, fx.updateConfirmed(), ErrNameDataIncomplete)
+			require.ErrorIs(t, fx.refreshName(), ErrNameDataIncomplete)
 
 			item := cachedItem(t, fx)
 			require.Equal(t, c.owner, item.OwnerEthAddress)
@@ -379,14 +379,14 @@ func TestCacheService_ChainOrder(t *testing.T) {
 
 		fx.setHead(1, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.updateConfirmed())
+		require.NoError(t, fx.refreshName())
 
 		require.Equal(t, notExpired, cachedItem(t, fx).NameExpires)
 		require.EqualValues(t, 1, countRecords(t, fx))
 	})
 }
 
-// a tombstone never resolves in a reverse lookup, whatever fields its document has
+// a 0.7.1 tombstone never resolves in a reverse lookup, whatever fields its document has
 func TestCacheService_ReverseLookupSkipsTombstones(t *testing.T) {
 	fx := newFixture(t)
 	defer fx.finish(t)
@@ -402,153 +402,199 @@ func TestCacheService_ReverseLookupSkipsTombstones(t *testing.T) {
 	require.False(t, res.Found)
 }
 
-// a cached name becomes available only when the latest block says it is not registered AND a
-// re-read at the finalized block confirms it
-func TestCacheService_Finality(t *testing.T) {
-	t.Run("not registered at the latest block, registered at the finalized one: nothing is removed", func(t *testing.T) {
+// a lapse (expired and past the grace period) keeps the record: a name stays reserved to the
+// identity that registered it. the lapse is stored in place, the owner fields are never wiped
+func TestCacheService_Lapse(t *testing.T) {
+	t.Run("the owner, AnyID, space and canon stay; lapsed, the expiry and the block are stored; no enrichment read", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, inGrace, 10, 0)
+		// incomplete and marked, with a backoff count: a lapse has nothing more to read
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{
+			"canon": testFullName, "incomplete": true, "refresh_needed": true, "refresh_failures": 3, "repair_at": int64(1)}})
+		require.NoError(t, err)
+
+		fx.setHead(300, time.Now())
+		// (only these two reads: an enrichment read fails the test)
+		expectLapsed(fx.contracts)
+		require.NoError(t, fx.refreshName())
+
+		item := cachedItem(t, fx)
+		require.True(t, item.Lapsed)
+		require.Equal(t, lapsed, item.NameExpires)
+		require.Equal(t, int64(300), item.ObservedBlock)
+		require.Equal(t, blockHash(300).Hex(), item.ObservedBlockHash)
+		require.Equal(t, strings.ToLower(nameWrapper), item.RegistryOwner)
+		require.Equal(t, testEoa, item.OwnerEthAddress)
+		require.Equal(t, testScw, item.OwnerScwEthAddress)
+		require.Equal(t, testAnyID, item.OwnerAnyAddress)
+		require.Equal(t, "space", item.SpaceId)
+		require.Equal(t, testFullName, item.Canon)
+		require.False(t, item.Incomplete)
+		require.False(t, item.RefreshNeeded)
+		require.Zero(t, item.RefreshFailures)
+		require.Zero(t, item.RepairAt, "nothing to read: not scanned")
+		require.False(t, item.Removed)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
+		require.Zero(t, fx.runQueued())
+
+		// idempotent: read again at a later block, the same record
+		before := rawItem(t, fx, testFullName)
+		fx.setHead(301, time.Now())
+		expectLapsed(fx.contracts)
+		require.NoError(t, fx.refreshName())
+		after := rawItem(t, fx, testFullName)
+		require.Equal(t, int64(301), after["observed_block"])
+		for _, k := range []string{"owner_eth_address", "owner_scw_eth_address", "owner_any_address", "space_id", "name_expires", "lapsed", "canon", "_id"} {
+			require.Equal(t, before[k], after[k], k)
+		}
+		require.EqualValues(t, 1, countRecords(t, fx))
+	})
+
+	t.Run("an older lapse observation does not overwrite a newer record", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 500, time.Now().UnixMilli())
+
+		fx.setHead(400, time.Now())
+		expectLapsed(fx.contracts)
+		require.NoError(t, fx.refreshName())
+
+		item := cachedItem(t, fx)
+		require.False(t, item.Lapsed)
+		require.Equal(t, notExpired, item.NameExpires)
+		require.Equal(t, int64(500), item.ObservedBlock)
+	})
+
+	t.Run("a 0.7.1 tombstone: the lapse is stored, removed stays (it has no owner to keep)", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": int64(10), "observed_block_hash": blockHash(10).Hex()})
+
+		fx.setHead(300, time.Now())
+		expectLapsed(fx.contracts)
+		require.NoError(t, fx.refreshName())
+		item := cachedItem(t, fx)
+		require.True(t, item.Lapsed)
+		require.True(t, item.Removed)
+		require.Equal(t, lapsed, item.NameExpires)
+		out := isNameAvailable(t, fx.cacheService)
+		require.False(t, out.Available)
+		require.Equal(t, lapsed, out.NameExpires)
+	})
+
+	t.Run("lapsed and not cached: nothing is written, not registered", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		expectLapsed(fx.contracts)
+		require.ErrorIs(t, fx.refreshName(), ErrNameNotRegistered)
+		require.Zero(t, countRecords(t, fx))
+	})
+
+	t.Run("a dry run decides the same, writes nothing", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, inGrace, 10, 0)
+		before := rawItem(t, fx, testFullName)
+
+		expectLapsed(fx.contracts)
+		stored, err := fx.refresh(ctx, testFullName, refreshOpts{dry: true})
+		require.NoError(t, err)
+		require.True(t, stored.Lapsed)
+		require.Equal(t, testEoa, stored.OwnerEthAddress)
+		require.Equal(t, before, rawItem(t, fx, testFullName))
+	})
+}
+
+// the chain says that a name was never registered: a cached record is never removed (a lagging
+// provider right after a registration); nothing cached stays nothing
+func TestCacheService_NotOnChain(t *testing.T) {
+	noOwner := func(m *mock_contracts.MockContractsService) {
+		m.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
+		m.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
+	}
+
+	t.Run("cached: kept as it is, a settled refresh (no backoff loop), served as taken", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seedItem(t, fx, notExpired, 10, 0)
+		before := rawItem(t, fx, testFullName)
 
 		fx.setHead(300, time.Now())
-		fx.setFinalized(290, time.Now())
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), blockHash(300)).Return(big.NewInt(0), nil)
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(notExpired), nil)
-
-		err := fx.updateConfirmed()
+		noOwner(fx.contracts)
+		err := fx.refreshName()
 		require.ErrorIs(t, err, ErrNameNotRegistered)
-		require.ErrorIs(t, err, errNotFinal)
-
-		item := cachedItem(t, fx)
-		require.False(t, item.Removed)
-		require.Equal(t, int64(10), item.ObservedBlock)
+		require.ErrorIs(t, err, errNotOnChain)
+		require.False(t, failed(err), "settled: no backoff")
+		require.Equal(t, before, rawItem(t, fx, testFullName))
 		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
-	})
 
-	t.Run("lapsed at the latest block, still in the grace period at the finalized one: nothing is removed", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		// lapses exactly between the finalized block and the latest one
-		exp := time.Now().Add(-time.Minute).Unix() - gracePeriodSec
-		seedItem(t, fx, exp, 10, 0)
-
-		fx.setHead(300, time.Now())
-		fx.setFinalized(290, time.Now().Add(-10*time.Minute))
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(exp), nil).Times(2)
-
-		require.ErrorIs(t, fx.updateConfirmed(), errNotFinal)
-		require.False(t, cachedItem(t, fx).Removed)
-	})
-
-	t.Run("the finalized block can not be read: a failure, nothing is removed", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		seedItem(t, fx, lapsed, 10, 0)
-
-		fx.setFinalizedErr(errors.New("unknown block tag"))
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(lapsed), nil)
-
-		err := fx.updateConfirmed()
-		require.Error(t, err)
-		require.NotErrorIs(t, err, ErrNameNotRegistered, "not a not-final answer: the confirmation failed")
-		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
-	})
-
-	t.Run("the registry read at the finalized block fails: a failure, nothing is removed", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		seedItem(t, fx, lapsed, 10, 0)
-
-		fx.setHead(300, time.Now())
-		fx.setFinalized(290, time.Now())
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.Address{}, nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), blockHash(300)).Return(big.NewInt(0), nil)
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.Address{}, errors.New("rpc is down"))
-
-		err := fx.updateConfirmed()
-		require.Error(t, err)
-		require.NotErrorIs(t, err, ErrNameNotRegistered)
-		require.False(t, cachedItem(t, fx).Removed)
-	})
-
-	t.Run("confirmed: the tombstone is written at the finalized block", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		seedItem(t, fx, lapsed, 10, 0)
-
-		fx.setHead(300, time.Now())
-		fx.setFinalized(280, time.Now())
-		expectLapsed(fx.contracts)
-
-		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
+		// a record that is not marked: no backoff, nothing marked, not due
+		noOwner(fx.contracts)
+		require.True(t, fx.refreshLeased(ctx, testFullName))
 		item := cachedItem(t, fx)
-		require.True(t, item.Removed)
-		require.Equal(t, int64(280), item.ObservedBlock)
-		require.Equal(t, blockHash(280).Hex(), item.ObservedBlockHash)
-		require.Empty(t, item.OwnerEthAddress)
-		require.Empty(t, item.OwnerAnyAddress)
-		require.EqualValues(t, 1, countRecords(t, fx))
-		require.True(t, isNameAvailable(t, fx.cacheService).Available)
+		require.Zero(t, item.RefreshFailures)
+		require.False(t, item.RefreshNeeded)
+		require.Zero(t, item.RepairAt)
+		require.Equal(t, testEoa, item.OwnerEthAddress)
 	})
 
-	t.Run("no owner in the registry (confirmed): a tombstone replaces the record", func(t *testing.T) {
+	t.Run("cached and marked (e.g. restored for a read): kept marked, retried after a growing backoff, not every lease", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-		seedItem(t, fx, notExpired, 0, 0)
+		seedItem(t, fx, notExpired, 10, 0)
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"refresh_needed": true, "repair_at": int64(1)}})
+		require.NoError(t, err)
+		old := refreshLease
+		refreshLease = time.Millisecond
+		defer func() { refreshLease = old }()
 
-		// at the latest block, then at the finalized one
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).Times(2)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil).Times(2)
-
-		require.ErrorIs(t, fx.updateConfirmed(), ErrNameNotRegistered)
-		require.True(t, cachedItem(t, fx).Removed)
+		at := time.Now()
+		for i, want := range []time.Duration{time.Minute, 2 * time.Minute} {
+			fx.now = func() time.Time { return at }
+			noOwner(fx.contracts)
+			require.Equal(t, 1, repairRound(t, fx))
+			item := cachedItem(t, fx)
+			require.True(t, item.RefreshNeeded)
+			require.Equal(t, i+1, item.RefreshFailures)
+			require.Equal(t, at.Add(want).UnixMilli(), item.RepairAt)
+			require.Equal(t, testAnyID, item.OwnerAnyAddress)
+			fx.now = func() time.Time { return at.Add(want - time.Second) }
+			require.Zero(t, repairRound(t, fx))
+			at = at.Add(want + time.Second)
+		}
 	})
 
-	t.Run("a request never reads the finalized block: the record stays taken, the background confirms", func(t *testing.T) {
+	t.Run("a marked record past the retries is retired: unmarked, not due, never read again", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-		seedItem(t, fx, lapsed, 10, time.Now().UnixMilli())
+		seedItem(t, fx, notExpired, 10, 0)
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{
+			"refresh_needed": true, "refresh_failures": notOnChainRetries, "repair_at": int64(1)}})
+		require.NoError(t, err)
 
-		fx.setHead(300, time.Now())
-		fx.setFinalized(290, time.Now())
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(300)).Return(common.HexToAddress(nameWrapper), nil).Times(2)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(300)).Return(big.NewInt(lapsed), nil).Times(2)
-
-		var headers int
-		fx.setHeadFunc(func() *contracts.Block {
-			headers++
-			return testBlock(300, time.Now())
-		})
-		fx.setFinalizedErr(errors.New("a request must not read the finalized block"))
-		err := fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName})
-		require.ErrorIs(t, err, errNotFinal)
-		require.Equal(t, 1, headers)
-		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), lapsed)
-
-		// the background confirms it at the finalized block
-		fx.setFinalizedErr(nil)
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), blockHash(290)).Return(common.HexToAddress(nameWrapper), nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, blockHash(290)).Return(big.NewInt(lapsed), nil)
-		require.Equal(t, 1, fx.runQueued())
-		require.True(t, isNameAvailable(t, fx.cacheService).Available)
-		require.Equal(t, int64(290), cachedItem(t, fx).ObservedBlock)
+		noOwner(fx.contracts)
+		require.Equal(t, 1, repairRound(t, fx))
+		item := cachedItem(t, fx)
+		require.False(t, item.RefreshNeeded)
+		require.Zero(t, item.RepairAt)
+		require.Equal(t, testAnyID, item.OwnerAnyAddress)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+		// (no more contract expectations: a read fails the test)
+		for _, later := range []time.Duration{time.Hour, 48 * time.Hour} {
+			fx.now = func() time.Time { return time.Now().Add(later) }
+			require.Zero(t, repairRound(t, fx))
+			require.Zero(t, fx.runQueued())
+		}
 	})
 
-	t.Run("not registered and nothing cached: no finalized read, nothing written", func(t *testing.T) {
+	t.Run("not cached: ErrNameNotRegistered (not errNotOnChain), nothing written", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-
-		fx.setFinalizedErr(errors.New("must not be read"))
-		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
-		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
-
-		err := fx.updateConfirmed()
+		noOwner(fx.contracts)
+		err := fx.refreshName()
 		require.ErrorIs(t, err, ErrNameNotRegistered)
-		require.NotErrorIs(t, err, errNotFinal)
+		require.NotErrorIs(t, err, errNotOnChain)
 		require.Zero(t, countRecords(t, fx))
 	})
 }
@@ -561,8 +607,8 @@ func TestCacheService_TransactionInterleave(t *testing.T) {
 		older, newerO *NameDataItem
 	}{
 		{"registration over registration", obsAt(100, blockHash(100).Hex(), time.Now().UnixMilli()), obsAt(200, blockHash(200).Hex(), time.Now().UnixMilli())},
-		{"registration over a tombstone", obsAt(100, blockHash(100).Hex(), time.Now().UnixMilli()),
-			&NameDataItem{FullName: testFullName, Removed: true, ObservedBlock: 200, ObservedBlockHash: blockHash(200).Hex(), ObservedAt: time.Now().UnixMilli()}},
+		{"registration over a lapse", obsAt(100, blockHash(100).Hex(), time.Now().UnixMilli()),
+			&NameDataItem{FullName: testFullName, Lapsed: true, NameExpires: lapsed, ObservedBlock: 200, ObservedBlockHash: blockHash(200).Hex(), ObservedAt: time.Now().UnixMilli()}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			fx := newFixture(t)
@@ -606,7 +652,8 @@ func TestCacheService_TransactionInterleave(t *testing.T) {
 
 			item := cachedItem(t, fx)
 			require.Equal(t, int64(200), item.ObservedBlock)
-			require.Equal(t, c.newerO.Removed, item.Removed)
+			require.Equal(t, c.newerO.Lapsed, item.Lapsed)
+			require.Equal(t, testEoa, item.OwnerEthAddress, "the owner stays")
 			require.EqualValues(t, 1, countRecords(t, fx))
 		})
 	}
@@ -633,9 +680,9 @@ func TestCacheService_ConcurrentWriters(t *testing.T) {
 				defer wg.Done()
 				<-start
 				o := obsAt(block, blockHash(block).Hex(), time.Now().UnixMilli())
-				// every third one a tombstone
+				// every third one a lapse (stored in place, or nothing while there is no record)
 				if block%3 == 0 {
-					o = &NameDataItem{FullName: testFullName, Removed: true, ObservedBlock: block, ObservedBlockHash: blockHash(block).Hex()}
+					o = &NameDataItem{FullName: testFullName, Lapsed: true, NameExpires: lapsed, ObservedBlock: block, ObservedBlockHash: blockHash(block).Hex()}
 				}
 				_, err := fx.applyObservation(ctx, o, refreshOpts{})
 				errs <- err
@@ -884,7 +931,7 @@ func TestCacheService_CanonicalNames(t *testing.T) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).AnyTimes()
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(0), nil).AnyTimes()
 
-		err := fx.updateConfirmed()
+		err := fx.refreshName()
 		require.ErrorIs(t, err, errInconsistentRegistry)
 		require.NotErrorIs(t, err, ErrNameNotRegistered)
 

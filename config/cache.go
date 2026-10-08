@@ -9,6 +9,6 @@ type Cache struct {
 	AllowUnsafeStandalone bool `yaml:"allowUnsafeStandalone"`
 
 	// how often the background repair scans the cache for the records that need a refresh
-	// (seconds): incomplete ones, expired ones, lapsed ones. 0: the default (60), negative: off
+	// (seconds): incomplete ones and the re-reads after an operation. 0: the default (60), negative: off
 	RepairIntervalSec int `yaml:"repairIntervalSec"`
 }

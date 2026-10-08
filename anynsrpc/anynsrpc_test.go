@@ -426,49 +426,88 @@ func TestAnynsRpc_GetNameByAnyId(t *testing.T) {
 	})
 }
 
-func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		fx := newFixture(t, true)
-		defer fx.finish(t)
+// a signed admin registration of hello.any for anyID, as the payment node sends it
+func adminRegisterRequest(t *testing.T, anyID string) *nsp.NameRegisterRequestSigned {
+	realSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+	decodedPeerKey, err := crypto.DecodeKeyFromString(realSignKey, crypto.UnmarshalEd25519PrivateKey, nil)
+	require.NoError(t, err)
 
+	req := nsp.NameRegisterRequest{}
+	req.OwnerAnyAddress = anyID
+	// the cache is checked by the canonical spelling
+	req.FullName = "Hello.any"
+	req.OwnerEthAddress = "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"
+
+	nrrs := &nsp.NameRegisterRequestSigned{}
+	nrrs.Payload, err = req.MarshalVT()
+	require.NoError(t, err)
+	nrrs.Signature, err = decodedPeerKey.Sign(nrrs.Payload)
+	require.NoError(t, err)
+	return nrrs
+}
+
+func TestAnynsRpc_AdminNameRegisterSigned(t *testing.T) {
+	// OwnerAnyID
+	const anytypeID = "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+	const peerID = "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
+	pctx := peer.CtxWithPeerId(context.Background(), peerID)
+
+	expectRegistered := func(fx *fixture) {
 		fx.aa.EXPECT().AdminNameRegister(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx interface{}, in interface{}) (string, error) {
 			return "operation-id", nil
 		}).MinTimes(1)
-
 		fx.db.EXPECT().SaveOperation(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, operationID string, operation nsp.CreateUserOperationRequest) error {
 			return nil
 		}).MinTimes(1)
+	}
+	cached := func(fx *fixture, resp *nsp.NameAvailableResponse, err error) {
+		fx.cache.EXPECT().IsNameAvailable(gomock.Any(), &nsp.NameAvailableRequest{FullName: "hello.any"}).Return(resp, err)
+	}
 
-		// OwnerAnyID
-		AnytypeID := "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
-		PeerID := "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
-		realSignKey := "3MFdA66xRw9PbCWlfa620980P4QccXehFlABnyJ/tfwHbtBVHt+KWuXOfyWSF63Ngi70m+gcWtPAcW5fxCwgVg=="
+	for _, c := range []struct {
+		name string
+		resp *nsp.NameAvailableResponse
+	}{
+		{"not cached", &nsp.NameAvailableResponse{Available: true}},
+		{"cached for the same identity (a re-registration after a lapse)", &nsp.NameAvailableResponse{OwnerAnyAddress: anytypeID, NameExpires: 1}},
+	} {
+		t.Run("allowed: "+c.name, func(t *testing.T) {
+			fx := newFixture(t, true)
+			defer fx.finish(t)
+			cached(fx, c.resp, nil)
+			expectRegistered(fx)
 
-		decodedPeerKey, err := crypto.DecodeKeyFromString(
-			realSignKey,
-			crypto.UnmarshalEd25519PrivateKey,
-			nil)
-		assert.NoError(t, err)
+			resp, err := fx.AdminNameRegisterSigned(pctx, adminRegisterRequest(t, anytypeID))
+			require.NoError(t, err)
+			assert.Equal(t, "operation-id", resp.OperationId)
+		})
+	}
 
-		// OwnerAnyID in string format
-		req := nsp.NameRegisterRequest{}
-		req.OwnerAnyAddress = AnytypeID
-		req.FullName = "hello.any"
-		req.OwnerEthAddress = "0x10d5B0e279E5E4c1d1Df5F57DFB7E84813920a51"
+	for _, c := range []struct {
+		name string
+		resp *nsp.NameAvailableResponse
+	}{
+		{"reserved for another identity", &nsp.NameAvailableResponse{OwnerAnyAddress: "A-other", NameExpires: 1}},
+		{"cached without an owner (a 0.7.1 tombstone, an incomplete read)", &nsp.NameAvailableResponse{}},
+	} {
+		t.Run("rejected: "+c.name, func(t *testing.T) {
+			fx := newFixture(t, true)
+			defer fx.finish(t)
+			cached(fx, c.resp, nil)
+			// (no aa or db expectations: nothing is registered or saved)
 
-		nrrs := nsp.NameRegisterRequestSigned{}
-		nrrs.Payload, err = req.MarshalVT()
-		require.NoError(t, err)
+			_, err := fx.AdminNameRegisterSigned(pctx, adminRegisterRequest(t, anytypeID))
+			require.ErrorIs(t, err, cache.ErrNameReserved)
+		})
+	}
 
-		nrrs.Signature, err = decodedPeerKey.Sign(nrrs.Payload)
-		assert.NoError(t, err)
+	t.Run("rejected: the cache can not be read (fail closed)", func(t *testing.T) {
+		fx := newFixture(t, true)
+		defer fx.finish(t)
+		cached(fx, nil, errors.New("mongo is down"))
 
-		// call it
-		pctx := peer.CtxWithPeerId(context.Background(), PeerID)
-		resp, err := fx.AdminNameRegisterSigned(pctx, &nrrs)
-
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, "operation-id", resp.OperationId)
+		_, err := fx.AdminNameRegisterSigned(pctx, adminRegisterRequest(t, anytypeID))
+		require.Error(t, err)
+		require.NotErrorIs(t, err, cache.ErrNameReserved)
 	})
 }

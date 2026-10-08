@@ -14,8 +14,8 @@ import (
 // "Foo.any": a node older than GO-7567 cached an operation's name as the client sent it). every
 // read and write of this version uses the canonical spelling, so such a record is never
 // refreshed or removed. until -dedupe-cache -refresh-apply migrates them:
-//   - a live alias keeps its canonical name taken (see liveAlias: checked on every lookup that
-//     finds no live canonical record, nothing is remembered)
+//   - an alias keeps its canonical name taken (see liveAlias: checked on every lookup that
+//     finds no canonical record or a removed one, nothing is remembered)
 //   - reverse lookups prefer the canonical record, an alias only counts when there is none
 //   - the background refresh of an alias refreshes the canonical name and settles the alias
 
@@ -96,15 +96,21 @@ func (cs *cacheService) aliasesOf(ctx context.Context, canonical string, filter 
 	return out, nil
 }
 
-// liveAlias: a live (not a tombstone) record whose name normalizes to canonical, nil if there is
-// none (see aliasesOf). it also finds a record renamed to the canonical name in between, or one
-// written by an old node a moment ago
+// liveAlias: a record whose name normalizes to canonical, nil if there is none (see aliasesOf):
+// a live one if there is one, otherwise a removed one (a 0.7.1 tombstone keeps its name taken
+// too). it also finds a record renamed to the canonical name in between, or one written by an
+// old node a moment ago
 func (cs *cacheService) liveAlias(ctx context.Context, canonical string) (*NameDataItem, error) {
 	// the canonical record itself counts too: it can have been written (or renamed to its name,
 	// with its canon) since the lookup missed it
-	aliases, err := cs.aliasesOf(ctx, canonical, bson.M{"removed": bson.M{"$ne": true}}, true)
+	aliases, err := cs.aliasesOf(ctx, canonical, nil, true)
 	if err != nil || len(aliases) == 0 {
 		return nil, err
+	}
+	for i := range aliases {
+		if !aliases[i].Removed {
+			return &aliases[i], nil
+		}
 	}
 	return &aliases[0], nil
 }
@@ -153,14 +159,15 @@ func (cs *cacheService) warnAliases(ctx context.Context) {
 	}
 }
 
-// settleAlias takes an alias out of the periodic scan (its canonical name is what is refreshed)
-// and keeps lookups from handing it to the background again for a while
+// settleAlias takes an alias out of the periodic scan and out of the lookups' refreshes (its
+// canonical name is what is refreshed): no repair_at, no refresh_needed, and a while before a
+// lookup could hand it again anyway
 func (cs *cacheService) settleAlias(ctx context.Context, alias string) {
 	ctx, cancel := boundedCtx(ctx)
 	defer cancel()
 	_, err := cs.itemColl.UpdateOne(ctx, bson.M{"name": alias}, bson.M{
-		"$unset": bson.M{"repair_at": ""},
-		"$set":   bson.M{"refresh_next_at": cs.now().Add(expiredRefreshInterval).UnixMilli()},
+		"$unset": bson.M{"repair_at": "", "refresh_needed": ""},
+		"$set":   bson.M{"refresh_next_at": cs.now().Add(aliasSettleInterval).UnixMilli()},
 	})
 	if err != nil {
 		log.Warn("failed to settle a non-canonical record", zap.String("FullName", alias), zap.Error(err))

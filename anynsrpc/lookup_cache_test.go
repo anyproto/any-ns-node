@@ -12,6 +12,7 @@ import (
 
 	"github.com/anyproto/any-sync/app"
 	nsp "github.com/anyproto/any-sync/nameservice/nameserviceproto"
+	"github.com/anyproto/any-sync/net/peer"
 	"github.com/anyproto/any-sync/net/rpc/rpctest"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -35,8 +36,6 @@ const (
 	testEoa     = "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5"
 	testScw     = "0x10d5b0e279e5e4c1d1df5f57dfb7e84813920a51"
 	testAnyID   = "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS"
-
-	watchdog = 10 * time.Second
 )
 
 func testMongoURI() string {
@@ -54,12 +53,9 @@ func withAppName(uri, app string) string {
 	return uri + "/?appName=" + app
 }
 
-// finalizedGate, if set, holds every read of the finalized block until it is closed
-var finalizedGate atomic.Pointer[chan struct{}]
-
 // a real cache (local test Mongo, its client named realCacheApp) on top of mocked contracts: a
-// new block on every read of the latest one, the finalized block is the latest one. the
-// background worker runs (the periodic scan does not). a separate database, so that it does not
+// new block on every read of the latest one. the background worker runs (the periodic scan
+// does not). a separate database, so that it does not
 // race with the other packages' tests
 func newRealCache(t *testing.T) (cache.CacheService, *mock_contracts.MockContractsService, *mongo.Collection) {
 	ctrl := gomock.NewController(t)
@@ -74,17 +70,6 @@ func newRealCache(t *testing.T) (cache.CacheService, *mock_contracts.MockContrac
 	var block atomic.Int64
 	cm.EXPECT().LatestBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
 		n := 1000 + block.Add(1)
-		return &contracts.Block{Number: n, Hash: common.BigToHash(big.NewInt(n)), Time: uint64(time.Now().Unix())}, nil
-	}).AnyTimes()
-	cm.EXPECT().FinalizedBlock(gomock.Any()).DoAndReturn(func(ctx context.Context) (*contracts.Block, error) {
-		if gate := finalizedGate.Load(); gate != nil {
-			select {
-			case <-*gate:
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
-		n := 1000 + block.Load()
 		return &contracts.Block{Number: n, Hash: common.BigToHash(big.NewInt(n)), Time: uint64(time.Now().Unix())}, nil
 	}).AnyTimes()
 
@@ -132,7 +117,7 @@ func TestAnynsRpc_IsNameAvailable_LapsedName(t *testing.T) {
 	lapsed := time.Now().Add(-100 * 24 * time.Hour).Unix()
 
 	for _, readFromCache := range []bool{true, false} {
-		t.Run(fmt.Sprintf("readFromCache=%v: taken until the background confirmed the lapse at the finalized block, then a tombstone", readFromCache), func(t *testing.T) {
+		t.Run(fmt.Sprintf("readFromCache=%v: a lapsed name stays taken by its owner, no background refresh", readFromCache), func(t *testing.T) {
 			fx := newFixture(t, readFromCache)
 			defer fx.finish(t)
 
@@ -145,40 +130,77 @@ func TestAnynsRpc_IsNameAvailable_LapsedName(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// the registry still points to the NameWrapper: read at the latest block (by the
-			// request with readFromCache: false, and by the background), then confirmed at the
-			// finalized one (by the background only)
-			cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).MinTimes(2)
-			cm.EXPECT().GetNameExpires(gomock.Any(), fullName, gomock.Any()).Return(big.NewInt(lapsed), nil).MinTimes(2)
-
-			// served from the cache as taken; the background confirms the lapse (held until the
-			// first answer was checked: the worker could otherwise confirm it in between)
-			gate := make(chan struct{})
-			finalizedGate.Store(&gate)
-			defer finalizedGate.Store(nil)
-			resp, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
-			require.NoError(t, err)
-			require.False(t, resp.Available)
-			require.Equal(t, testEoa, resp.OwnerEthAddress)
-			close(gate)
-			deadline := time.Now().Add(watchdog)
-			for !resp.Available {
-				require.True(t, time.Now().Before(deadline), "the background refresh did not confirm the lapse")
-				time.Sleep(10 * time.Millisecond)
-				resp, err = fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
-				require.NoError(t, err)
+			// readFromCache: false reads the registry at the latest block, once per request (the
+			// lapse is stored on the record). nothing else reads the chain
+			if !readFromCache {
+				cm.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil).Times(2)
+				cm.EXPECT().GetNameExpires(gomock.Any(), fullName, gomock.Any()).Return(big.NewInt(lapsed), nil).Times(2)
 			}
-			require.True(t, resp.Available)
-			require.Empty(t, resp.OwnerEthAddress)
-			require.Empty(t, resp.OwnerAnyAddress)
+			for i := 0; i < 2; i++ {
+				resp, err := fx.IsNameAvailable(ctx, &nsp.NameAvailableRequest{FullName: fullName})
+				require.NoError(t, err)
+				require.False(t, resp.Available)
+				require.Equal(t, testEoa, resp.OwnerEthAddress)
+				require.Equal(t, testAnyID, resp.OwnerAnyAddress)
+				require.Equal(t, lapsed, resp.NameExpires)
+			}
+			// the background had the time to refresh it, if anything had asked it to
+			time.Sleep(200 * time.Millisecond)
 
-			// a tombstone: the old owner does not resolve
 			var item cache.NameDataItem
 			require.NoError(t, coll.FindOne(ctx, bson.M{"name": fullName}).Decode(&item))
-			require.True(t, item.Removed)
+			require.False(t, item.Removed)
+			require.Equal(t, !readFromCache, item.Lapsed)
+			require.Equal(t, testAnyID, item.OwnerAnyAddress)
 			byID, err := fx.GetNameByAnyId(ctx, &nsp.NameByAnyIdRequest{AnyAddress: testAnyID})
 			require.NoError(t, err)
-			require.False(t, byID.Found)
+			require.True(t, byID.Found)
+		})
+	}
+}
+
+// the reservation check of a registration on the real cache: any record of the name reserves
+// it for its owner (a lapsed one, a 0.7.1 tombstone, one under another spelling); none: allowed
+func TestAnynsRpc_AdminNameRegisterSigned_RealCache(t *testing.T) {
+	const anytypeID = "A5k2d9sFZw84yisTxRnz2bPRd1YPfVfhxqymZ6yESprFTG65"
+	pctx := peer.CtxWithPeerId(context.Background(), "12D3KooWA8EXV3KjBxEU5EnsPfneLx84vMWAtTBQBeyooN82KSuS")
+	lapsed := time.Now().Add(-100 * 24 * time.Hour).Unix()
+
+	for _, c := range []struct {
+		name    string
+		record  bson.M
+		allowed bool
+	}{
+		{"lapsed, another identity", bson.M{"owner_any_address": "A-other", "name_expires": lapsed, "lapsed": true}, false},
+		{"lapsed, the same identity", bson.M{"owner_any_address": anytypeID, "name_expires": lapsed, "lapsed": true}, true},
+		{"a 0.7.1 tombstone", bson.M{"removed": true, "observed_block": int64(10)}, false},
+		{"under another spelling, another identity", bson.M{"name": "HELLO.any", "owner_any_address": "A-other", "name_expires": lapsed}, false},
+		{"none", nil, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fx := newFixture(t, true)
+			defer fx.finish(t)
+			cs, _, coll := newRealCache(t)
+			fx.anynsRpc.cache = cs
+			if c.record != nil {
+				doc := bson.M{"name": "hello.any"}
+				for k, v := range c.record {
+					doc[k] = v
+				}
+				_, err := coll.InsertOne(ctx, doc)
+				require.NoError(t, err)
+			}
+			if c.allowed {
+				fx.aa.EXPECT().AdminNameRegister(gomock.Any(), gomock.Any()).Return("operation-id", nil)
+				fx.db.EXPECT().SaveOperation(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			}
+
+			_, err := fx.AdminNameRegisterSigned(pctx, adminRegisterRequest(t, anytypeID))
+			if c.allowed {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, cache.ErrNameReserved)
+			}
 		})
 	}
 }

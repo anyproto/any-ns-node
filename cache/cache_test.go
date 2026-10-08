@@ -54,14 +54,11 @@ type fixture struct {
 	config    *config.Config
 	contracts *mock_contracts.MockContractsService
 
-	// what LatestBlock and FinalizedBlock return. by default a new block on every call of
-	// LatestBlock, at the local time, and the finalized block is the latest one
-	headMu    sync.Mutex
-	head      func() *contracts.Block
-	finalized func() *contracts.Block
-	// what FinalizedBlock fails with
-	finalizedErr error
-	block        int64
+	// what LatestBlock returns. by default a new block on every call, at the local time. the
+	// finalized block is never read (no expectation: a read fails the test)
+	headMu sync.Mutex
+	head   func() *contracts.Block
+	block  int64
 
 	*cacheService
 }
@@ -85,20 +82,6 @@ func (fx *fixture) latestBlock() *contracts.Block {
 	return testBlock(fx.block, time.Now())
 }
 
-func (fx *fixture) finalizedBlock() (*contracts.Block, error) {
-	fx.headMu.Lock()
-	defer fx.headMu.Unlock()
-	switch {
-	case fx.finalizedErr != nil:
-		return nil, fx.finalizedErr
-	case fx.finalized != nil:
-		return fx.finalized(), nil
-	case fx.head != nil:
-		return fx.head(), nil
-	}
-	return testBlock(fx.block, time.Now()), nil
-}
-
 // setHead makes LatestBlock return this block from now on
 func (fx *fixture) setHead(block int64, at time.Time) {
 	fx.setHeadBlock(testBlock(block, at))
@@ -113,21 +96,6 @@ func (fx *fixture) setHeadFunc(head func() *contracts.Block) {
 	fx.headMu.Lock()
 	defer fx.headMu.Unlock()
 	fx.head = head
-}
-
-// setFinalized makes FinalizedBlock return this block from now on
-func (fx *fixture) setFinalized(block int64, at time.Time) {
-	fx.headMu.Lock()
-	defer fx.headMu.Unlock()
-	b := testBlock(block, at)
-	fx.finalized = func() *contracts.Block { return b }
-}
-
-// setFinalizedErr makes FinalizedBlock fail with err from now on
-func (fx *fixture) setFinalizedErr(err error) {
-	fx.headMu.Lock()
-	defer fx.headMu.Unlock()
-	fx.finalizedErr = err
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -153,9 +121,6 @@ func newFixture(t *testing.T) *fixture {
 	fx.block = 1000
 	fx.contracts.EXPECT().LatestBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
 		return fx.latestBlock(), nil
-	}).AnyTimes()
-	fx.contracts.EXPECT().FinalizedBlock(gomock.Any()).DoAndReturn(func(context.Context) (*contracts.Block, error) {
-		return fx.finalizedBlock()
 	}).AnyTimes()
 	fx.config.Mongo = config.Mongo{
 		Connect:  testMongoURI(),
