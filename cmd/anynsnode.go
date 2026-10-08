@@ -73,7 +73,7 @@ var (
 	flagRefreshCache      = flag.Bool("refresh-cache", false, "re-read every cached name from the contracts and exit (1 if any name failed). never removes a record. a dry run unless -refresh-apply is set")
 	flagRefreshApply      = flag.Bool("refresh-apply", false, "with -refresh-cache, -dedupe-cache, -release-name or -restore-tombstones: write the changes")
 	flagRefreshInterval   = flag.Duration("refresh-interval", time.Second, "with -refresh-cache: delay between two names")
-	flagRPCURL            = flag.String("rpc-url", "", "cache maintenance runs only: the contracts provider URL for this process instead of contracts.gethUrl (e.g. another provider, so that a full -refresh-cache does not spend the quota of the live nodes)")
+	flagRPCURL            = flag.String("rpc-url", "", "cache maintenance runs only: the contracts provider URL for this process instead of contracts.gethUrl (e.g. another provider, so that a full -refresh-cache does not spend the quota of the live nodes). its eth_chainId must match the config (accountAbstraction.chainID, or the one of gethUrl)")
 )
 
 func main() {
@@ -137,6 +137,10 @@ func main() {
 		// never for the live node: its provider is the one in the config
 		if !maintenance {
 			log.Fatal("-rpc-url is for the cache maintenance runs only (-refresh-cache, -dedupe-cache, -release-name, -restore-tombstones)")
+		}
+		// the same chain as the node, or nothing runs
+		if err := checkRPCURL(ctx, *flagRPCURL, conf.Contracts.GethUrl, int64(conf.Aa.ChainID), chainIDOf); err != nil {
+			log.Fatal("refusing -rpc-url", zap.Error(err))
 		}
 		conf.Contracts.GethUrl = *flagRPCURL
 		log.Info("cache maintenance: the contracts provider from -rpc-url", zap.String("host", rpcHost(*flagRPCURL)))
