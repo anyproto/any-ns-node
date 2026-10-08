@@ -598,31 +598,70 @@ func TestCacheService_Rereads(t *testing.T) {
 		require.Equal(t, item.Rereads[0], item.RepairAt)
 	})
 
-	t.Run("not on chain at a re-read (a lagging provider): kept, the due re-read done, the later one stays, no backoff", func(t *testing.T) {
+	t.Run("not on chain at the re-reads (a lagging provider): kept, the re-reads stay due with a growing backoff, bounded", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 
+		start := time.Now()
 		fx.setHead(500, time.Now())
 		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
 		require.NoError(t, fx.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
 		rereads := cachedItem(t, fx).Rereads
 		require.Len(t, rereads, 2)
 
-		// at the first re-read: no owner, no expiry at the latest block
+		// no owner, no expiry at the latest block, at every read from the first re-read on
+		fx.setHead(505, time.Now())
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil).AnyTimes()
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil).AnyTimes()
+
+		at := start.Add(5*time.Minute + time.Second)
+		var times []time.Duration
+		for round := 0; round < 20; round++ {
+			fx.now = func() time.Time { return at }
+			if repairRound(t, fx) == 0 {
+				break
+			}
+			times = append(times, at.Sub(start).Round(time.Minute))
+			item := cachedItem(t, fx)
+			require.Equal(t, testEoa, item.OwnerEthAddress)
+			require.Equal(t, int64(500), item.ObservedBlock)
+			require.False(t, item.RefreshNeeded)
+			if item.RepairAt == 0 {
+				require.Empty(t, item.Rereads, "done after the retries")
+				break
+			}
+			require.Equal(t, rereads, item.Rereads, "a lagging provider does not use them up")
+			at = time.UnixMilli(item.RepairAt).Add(time.Second)
+		}
+		// 1, 2, 4, 8, 16, 32 minutes apart: never every lease, done with them past the +30 re-read
+		require.Equal(t, []time.Duration{5 * time.Minute, 6 * time.Minute, 8 * time.Minute, 12 * time.Minute, 20 * time.Minute,
+			36 * time.Minute, 68 * time.Minute}, times)
+		fx.now = func() time.Time { return at.Add(48 * time.Hour) }
+		require.Zero(t, repairRound(t, fx))
+	})
+
+	t.Run("the provider catches up at a retry: the re-reads are done, the backoff is reset", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		fx.setHead(500, time.Now())
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.NoError(t, fx.UpdateInCacheAfterOperation(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+
 		later := time.Now().Add(5*time.Minute + time.Second)
 		fx.now = func() time.Time { return later }
 		fx.setHead(505, time.Now())
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.Address{}, nil)
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), gomock.Any(), gomock.Any()).Return(big.NewInt(0), nil)
 		require.Equal(t, 1, repairRound(t, fx))
+		require.Equal(t, 1, cachedItem(t, fx).RefreshFailures)
+
+		later = later.Add(refreshFailureBackoff + time.Second)
+		fx.setHead(510, time.Now())
+		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
+		require.Equal(t, 1, repairRound(t, fx))
 		item := cachedItem(t, fx)
-		require.Equal(t, testEoa, item.OwnerEthAddress)
-		require.Equal(t, int64(500), item.ObservedBlock)
-		require.False(t, item.RefreshNeeded)
 		require.Zero(t, item.RefreshFailures)
-		require.Equal(t, rereads[1:], item.Rereads)
-		require.Equal(t, rereads[1], item.RepairAt)
-		require.Zero(t, repairRound(t, fx))
+		require.Len(t, item.Rereads, 1, "the +5 one is done, the +30 one stays")
 	})
 
 	t.Run("a failed refresh after an operation marks the record (data kept) with the re-reads", func(t *testing.T) {

@@ -583,11 +583,18 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 	return stored, nil
 }
 
+// notOnChainRetries: a cached record that the chain says was never registered keeps its due
+// re-reads for this many reads in a row (with the failure backoff: 1+2+4+8+16+32 minutes, past the
+// last re-read of an operation at +30), then such a read is done with them
+const notOnChainRetries = 6
+
 // notOnChain: the latest block says that the name was never registered (no registry owner, no
 // expiry). nothing cached: ErrNameNotRegistered. a cached record stays as it is (a lagging
-// provider right after a registration, or a record the chain never had: for an operator), only
-// its due re-reads are done by this read (the later ones stay), and a marked one backs off:
-// errNotOnChain
+// provider right after a registration, or a record the chain never had: for an operator):
+// errNotOnChain. its due re-reads stay due (a lagging provider must not use them up) and it backs
+// off like a failed refresh, so it is read again after 1, 2, 4... minutes, never every lease; after
+// notOnChainRetries such reads the due re-reads are done (the record is left to an operator). a
+// marked record (incomplete, or restored for a read) stays marked, its backoff grows up to a day
 func (cs *cacheService) notOnChain(ctx context.Context, obs *NameDataItem, o refreshOpts) (*NameDataItem, error) {
 	settle := func(ctx context.Context) (*NameDataItem, error) {
 		stored, err := cs.getNameData(ctx, obs.FullName)
@@ -595,14 +602,17 @@ func (cs *cacheService) notOnChain(ctx context.Context, obs *NameDataItem, o ref
 			return stored, err
 		}
 		set, unset := bson.M{}, bson.M{}
-		// a marked record stays marked (it is incomplete, or restored for one read): it is
-		// retried after a backoff that grows with every such read, not at every lease
-		if stored.RefreshNeeded {
+		dueRereads := len(stored.Rereads) > 0 && slices.Min(stored.Rereads) <= obs.ObservedAt
+		doneAt := int64(0)
+		if dueRereads && stored.RefreshFailures >= notOnChainRetries {
+			doneAt = obs.ObservedAt
+		}
+		if stored.RefreshNeeded || (dueRereads && doneAt == 0) {
 			stored.RefreshFailures++
 			stored.RefreshNextAt = max(stored.RefreshNextAt, cs.now().Add(failureBackoff(stored.RefreshFailures)).UnixMilli())
 			set["refresh_failures"], set["refresh_next_at"] = stored.RefreshFailures, stored.RefreshNextAt
 		}
-		rereads := mergeRereads(stored.Rereads, o.rereads, obs.ObservedAt)
+		rereads := mergeRereads(stored.Rereads, o.rereads, doneAt)
 		if len(set) == 0 && slices.Equal(rereads, stored.Rereads) {
 			return stored, nil
 		}
