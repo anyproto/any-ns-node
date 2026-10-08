@@ -88,9 +88,11 @@ Details:
   name (the same owner, or after a support transfer) replaces the record as usual.
 - **"Never registered" never removes.** If the chain says a cached name was never registered (right
   after a registration: a lagging provider), the record stays as it is. Its due re-reads stay due
-  and it backs off like a failed refresh (read again after 1, 2, 4... minutes, never every lease);
-  after 6 such reads in a row (past the +30 min re-read) the due re-reads are done and the record is
-  left to an operator. `GetOperation` reports `PendingOrNotFound` for a name that is neither on
+  and it backs off like a failed refresh (read again after 1, 2, 4... minutes, never every lease).
+  The 7th such read in a row (past the +30 min re-read) retires it: the due re-reads are done, its
+  `refresh_needed` mark is cleared, nothing reads it any more; it stays (taken) for an operator and
+  `-refresh-cache` reports it as `not-on-chain`. An operation's re-reads cut a failure backoff to a
+  minute (and reset `refresh_failures`), so a renewal after a provider outage shows soon. `GetOperation` reports `PendingOrNotFound` for a name that is neither on
   chain nor cached (GO-7482).
 - **Removed records** (`removed: true`) are tombstones written by 0.7.1 (their owner fields were
   wiped). They are served as taken (without an owner), block registrations, and reverse lookups skip
@@ -119,9 +121,10 @@ Details:
   periodic scan (`repairIntervalSec`) takes a bounded batch, the longest waiting first. A record
   that 0.7.1 scheduled under its rules (at its expiry, its lapse, daily) is rescheduled by the scan
   from its fields, without a chain read; such records do not count toward the batch (at most 500
-  per round). A failed refresh backs off exponentially per record (`refresh_failures`: 1 min,
-  doubled with every failure in a row, at most 24 h), reset by a successful write of the record. A
-  replacing write holds the record for a minute (`refresh_next_at`).
+  per round). A failed refresh backs off exponentially per record: 1 min * 2^(failures-1), at most
+  24 h (`refresh_failures`, the failures in a row), reset by a successful write of the record. A
+  replacing write holds the record for a minute (`refresh_next_at`). A maintenance run never
+  replaces a complete record with an incomplete read (it counts as failed).
 - **GetOperation** answers as before (GO-7482). A completed operation's name is refreshed at the
   latest block: in the poll if it is not cached yet, in the background if it is (the poll waits
   neither for the contracts nor for a write: the re-reads are stored on the record in the
@@ -174,13 +177,13 @@ run in this order: `-dedupe-cache`, `-release-name`, `-restore-tombstones`, `-re
   `--jsonArray`). For every removed record (one transaction each, only while it is still removed):
   found in the export with an `owner_any_address` → the owner fields and `space_id` from the export,
   `name_expires` the later of the export's and the tombstone's (a restore with `name_expires` 0 is
-  logged), `lapsed` if it has lapsed by now (otherwise `refresh_needed`: the background reads it
-  once), `canon` if missing, `removed` cleared; the block of the tombstone stays. Not found, or
+  logged), `lapsed` if it has lapsed by now (no mark, no re-reads: no chain read; otherwise, or with
+  no expiry known, `refresh_needed`: the background reads it once), `canon` if missing, `removed` cleared; the block of the tombstone stays. Not found, or
   without an owner → `  missing: <name>`; records of the name (or of a spelling of it) with
   different owners in the export → `  conflict: <name>`; both are left as they are (taken, without
-  an owner). Live records whose owner differs from the export's are listed as
-  `  owner-differs: <name>` (a name taken by another identity while 0.7.1 had freed it?), never
-  written: for support. Output: `restore DRY RUN|APPLIED: tombstones=N restored=N skipped=N
+  an owner). Live records whose owner differs from the export's (also live records without an
+  owner, e.g. incomplete ones) are listed as `  owner-differs: <name>` (a name taken by another
+  identity while 0.7.1 had freed it?), never written: for support. Output: `restore DRY RUN|APPLIED: tombstones=N restored=N skipped=N
   missing=N conflicts=N owner-differs=N` (tombstones = restored + skipped + missing + conflicts;
   `skipped`: no longer removed at the write); exits 1 if any are missing, conflicting or differ.
 - `-refresh-cache`: re-reads every cached name with the same decisions as the node, and never
@@ -202,30 +205,42 @@ Rollout of 0.7.2 (both ns nodes share the cache):
 
 Before every `-refresh-apply` run take a `mongoexport` (JSON lines) or `mongodump` of `ns.cache`.
 
-1. Deploy 0.7.2 on **both** ns nodes. From then on no tombstones are written, removed records are
+1. Before the deploy, count the records that are due under the new rules (the live nodes read them
+   right after the start): `db.cache.countDocuments({$or: [{refresh_needed: true}, {rereads: {$lte:
+   <now, unix ms>}}]})`. If it is large, deploy after the provider's daily quota reset.
+   Deploy 0.7.2 on **both** ns nodes. From then on no tombstones are written, removed records are
    served as taken, and there are no lookup- or time-driven chain reads. Do the next steps only after
    no 0.7.1 node runs any more (a 0.7.1 node keeps writing tombstones).
 2. **Right away** (until then the owners of tombstoned names are rejected when they register their
-   own name again): `anynsnode -c <config> -restore-tombstones -restore-from ns-cache-<date>.jsonl`
-   (dry run), then with `-refresh-apply`. The export must be JSON lines (`mongoexport` without
+   own name again): `anynsnode -c <config> -restore-tombstones -restore-from ns-cache-20261007.jsonl`
+   (dry run), then with `-refresh-apply`. The export must be the one taken **before 0.7.1 was
+   deployed** (the nightly dump of 2026-10-07): a fresh backup has the owners wiped already and
+   reports every tombstone as `missing`. It must be JSON lines (`mongoexport` without
    `--jsonArray`). Expect `missing=0 conflicts=0`; a missing or conflicting name stays taken without
    an owner (a registration of it is rejected) until an operator decides (`-release-name`, or
    restore it by hand). Review the `owner-differs:` list with support (names that another identity
-   may have registered while 0.7.1 had freed them).
+   may have registered while 0.7.1 had freed them, and live records without an owner). The run
+   exits 1 while any such line is printed, also when the only lines are `owner-differs:`: the
+   restore itself is done then.
 3. `anynsnode -c <config> -refresh-cache -rpc-url <another provider> -refresh-interval 2s` (dry
    run), then with `-refresh-apply`: fixes the stale renewals, marks the lapsed names. Some
    `unnormalizable` names are expected. Re-run until `failed=0`.
 
 Rollback to 0.6.9: just deploy it on both nodes. 0.6.9 serves any record as taken (a removed one too)
 and ignores the new fields (`lapsed`, `refresh_failures`) and the indexes, so the data stays safe;
-the server-side reservation check of registrations goes away with it. Never roll back to 0.7.1: it
+the server-side reservation check of registrations goes away with it. Note that 0.6.9 rewrites a
+whole record (`ReplaceOne`) when it reads a name after an operation: that drops `lapsed` and `canon`
+and can store an empty owner for a lapsed name; limited to the names that have operations. Never roll back to 0.7.1: it
 frees lapsed names and wipes their owners again.
 
 Not in this version (follow-ups): `nameExpires` (and a state) in `NameByAddressResponse` (any-sync
 proto), a strict reservation check on the user-operation path (`CreateUserOperation`), redacting
 provider URLs inside go-ethereum transport errors, a provider fallback for the live nodes' chain
 reads, pinning the post-operation read to the operation receipt's block, names with a leading `_`
-(STD3), a CI job with Mongo fail points.
+(STD3), a CI job with Mongo fail points, a worker throttle for completed operations of names that are
+not cached (the `GetOperation` path without a lease), an expected-owner flag for `-release-name`,
+a backoff for stale reads of a lagging backend (an older block), carrying the poll time in the
+refresh request for the coalescing of re-reads.
 
 Tests of the cache need a Mongo: a standalone one on `localhost:27017` (the replica set tests skip),
 or a one-node replica set. The fail point tests (stalled Mongo commands) need `enableTestCommands`:

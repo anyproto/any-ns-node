@@ -10,7 +10,7 @@ available. In production (deployed 2026-10-07) this caused:
 
 1. **Data loss.** A tombstone is written with `ReplaceOne` of a bare observation
    (`cache/read.go` `observation()` + `cache/store.go` `applyObservationTx`): the owner, AnyID,
-   space ID and expiry of the record are wiped. 156 prod records by 2026-10-08 (owners recoverable
+   space ID and expiry of the record are wiped. ~160 prod records by 2026-10-08 (the prod count grows until 0.7.2 is deployed) (owners recoverable
    from the 2026-10-07 nightly dump, `db3:/var/lib/backup/mongodb/ns-cache-20261007.jsonl`).
 2. **A policy change nobody wanted.** Product decision (2026-10-08): **a name stays reserved to the
    identity that registered it, forever, even when it has lapsed on chain.** Moving a name to
@@ -97,7 +97,8 @@ requirement, ctx in contract calls, `-dedupe-cache`.
   the upgrade from re-reading hundreds of names.
 - Failure backoff becomes exponential per record: a new field
   `refresh_failures int \`bson:"refresh_failures,omitempty"\`` incremented on each failed
-  background refresh, reset on success; backoff = min(1 min * 2^failures, 24 h). Applies to
+  background refresh, reset on success; backoff = min(1 min * 2^(failures-1), 24 h), failures
+  counted including this one. Applies to
   `backOff` / `retryAfterBackoff` and `markRefreshNeeded`. A successful write of the record
   (applyObservationTx replace, lapse update) resets it.
 - Post-operation behaviour stays: `RefreshAfterOperation`, `UpdateInCacheAfterOperation`,
@@ -138,8 +139,9 @@ requirement, ctx in contract calls, `-dedupe-cache`.
     Keep the `observed_*` block fields of the tombstone.
   - not found / no owner: list it, leave it (served as taken without an owner).
 - Dry run by default (`-refresh-apply` writes). Output:
-  `restore DRY RUN|APPLIED: tombstones=N restored=N missing=N` + `  missing: <name>` lines.
-  Exit 1 if `missing > 0` (operator attention), 0 otherwise.
+  `restore DRY RUN|APPLIED: tombstones=N restored=N skipped=N missing=N conflicts=N owner-differs=N`
+  + `  missing:`, `  conflict:` and `  owner-differs:` lines (see the README). Exit 1 if any of
+  them is printed (operator attention), 0 otherwise.
 
 ### 7. `-refresh-cache` changes
 
@@ -194,8 +196,8 @@ it, unused, to keep the diff focused.
 1. Deploy 0.7.2 on both ns nodes (puppet `pkg::any-ns-node: 0.7.2`). From now on no tombstones,
    removed records are served as taken, no lookup/time-driven chain reads.
 2. `anynsnode -c <config> -restore-tombstones -restore-from ns-cache-20261007.jsonl` (dry run), then
-   with `-refresh-apply`. Expect `tombstones=156 restored=156 missing=0` (or more if 0.7.1 kept
-   writing until step 1).
+   with `-refresh-apply`. Expect `tombstones=~160 restored=~160 missing=0` (the prod count grows
+   until 0.7.2 is deployed). The export must be the one taken before 0.7.1 was deployed.
 3. `anynsnode -c <config> -refresh-cache -rpc-url <alchemy> -refresh-interval 2s` (dry run), then
    with `-refresh-apply`: fixes the stale renewals (~650 on prod), marks lapsed names.
 
@@ -206,6 +208,11 @@ Rollback to 0.6.9: just deploy it. 0.6.9 serves any record as taken and ignores 
 - A strict reservation check on the user-operation path (`CreateUserOperation`): the check in
   `GetDataNameRegister*` is advisory only (client-supplied owner, opaque calldata).
 - Redacting provider URLs (API keys) inside go-ethereum transport errors.
+- A worker throttle for completed operations of names that are not cached (`GetOperation` path, no
+  lease).
+- An expected-owner flag for `-release-name`.
+- A backoff for stale reads of a lagging backend (an older block).
+- Carrying the poll time in `refreshRequest` for the coalescing of re-reads.
 
 - any-sync proto: `nameExpires` / state in `NameByAddressResponse`.
 - A provider fallback (Alchemy) for the live nodes' chain reads.
