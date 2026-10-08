@@ -351,7 +351,7 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	// a changed registration (a new one, another owner, a renewal, a registration of a lapsed
 	// name) is read again later, like after an operation: an unfinalized change can be reorged away
 	rereads := o.rereads
-	if stored == nil || !sameNameData(stored, &item) {
+	if !o.noChangeRereads && (stored == nil || !sameNameData(stored, &item)) {
 		rereads = append(append([]int64{}, rereads...), cs.rereadTimes()...)
 	}
 	// a replacement in the same fork keeps the latest read of that fork (the stored record's,

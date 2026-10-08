@@ -522,6 +522,10 @@ type refreshOpts struct {
 	dry bool
 	// re-reads to schedule on the record (unix ms, see rereadDelays), in the same write
 	rereads []int64
+	// a maintenance run (-refresh-cache): a changed registration schedules no re-reads of its
+	// own. the live nodes would run them on their provider for hundreds of names at once; a change
+	// the run finds is no operation of ours, and the run can simply be repeated
+	noChangeRereads bool
 }
 
 // refresh reads the name from the contracts at the latest block and stores what the chain

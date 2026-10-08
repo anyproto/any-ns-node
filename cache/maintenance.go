@@ -174,7 +174,7 @@ func (cs *cacheService) refreshOne(ctx context.Context, fullName string, apply b
 	}
 
 	// the same decisions with or without apply: only the writes are left out
-	fresh, err := cs.refresh(ctx, fullName, refreshOpts{dry: !apply})
+	fresh, err := cs.refresh(ctx, fullName, refreshOpts{dry: !apply, noChangeRereads: true})
 
 	switch {
 	case errors.Is(err, errNotOnChain):

@@ -87,9 +87,9 @@ func TestCacheService_RefreshAll(t *testing.T) {
 		renewed := get(t, fx, "renewed.any")
 		require.Equal(t, notExpired, renewed.NameExpires)
 		require.NotZero(t, renewed.ObservedBlock)
-		// a changed one: its re-reads
-		require.Len(t, renewed.Rereads, 2)
-		require.Equal(t, renewed.Rereads[0], renewed.RepairAt)
+		// a changed one: no re-reads (the live nodes would run them on their provider), not due
+		require.Empty(t, renewed.Rereads)
+		require.Zero(t, renewed.RepairAt)
 		l := get(t, fx, "lapsed.any")
 		require.True(t, l.Lapsed)
 		require.Equal(t, lapsed, l.NameExpires)
