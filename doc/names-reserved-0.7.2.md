@@ -203,6 +203,10 @@ Rollback to 0.6.9: just deploy it. 0.6.9 serves any record as taken and ignores 
 
 ## Follow-ups (not in 0.7.2)
 
+- A strict reservation check on the user-operation path (`CreateUserOperation`): the check in
+  `GetDataNameRegister*` is advisory only (client-supplied owner, opaque calldata).
+- Redacting provider URLs (API keys) inside go-ethereum transport errors.
+
 - any-sync proto: `nameExpires` / state in `NameByAddressResponse`.
 - A provider fallback (Alchemy) for the live nodes' chain reads.
 - Names with a leading `_` cannot be normalized (STD3); decide ENSIP-15 or exclusion.
