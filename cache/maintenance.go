@@ -471,13 +471,14 @@ func (cs *cacheService) RestoreTombstones(ctx context.Context, export io.Reader,
 		if rec.Canon != "" {
 			set["canon"] = rec.Canon
 		}
-		if isLapsed(rec.NameExpires, now) {
-			// the reason it was removed: kept reserved, no chain read
-			rec.Lapsed = true
+		if rec.NameExpires > 0 && isLapsed(rec.NameExpires, now) {
+			// the reason it was removed: kept reserved, no chain read (no mark, no re-reads)
+			rec.Lapsed, rec.RefreshNeeded, rec.RefreshFailures, rec.Rereads = true, false, 0, nil
 			set["lapsed"] = true
+			unset["refresh_needed"], unset["refresh_failures"], unset["rereads"] = "", "", ""
 		} else {
-			// renewed since the export, or removed by a read that was wrong: the background
-			// reads it once
+			// renewed since the export, removed by a read that was wrong, or no expiry known:
+			// the background reads it once
 			rec.Lapsed, rec.RefreshNeeded = false, true
 			set["refresh_needed"] = true
 			unset["lapsed"] = ""

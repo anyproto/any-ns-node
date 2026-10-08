@@ -193,7 +193,7 @@ func readAt(d *NameDataItem) int64 {
 // (-release-name deletes the record): a stored owner is never a guess. the record stays incomplete
 // (and marked) until a complete read:
 //   - unreadAll: the owner, its wallet, AnyID and space ID
-//   - unreadOwner: the owner and its wallet (AnyID and space ID were read)
+//   - unreadOwner: the owner and its wallet (AnyID and space ID were read), only for the same AnyID
 //   - unreadEOA: the EOA owner of the wallet, only if the read returned the same wallet (another
 //     wallet: its owner is not the stored one)
 func carryOver(obs *NameDataItem, stored *NameDataItem) {
@@ -205,7 +205,10 @@ func carryOver(obs *NameDataItem, stored *NameDataItem) {
 		obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
 		obs.OwnerAnyAddress, obs.SpaceId = stored.OwnerAnyAddress, stored.SpaceId
 	case unreadOwner:
-		obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
+		// the AnyID was read: the owner is the stored one only for the same identity
+		if obs.OwnerAnyAddress == stored.OwnerAnyAddress {
+			obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
+		}
 	case unreadEOA:
 		if obs.OwnerScwEthAddress != "" && strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
 			obs.OwnerEthAddress = stored.OwnerEthAddress
@@ -300,7 +303,10 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 		return nil, nil
 	}
 
-	if stored != nil && !newer(&item, stored) {
+	// a maintenance run never replaces a complete record with an incomplete read: it counts as a
+	// failure (see refresh) and a re-run fixes it, the live nodes do not read it again
+	keepComplete := o.noChangeRereads && item.Incomplete && stored != nil && !stored.Incomplete && !stored.Removed
+	if stored != nil && (keepComplete || !newer(&item, stored)) {
 		// the stored record stays. a read of its own fork that lost to it (e.g. an incomplete
 		// one) still counts for which fork was read last
 		log.Info("the cache has a newer record of the name, keeping it", zap.String("FullName", item.FullName),

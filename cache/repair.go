@@ -120,7 +120,8 @@ func (cs *cacheService) scheduleRereads(ctx context.Context, fullName string) er
 	return err
 }
 
-// storeRereads is the write of scheduleRereads; exited is closed when its transaction ended
+// storeRereads is the write of scheduleRereads (an operation completed): the re-reads, and the
+// failure backoff of the record cut to refreshLease. exited is closed when its transaction ended
 func (cs *cacheService) storeRereads(ctx context.Context, fullName string) (<-chan struct{}, error) {
 	name, err := cs.canonical(fullName)
 	if err != nil {
@@ -134,13 +135,24 @@ func (cs *cacheService) storeRereads(ctx context.Context, fullName string) (<-ch
 		if err != nil || stored == nil {
 			return struct{}{}, err
 		}
+		set, unset := bson.M{}, bson.M{}
+		// an operation cuts a failure backoff (a record that backed off for hours in a provider
+		// outage must show a renewal soon) to refreshLease: a live lease is never longer than that
+		if stored.RefreshFailures > 0 {
+			if cut := cs.now().Add(refreshLease).UnixMilli(); stored.RefreshNextAt > cut {
+				stored.RefreshNextAt = cut
+				set["refresh_next_at"] = cut
+			}
+			stored.RefreshFailures = 0
+			unset["refresh_failures"] = ""
+		}
 		rereads := mergeRereads(stored.Rereads, times, 0)
-		if slices.Equal(rereads, stored.Rereads) {
+		if len(set)+len(unset) == 0 && slices.Equal(rereads, stored.Rereads) {
 			return struct{}{}, nil
 		}
 		stored.Rereads = rereads
 		stored.RepairAt = repairAt(stored)
-		set, unset := bson.M{"rereads": rereads}, bson.M{}
+		set["rereads"] = rereads
 		setOrUnset(set, unset, "repair_at", stored.RepairAt, stored.RepairAt == 0)
 		_, err = cs.itemColl.UpdateOne(ctx, bson.M{"_id": stored.ID}, updateDoc(set, unset))
 		return struct{}{}, err

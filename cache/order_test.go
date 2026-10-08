@@ -565,6 +565,29 @@ func TestCacheService_NotOnChain(t *testing.T) {
 		}
 	})
 
+	t.Run("a marked record past the retries is retired: unmarked, not due, never read again", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 10, 0)
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{
+			"refresh_needed": true, "refresh_failures": notOnChainRetries, "repair_at": int64(1)}})
+		require.NoError(t, err)
+
+		noOwner(fx.contracts)
+		require.Equal(t, 1, repairRound(t, fx))
+		item := cachedItem(t, fx)
+		require.False(t, item.RefreshNeeded)
+		require.Zero(t, item.RepairAt)
+		require.Equal(t, testAnyID, item.OwnerAnyAddress)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+		// (no more contract expectations: a read fails the test)
+		for _, later := range []time.Duration{time.Hour, 48 * time.Hour} {
+			fx.now = func() time.Time { return time.Now().Add(later) }
+			require.Zero(t, repairRound(t, fx))
+			require.Zero(t, fx.runQueued())
+		}
+	})
+
 	t.Run("not cached: ErrNameNotRegistered (not errNotOnChain), nothing written", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)

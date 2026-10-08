@@ -569,6 +569,10 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 		return nil, fmt.Errorf("store the name: %w", err)
 	}
 
+	if o.noChangeRereads && obs.Incomplete && stored != nil && !stored.Incomplete {
+		// a maintenance run kept the complete record (see applyObservationTx): a failure
+		return stored, readErr
+	}
 	switch {
 	case stored == nil:
 		// a lapsed name that the cache does not have: never ours, or the cache lost it (an
@@ -583,18 +587,20 @@ func (cs *cacheService) refresh(ctx context.Context, fullName string, o refreshO
 	return stored, nil
 }
 
-// notOnChainRetries: a cached record that the chain says was never registered keeps its due
-// re-reads for this many reads in a row (with the failure backoff: 1+2+4+8+16+32 minutes, past the
-// last re-read of an operation at +30), then such a read is done with them
+// notOnChainRetries: a cached record that the chain says was never registered is read again
+// after this many failure backoffs (1+2+4+8+16+32 minutes, past the last re-read of an operation
+// at +30): the read after them (the 7th) retires it (see notOnChain)
 const notOnChainRetries = 6
 
 // notOnChain: the latest block says that the name was never registered (no registry owner, no
 // expiry). nothing cached: ErrNameNotRegistered. a cached record stays as it is (a lagging
 // provider right after a registration, or a record the chain never had: for an operator):
-// errNotOnChain. its due re-reads stay due (a lagging provider must not use them up) and it backs
-// off like a failed refresh, so it is read again after 1, 2, 4... minutes, never every lease; after
-// notOnChainRetries such reads the due re-reads are done (the record is left to an operator). a
-// marked record (incomplete, or restored for a read) stays marked, its backoff grows up to a day
+// errNotOnChain. its due re-reads stay due (a lagging provider must not use them up), and it backs
+// off like a failed refresh (refreshFailureBackoff * 2^(failures-1)): read again after 1, 2, 4...
+// minutes, never every lease. a record that is marked (incomplete, or restored for a read) stays
+// marked meanwhile. once it has notOnChainRetries failures, the next such read retires it: the due
+// re-reads are done and the mark is cleared, nothing reads it any more. it stays as it is (taken),
+// for an operator; -refresh-cache reports it as not-on-chain
 func (cs *cacheService) notOnChain(ctx context.Context, obs *NameDataItem, o refreshOpts) (*NameDataItem, error) {
 	settle := func(ctx context.Context) (*NameDataItem, error) {
 		stored, err := cs.getNameData(ctx, obs.FullName)
@@ -604,16 +610,21 @@ func (cs *cacheService) notOnChain(ctx context.Context, obs *NameDataItem, o ref
 		set, unset := bson.M{}, bson.M{}
 		dueRereads := len(stored.Rereads) > 0 && slices.Min(stored.Rereads) <= obs.ObservedAt
 		doneAt := int64(0)
-		if dueRereads && stored.RefreshFailures >= notOnChainRetries {
+		switch {
+		case stored.RefreshFailures >= notOnChainRetries:
+			// retired: nothing reads it any more
 			doneAt = obs.ObservedAt
-		}
-		if stored.RefreshNeeded || (dueRereads && doneAt == 0) {
+			if stored.RefreshNeeded {
+				stored.RefreshNeeded = false
+				unset["refresh_needed"] = ""
+			}
+		case stored.RefreshNeeded || dueRereads:
 			stored.RefreshFailures++
 			stored.RefreshNextAt = max(stored.RefreshNextAt, cs.now().Add(failureBackoff(stored.RefreshFailures)).UnixMilli())
 			set["refresh_failures"], set["refresh_next_at"] = stored.RefreshFailures, stored.RefreshNextAt
 		}
 		rereads := mergeRereads(stored.Rereads, o.rereads, doneAt)
-		if len(set) == 0 && slices.Equal(rereads, stored.Rereads) {
+		if len(set)+len(unset) == 0 && slices.Equal(rereads, stored.Rereads) {
 			return stored, nil
 		}
 		stored.Rereads = rereads

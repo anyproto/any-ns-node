@@ -144,7 +144,13 @@ func TestCacheService_RefreshAll(t *testing.T) {
 			stats, err := fx.RefreshAll(ctx, apply, time.Millisecond)
 			require.NoError(t, err)
 			require.Equal(t, RefreshStats{Total: 1, Failed: 1}, stats)
-			require.Equal(t, apply, cachedItem(t, fx).RefreshNeeded)
+			// a complete record is never replaced by an incomplete read of a maintenance run (a
+			// re-run fixes it; the live nodes do not read it again)
+			item := cachedItem(t, fx)
+			require.False(t, item.RefreshNeeded)
+			require.False(t, item.Incomplete)
+			require.Equal(t, testEoa, item.OwnerEthAddress)
+			require.Zero(t, item.RepairAt)
 		})
 	}
 }
@@ -326,9 +332,10 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		`{"_id":{"$oid":"6700000000000000000000a7"},"name":"F.any","owner_any_address":"F-two","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
 		`{"_id":{"$oid":"6700000000000000000000a8"},"name":"g.any","owner_any_address":"G-owner","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
 		`{"_id":{"$oid":"6700000000000000000000a9"},"name":"h.any","owner_any_address":"H-owner","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+		`{"_id":{"$oid":"6700000000000000000000aa"},"name":"z.any","owner_any_address":"Z-owner"}`,
 	}, "\n")
 	seed := func(t *testing.T, fx *fixture) {
-		for _, name := range []string{"a.any", "b.any", "c.any", "d.any", "f.any", "g.any", "missing.any"} {
+		for _, name := range []string{"a.any", "b.any", "c.any", "d.any", "f.any", "g.any", "missing.any", "z.any"} {
 			expires := int64(0)
 			if name == "g.any" {
 				// renewed after the export (the tombstone kept the newer expiry)
@@ -337,6 +344,10 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 			insertRaw(t, fx, bson.M{"name": name, "removed": true, "observed_block": int64(700),
 				"observed_block_hash": blockHash(700).Hex(), "owner_eth_address": "", "owner_any_address": "", "name_expires": expires})
 		}
+		// a tombstone with stale bookkeeping: a lapsed restore must not make the live nodes read it
+		_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": "a.any"}, bson.M{"$set": bson.M{
+			"refresh_needed": true, "refresh_failures": 2, "rereads": bson.A{int64(1)}, "repair_at": int64(1)}})
+		require.NoError(t, err)
 		// not tombstones: never touched. e.any has another owner than the export's (reported)
 		insertRaw(t, fx, bson.M{"name": "e.any", "owner_any_address": "E-new", "name_expires": notExpired, "observed_block": int64(800)})
 		insertRaw(t, fx, bson.M{"name": "h.any", "owner_any_address": "H-owner", "name_expires": lapsed, "observed_block": int64(800)})
@@ -346,7 +357,7 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		require.NoError(t, err)
 		return item
 	}
-	want := RestoreStats{Tombstones: 7, Restored: 3, Missing: []string{"c.any", "d.any", "missing.any"},
+	want := RestoreStats{Tombstones: 8, Restored: 4, Missing: []string{"c.any", "d.any", "missing.any"},
 		Conflicts: []string{"f.any"}, OwnerDiffers: []string{"e.any"}}
 
 	t.Run("dry run: counts, writes nothing", func(t *testing.T) {
@@ -391,6 +402,15 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		require.Equal(t, "a.any", a.Canon)
 		require.Equal(t, int64(700), a.ObservedBlock, "the block of the tombstone stays")
 		require.Zero(t, a.RepairAt, "lapsed: no chain read")
+		require.False(t, a.RefreshNeeded)
+		require.Zero(t, a.RefreshFailures)
+		require.Empty(t, a.Rereads)
+
+		// no expiry known (0): not taken for lapsed, the background reads it once
+		z := get(t, fx, "z.any")
+		require.False(t, z.Lapsed)
+		require.True(t, z.RefreshNeeded)
+		require.Equal(t, "Z-owner", z.OwnerAnyAddress)
 		require.True(t, byAnyID(t, fx, "A-owner").Found)
 
 		// not lapsed: renewed since? the background reads it once
@@ -439,7 +459,7 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), true)
 		require.NoError(t, err)
 		w := want
-		w.Restored, w.Skipped = 2, 1
+		w.Restored, w.Skipped = 3, 1
 		require.Equal(t, w, stats)
 		a := get(t, fx, "a.any")
 		require.Equal(t, "A-chain", a.OwnerAnyAddress)
