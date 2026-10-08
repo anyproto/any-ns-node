@@ -74,9 +74,9 @@ func TestMaintainCache_ExitCode(t *testing.T) {
 
 	t.Run("lapsed and not on chain are not failures", func(t *testing.T) {
 		var out bytes.Buffer
-		f := &fakeMaintainer{refreshStats: cache.RefreshStats{Total: 5, Unchanged: 1, Updated: 1, Lapsed: 2, NotOnChain: 1, NonCanonical: 1}}
+		f := &fakeMaintainer{refreshStats: cache.RefreshStats{Total: 6, Unchanged: 1, Updated: 1, Lapsed: 2, NotOnChain: 1, NonCanonical: 1, Unnormalizable: 1}}
 		require.Equal(t, 0, maintainCache(context.Background(), f, refresh, &out))
-		require.Equal(t, "refresh APPLIED: total=5 unchanged=1 updated=1 lapsed=2 not-on-chain=1 failed=0 non-canonical=1\n", out.String())
+		require.Equal(t, "refresh APPLIED: total=6 unchanged=1 updated=1 lapsed=2 not-on-chain=1 failed=0 non-canonical=1 unnormalizable=1\n", out.String())
 	})
 
 	t.Run("some names failed: exit 1, the summary is printed", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestMaintainCache_ExitCode(t *testing.T) {
 		require.Equal(t, 0, maintainCache(context.Background(), f, task, &out))
 		require.Equal(t, []string{"dedupe", "aliases", "release X.any", "restore", "refresh"}, f.calls)
 		require.Contains(t, out.String(), "unique name index=exists")
-		require.Contains(t, out.String(), "restore APPLIED: tombstones=3 restored=3 missing=0\n")
+		require.Contains(t, out.String(), "restore APPLIED: tombstones=3 restored=3 skipped=0 missing=0 conflicts=0 owner-differs=0\n")
 		require.Equal(t, "{}\n", f.export)
 	})
 
@@ -161,14 +161,25 @@ func TestMaintainCache_ExitCode(t *testing.T) {
 		require.Contains(t, out.String(), "not in the cache")
 	})
 
-	t.Run("restore: missing ones are listed, exit 1, no refresh", func(t *testing.T) {
+	t.Run("restore: missing, conflicting and owner-differs names are listed, exit 1, no refresh", func(t *testing.T) {
+		for _, stats := range []cache.RestoreStats{
+			{Tombstones: 3, Restored: 1, Missing: []string{"a.any", "b.any"}},
+			{Tombstones: 2, Restored: 1, Conflicts: []string{"c.any"}},
+			{Tombstones: 1, Restored: 1, OwnerDiffers: []string{"d.any"}},
+		} {
+			var out bytes.Buffer
+			f := &fakeMaintainer{restoreStats: stats}
+			task := refresh
+			task.restore, task.restoreFrom = true, writeExport(t, "")
+			require.Equal(t, 1, maintainCache(context.Background(), f, task, &out))
+			require.Equal(t, []string{"restore"}, f.calls)
+		}
 		var out bytes.Buffer
-		f := &fakeMaintainer{restoreStats: cache.RestoreStats{Tombstones: 3, Restored: 1, Missing: []string{"a.any", "b.any"}}}
-		task := refresh
-		task.restore, task.restoreFrom = true, writeExport(t, "")
-		require.Equal(t, 1, maintainCache(context.Background(), f, task, &out))
-		require.Equal(t, []string{"restore"}, f.calls)
-		require.Contains(t, out.String(), "restore APPLIED: tombstones=3 restored=1 missing=2\n  missing: a.any\n  missing: b.any\n")
+		f := &fakeMaintainer{restoreStats: cache.RestoreStats{Tombstones: 4, Restored: 2, Skipped: 1, Missing: []string{"a.any"},
+			Conflicts: []string{"c.any"}, OwnerDiffers: []string{"d.any"}}}
+		require.Equal(t, 1, maintainCache(context.Background(), f, cacheTask{restore: true, restoreFrom: writeExport(t, "")}, &out))
+		require.Contains(t, out.String(), "tombstones=4 restored=2 skipped=1 missing=1 conflicts=1 owner-differs=1\n"+
+			"  missing: a.any\n  conflict: c.any\n  owner-differs: d.any\n")
 	})
 
 	t.Run("restore without a readable export: exit 1, the maintainer is not called", func(t *testing.T) {

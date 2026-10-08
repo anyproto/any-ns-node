@@ -41,15 +41,18 @@ type Maintainer interface {
 
 	// ReleaseName is the support transfer of a name: a name stays reserved to its identity until
 	// an operator releases it. it finds the record of the name (normalized) and, with apply,
-	// deletes exactly that record; the records under other spellings (aliases) are listed, never
-	// deleted. ErrNameNotCached if there is no record. apply == false is a dry run
+	// deletes exactly that record (ErrRecordChanged if it changed since it was read: nothing is
+	// deleted); the records under other spellings (aliases) are listed, never deleted.
+	// ErrNameNotCached if there is no record. apply == false is a dry run
 	ReleaseName(ctx context.Context, fullName string, apply bool) (ReleaseStats, error)
 
 	// RestoreTombstones brings back the owners of the 0.7.1 tombstones (removed records, their
 	// owner fields wiped) from a mongoexport of the cache (JSON lines, MongoDB Extended JSON).
-	// one transaction per record, only while it is still removed. a tombstone that the export
-	// has no owner for is listed (Missing) and left as it is (served as taken, without an owner).
-	// apply == false is a dry run
+	// one transaction per record, only while it is still removed; the later expiry of the export
+	// and the tombstone. a tombstone that the export has no owner for (Missing), or records with
+	// different owners for (Conflicts), is left as it is (served as taken, without an owner).
+	// records that are not removed but have another owner than the export's are reported
+	// (OwnerDiffers), never written. apply == false is a dry run
 	RestoreTombstones(ctx context.Context, export io.Reader, apply bool) (RestoreStats, error)
 }
 
@@ -79,6 +82,9 @@ type RefreshStats struct {
 	// name was refreshed, the record under this spelling is left as it is (taken), for an
 	// operator to look at
 	NonCanonical int
+	// cached under a name that can not be normalized (e.g. a leading "_", see STD3): not read,
+	// left as it is (taken). not a failure: a re-run can not change it
+	Unnormalizable int
 }
 
 // NameIndexStats is what VerifyNameIndex found (or did)
@@ -106,14 +112,35 @@ type ReleaseStats struct {
 // ErrNameNotCached is returned by ReleaseName when the cache has no record of the name
 var ErrNameNotCached = errors.New("the name is not in the cache")
 
-// RestoreStats is what RestoreTombstones did (or would do, in a dry run)
+// ErrRecordChanged is returned by ReleaseName when the record changed between the read and the
+// delete: nothing was deleted
+var ErrRecordChanged = errors.New("the record changed, run again")
+
+// orMissing: a filter on a field equal to v, or missing when v is the zero value (a legacy record,
+// an omitted field)
+func orMissing[T comparable](v, zero T) interface{} {
+	if v == zero {
+		return bson.M{"$in": bson.A{v, nil}}
+	}
+	return v
+}
+
+// RestoreStats is what RestoreTombstones did (or would do, in a dry run). Tombstones = Restored +
+// Skipped + len(Missing) + len(Conflicts)
 type RestoreStats struct {
 	// the removed records of the cache
 	Tombstones int
 	// given their owner back from the export
 	Restored int
+	// not removed any more when they were written (a registration read in between): not touched
+	Skipped int
 	// the export has no owner for them: left as they are (taken, without an owner)
 	Missing []string
+	// the export has records of the name with different owners: left as they are, for an operator
+	Conflicts []string
+	// records that are not removed, but whose owner differs from the export's (a name taken by
+	// another identity while 0.7.1 had freed it?): nothing is written, for support to review
+	OwnerDiffers []string
 }
 
 // ErrDuplicateNames is returned by VerifyNameIndex when the unique index is missing and the cache
@@ -147,7 +174,10 @@ func (cs *cacheService) RefreshAll(ctx context.Context, apply bool, interval tim
 
 		name, _ := v.(string)
 		stats.Total++
-		if err := cs.refreshOne(ctx, name, apply, &stats); err != nil {
+		if err := cs.refreshOne(ctx, name, apply, &stats); errors.Is(err, errUnnormalizable) {
+			stats.Unnormalizable++
+			log.Warn("refresh: a cached name can not be normalized, left as it is", zap.String("FullName", name), zap.Error(err))
+		} else if err != nil {
 			stats.Failed++
 			log.Warn("refresh: failed", zap.String("FullName", name), zap.Error(err))
 		}
@@ -157,10 +187,13 @@ func (cs *cacheService) RefreshAll(ctx context.Context, apply bool, interval tim
 	return stats, nil
 }
 
+// errUnnormalizable: a cached name that the normalization rejects (see RefreshStats.Unnormalizable)
+var errUnnormalizable = errors.New("the name can not be normalized")
+
 func (cs *cacheService) refreshOne(ctx context.Context, fullName string, apply bool, stats *RefreshStats) error {
 	name, err := cs.canonical(fullName)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errUnnormalizable, err)
 	}
 	if name != fullName {
 		stats.NonCanonical++
@@ -283,11 +316,24 @@ func (cs *cacheService) ReleaseName(ctx context.Context, fullName string, apply 
 	if !apply {
 		return stats, nil
 	}
-	res, err := cs.itemColl.DeleteOne(ctx, bson.M{"_id": stats.Record.ID})
+	// exactly the record that was printed: a record written in between (a read, a migration) is
+	// not deleted, the operator looks again
+	if hookBeforeRelease != nil {
+		hookBeforeRelease()
+	}
+	r := stats.Record
+	res, err := cs.itemColl.DeleteOne(ctx, bson.M{
+		"_id":               r.ID,
+		"observed_at":       orMissing(r.ObservedAt, int64(0)),
+		"owner_any_address": orMissing(r.OwnerAnyAddress, ""),
+	})
 	if err != nil {
 		return stats, err
 	}
-	stats.Deleted = res.DeletedCount == 1
+	if res.DeletedCount == 0 {
+		return stats, fmt.Errorf("%w: %s", ErrRecordChanged, stats.Name)
+	}
+	stats.Deleted = true
 	log.Warn("release: the record of the name was deleted by an operator, the name can be registered again",
 		zap.String("FullName", stats.Name), zap.Any("record", stats.Record), zap.Strings("aliases", stats.Aliases))
 	return stats, nil
@@ -304,15 +350,35 @@ type exportedRecord struct {
 	Removed            bool   `bson:"removed"`
 }
 
+// test hook, nil in production: runs in ReleaseName between the read and the delete
+var hookBeforeRelease func()
+
 // test hook, nil in production: runs in RestoreTombstones before the write of a record
 var hookBeforeRestore func(name string)
 
 // maxExportLine bounds one line (one record) of the export
 const maxExportLine = 1 << 20
 
-// readExport: the records of the export that have an owner, by name (exact and canonical)
-func (cs *cacheService) readExport(export io.Reader) (map[string]exportedRecord, error) {
+// readExport: the records of the export that have an owner, by name (the exact spelling and the
+// canonical one), and the names whose records have different owners (conflicts: never restored)
+func (cs *cacheService) readExport(export io.Reader) (map[string]exportedRecord, map[string]bool, error) {
 	out := map[string]exportedRecord{}
+	exact := map[string]bool{}
+	conflicts := map[string]bool{}
+	add := func(key string, r exportedRecord, isExact bool) {
+		prev, ok := out[key]
+		switch {
+		case !ok:
+		case prev.OwnerAnyAddress != r.OwnerAnyAddress:
+			conflicts[key] = true
+			return
+		case exact[key] || !isExact:
+			// the same owner: the exact spelling wins
+			return
+		}
+		out[key] = r
+		exact[key] = exact[key] || isExact
+	}
 	sc := bufio.NewScanner(export)
 	sc.Buffer(make([]byte, 0, 64*1024), maxExportLine)
 	for line := 1; sc.Scan(); line++ {
@@ -322,62 +388,77 @@ func (cs *cacheService) readExport(export io.Reader) (map[string]exportedRecord,
 		}
 		var r exportedRecord
 		if err := bson.UnmarshalExtJSON(raw, false, &r); err != nil {
-			return nil, fmt.Errorf("the export, line %d: %w", line, err)
+			return nil, nil, fmt.Errorf("the export (JSON lines, not --jsonArray), line %d: %w", line, err)
 		}
 		if r.Removed || r.OwnerAnyAddress == "" {
 			continue
 		}
-		// the exact spelling wins over another one that normalizes to the same name
-		out[r.FullName] = r
+		add(r.FullName, r, true)
 		if c, err := cs.canonical(r.FullName); err == nil && c != r.FullName {
-			if _, ok := out[c]; !ok {
-				out[c] = r
-			}
+			add(c, r, false)
 		}
 	}
 	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("the export: %w", err)
+		return nil, nil, fmt.Errorf("the export: %w", err)
 	}
-	return out, nil
+	return out, conflicts, nil
 }
 
 func (cs *cacheService) RestoreTombstones(ctx context.Context, export io.Reader, apply bool) (stats RestoreStats, err error) {
-	byName, err := cs.readExport(export)
+	byName, conflicts, err := cs.readExport(export)
 	if err != nil {
 		return stats, err
 	}
-	cur, err := cs.itemColl.Find(ctx, bson.M{"removed": true}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
+	cur, err := cs.itemColl.Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
 	if err != nil {
 		return stats, err
 	}
-	var tombstones []NameDataItem
-	if err = cur.All(ctx, &tombstones); err != nil {
+	var records []NameDataItem
+	if err = cur.All(ctx, &records); err != nil {
 		return stats, err
 	}
 
 	now := cs.now()
-	for i := range tombstones {
-		t := &tombstones[i]
+	for i := range records {
+		t := &records[i]
+		r, inExport := byName[t.FullName]
+		if !t.Removed {
+			// for support: an owner other than the one before 0.7.1 freed names
+			if inExport && !conflicts[t.FullName] && t.OwnerAnyAddress != r.OwnerAnyAddress {
+				stats.OwnerDiffers = append(stats.OwnerDiffers, t.FullName)
+				log.Warn("restore: a record's owner differs from the export's", zap.String("FullName", t.FullName),
+					zap.String("owner", t.OwnerAnyAddress), zap.String("export owner", r.OwnerAnyAddress))
+			}
+			continue
+		}
 		stats.Tombstones++
-		r, ok := byName[t.FullName]
-		if !ok {
+		switch {
+		case conflicts[t.FullName]:
+			stats.Conflicts = append(stats.Conflicts, t.FullName)
+			log.Warn("restore: the export has records of a tombstone with different owners, it stays", zap.String("FullName", t.FullName))
+			continue
+		case !inExport:
 			stats.Missing = append(stats.Missing, t.FullName)
 			log.Warn("restore: the export has no owner for a tombstone, it stays (taken, without an owner)", zap.String("FullName", t.FullName))
 			continue
 		}
 
-		// the record as it will be: the owner from the export, the block of the tombstone
+		// the record as it will be: the owner from the export, the block of the tombstone, the
+		// later of the two expiries
 		rec := *t
 		rec.Removed, rec.Incomplete = false, false
 		rec.OwnerEthAddress = strings.ToLower(r.OwnerEthAddress)
 		rec.OwnerScwEthAddress = strings.ToLower(r.OwnerScwEthAddress)
 		rec.OwnerAnyAddress = r.OwnerAnyAddress
 		rec.SpaceId = r.SpaceID
-		rec.NameExpires = r.NameExpires
+		rec.NameExpires = max(r.NameExpires, t.NameExpires)
 		if rec.Canon == "" {
 			if c, err := cs.canonical(rec.FullName); err == nil {
 				rec.Canon = c
 			}
+		}
+		if rec.NameExpires == 0 {
+			log.Warn("restore: a tombstone is restored without an expiry (name_expires 0)", zap.String("FullName", t.FullName))
 		}
 		set := bson.M{
 			"owner_eth_address":     rec.OwnerEthAddress,
@@ -420,6 +501,7 @@ func (cs *cacheService) RestoreTombstones(ctx context.Context, export io.Reader,
 			}
 			if matched == 0 {
 				// written since the scan (a registration read, say): not a tombstone any more
+				stats.Skipped++
 				log.Info("restore: the record is not removed any more, leaving it", zap.String("FullName", t.FullName))
 				continue
 			}
@@ -428,7 +510,6 @@ func (cs *cacheService) RestoreTombstones(ctx context.Context, export io.Reader,
 		log.Info("restore: the owner of a tombstone", zap.String("FullName", t.FullName), zap.Bool("apply", apply),
 			zap.String("owner", rec.OwnerAnyAddress), zap.Bool("lapsed", rec.Lapsed))
 	}
-	log.Info("restore done", zap.Bool("apply", apply), zap.Int("tombstones", stats.Tombstones),
-		zap.Int("restored", stats.Restored), zap.Int("missing", len(stats.Missing)))
+	log.Info("restore done", zap.Bool("apply", apply), zap.Any("stats", stats))
 	return stats, nil
 }

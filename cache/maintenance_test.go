@@ -119,6 +119,19 @@ func TestCacheService_RefreshAll(t *testing.T) {
 		require.Equal(t, RefreshStats{Total: 4, Unchanged: 2, Lapsed: 1, NotOnChain: 1}, stats)
 	})
 
+	t.Run("a name that can not be normalized: counted, not read, not a failure", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		_, err := fx.canonical("x..any")
+		require.Error(t, err)
+		insertRaw(t, fx, bson.M{"name": "x..any", "owner_any_address": testAnyID, "name_expires": notExpired})
+
+		// (no contracts expectations: a read fails the test)
+		stats, err := fx.RefreshAll(ctx, true, time.Millisecond)
+		require.NoError(t, err)
+		require.Equal(t, RefreshStats{Total: 1, Unnormalizable: 1}, stats)
+	})
+
 	for _, apply := range []bool{false, true} {
 		t.Run(fmt.Sprintf("apply=%v: the owner can not be read: failed", apply), func(t *testing.T) {
 			fx := newFixture(t)
@@ -265,6 +278,28 @@ func TestCacheService_ReleaseName(t *testing.T) {
 		require.True(t, isNameAvailable(t, fx.cacheService).Available)
 	})
 
+	t.Run("the record changed after it was read: ErrRecordChanged, nothing deleted", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seed(t, fx)
+		// a legacy record without observed_at: deleted as printed
+		insertRaw(t, fx, bson.M{"name": "legacy.any", "name_expires": lapsed})
+		stats, err := fx.ReleaseName(ctx, "legacy.any", true)
+		require.NoError(t, err)
+		require.True(t, stats.Deleted)
+
+		// written in between (a read)
+		hookBeforeRelease = func() {
+			_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"observed_at": int64(99)}})
+			require.NoError(t, err)
+		}
+		defer func() { hookBeforeRelease = nil }()
+		stats, err = fx.ReleaseName(ctx, testFullName, true)
+		require.ErrorIs(t, err, ErrRecordChanged)
+		require.False(t, stats.Deleted)
+		require.NotNil(t, cachedItem(t, fx))
+	})
+
 	t.Run("not cached: ErrNameNotCached, nothing deleted", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
@@ -278,7 +313,8 @@ func TestCacheService_ReleaseName(t *testing.T) {
 
 func TestCacheService_RestoreTombstones(t *testing.T) {
 	// a mongoexport of the cache before 0.7.1 wiped the tombstones: canonical and relaxed
-	// Extended JSON, an owner in another case, a record without an owner, a tombstone already
+	// Extended JSON, an owner in another case, a record without an owner, a tombstone already, two
+	// spellings of one name with different owners, an expiry older than the tombstone's
 	export := strings.Join([]string{
 		`{"_id":{"$oid":"6700000000000000000000a1"},"name":"a.any","owner_eth_address":"0xAA","owner_scw_eth_address":"0xBB","owner_any_address":"A-owner","space_id":"space-a","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
 		`{"_id":{"$oid":"6700000000000000000000a2"},"name":"b.any","owner_eth_address":"0xcc","owner_scw_eth_address":"","owner_any_address":"B-owner","space_id":"","name_expires":` + fmt.Sprint(notExpired) + `}`,
@@ -286,21 +322,32 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		`{"_id":{"$oid":"6700000000000000000000a3"},"name":"c.any","owner_eth_address":"","owner_any_address":"","name_expires":{"$numberLong":"0"}}`,
 		`{"_id":{"$oid":"6700000000000000000000a4"},"name":"d.any","removed":true,"observed_block":{"$numberLong":"5"}}`,
 		`{"_id":{"$oid":"6700000000000000000000a5"},"name":"e.any","owner_eth_address":"0xee","owner_any_address":"E-owner","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a6"},"name":"f.any","owner_any_address":"F-one","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a7"},"name":"F.any","owner_any_address":"F-two","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a8"},"name":"g.any","owner_any_address":"G-owner","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
+		`{"_id":{"$oid":"6700000000000000000000a9"},"name":"h.any","owner_any_address":"H-owner","name_expires":{"$numberLong":"` + fmt.Sprint(lapsed) + `"}}`,
 	}, "\n")
 	seed := func(t *testing.T, fx *fixture) {
-		for _, name := range []string{"a.any", "b.any", "c.any", "d.any", "missing.any"} {
+		for _, name := range []string{"a.any", "b.any", "c.any", "d.any", "f.any", "g.any", "missing.any"} {
+			expires := int64(0)
+			if name == "g.any" {
+				// renewed after the export (the tombstone kept the newer expiry)
+				expires = notExpired
+			}
 			insertRaw(t, fx, bson.M{"name": name, "removed": true, "observed_block": int64(700),
-				"observed_block_hash": blockHash(700).Hex(), "owner_eth_address": "", "owner_any_address": "", "name_expires": int64(0)})
+				"observed_block_hash": blockHash(700).Hex(), "owner_eth_address": "", "owner_any_address": "", "name_expires": expires})
 		}
-		// not a tombstone (any more): never touched
+		// not tombstones: never touched. e.any has another owner than the export's (reported)
 		insertRaw(t, fx, bson.M{"name": "e.any", "owner_any_address": "E-new", "name_expires": notExpired, "observed_block": int64(800)})
+		insertRaw(t, fx, bson.M{"name": "h.any", "owner_any_address": "H-owner", "name_expires": lapsed, "observed_block": int64(800)})
 	}
 	get := func(t *testing.T, fx *fixture, name string) *NameDataItem {
 		item, err := fx.getNameData(ctx, name)
 		require.NoError(t, err)
 		return item
 	}
-	wantMissing := []string{"c.any", "d.any", "missing.any"}
+	want := RestoreStats{Tombstones: 7, Restored: 3, Missing: []string{"c.any", "d.any", "missing.any"},
+		Conflicts: []string{"f.any"}, OwnerDiffers: []string{"e.any"}}
 
 	t.Run("dry run: counts, writes nothing", func(t *testing.T) {
 		fx := newFixture(t)
@@ -313,7 +360,7 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 
 		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), false)
 		require.NoError(t, err)
-		require.Equal(t, RestoreStats{Tombstones: 5, Restored: 2, Missing: wantMissing}, stats)
+		require.Equal(t, want, stats)
 
 		var after []bson.M
 		cur, err = fx.itemColl.Find(ctx, bson.M{})
@@ -322,14 +369,15 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		require.Equal(t, before, after)
 	})
 
-	t.Run("apply: owners restored (lapsed or marked for one read), missing ones listed and left", func(t *testing.T) {
+	t.Run("apply: owners restored (lapsed or marked for one read), the rest listed and left", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seed(t, fx)
 
 		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), true)
 		require.NoError(t, err)
-		require.Equal(t, RestoreStats{Tombstones: 5, Restored: 2, Missing: wantMissing}, stats)
+		require.Equal(t, want, stats)
+		require.Equal(t, stats.Tombstones, stats.Restored+stats.Skipped+len(stats.Missing)+len(stats.Conflicts))
 
 		a := get(t, fx, "a.any")
 		require.False(t, a.Removed)
@@ -354,22 +402,27 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 		require.Equal(t, "B-owner", b.OwnerAnyAddress)
 		require.Equal(t, notExpired, b.NameExpires)
 
-		for _, name := range []string{"c.any", "d.any", "missing.any"} {
+		// the later expiry: the tombstone's
+		g := get(t, fx, "g.any")
+		require.Equal(t, "G-owner", g.OwnerAnyAddress)
+		require.Equal(t, notExpired, g.NameExpires)
+		require.False(t, g.Lapsed)
+		require.True(t, g.RefreshNeeded)
+
+		for _, name := range []string{"c.any", "d.any", "f.any", "missing.any"} {
 			item := get(t, fx, name)
 			require.True(t, item.Removed, name)
 			require.Empty(t, item.OwnerAnyAddress, name)
 		}
-		e := get(t, fx, "e.any")
-		require.Equal(t, "E-new", e.OwnerAnyAddress)
-		require.Equal(t, notExpired, e.NameExpires)
+		require.Equal(t, "E-new", get(t, fx, "e.any").OwnerAnyAddress)
 
 		// a second run: nothing left to restore
 		stats, err = fx.RestoreTombstones(ctx, strings.NewReader(export), true)
 		require.NoError(t, err)
-		require.Equal(t, RestoreStats{Tombstones: 3, Missing: wantMissing}, stats)
+		require.Equal(t, RestoreStats{Tombstones: 4, Missing: want.Missing, Conflicts: want.Conflicts, OwnerDiffers: want.OwnerDiffers}, stats)
 	})
 
-	t.Run("a record that is not removed any more when it is written is not touched", func(t *testing.T) {
+	t.Run("a record that is not removed any more when it is written is not touched, it is counted as skipped", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seed(t, fx)
@@ -385,19 +438,23 @@ func TestCacheService_RestoreTombstones(t *testing.T) {
 
 		stats, err := fx.RestoreTombstones(ctx, strings.NewReader(export), true)
 		require.NoError(t, err)
-		require.Equal(t, RestoreStats{Tombstones: 5, Restored: 1, Missing: wantMissing}, stats)
+		w := want
+		w.Restored, w.Skipped = 2, 1
+		require.Equal(t, w, stats)
 		a := get(t, fx, "a.any")
 		require.Equal(t, "A-chain", a.OwnerAnyAddress)
 		require.False(t, a.Lapsed)
 	})
 
-	t.Run("an export that can not be parsed: an error, nothing written", func(t *testing.T) {
+	t.Run("an export that can not be parsed (e.g. --jsonArray): an error, nothing written", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
 		seed(t, fx)
-		_, err := fx.RestoreTombstones(ctx, strings.NewReader(export+"\n{not json"), true)
-		require.Error(t, err)
-		require.True(t, get(t, fx, "a.any").Removed)
+		for _, bad := range []string{export + "\n{not json", "[" + strings.ReplaceAll(export, "\n", ",") + "]"} {
+			_, err := fx.RestoreTombstones(ctx, strings.NewReader(bad), true)
+			require.Error(t, err)
+			require.True(t, get(t, fx, "a.any").Removed)
+		}
 	})
 }
 

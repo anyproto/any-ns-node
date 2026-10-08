@@ -100,17 +100,23 @@ func maintainCache(ctx context.Context, m cache.Maintainer, task cacheTask, out 
 	// 3 - the owners of the 0.7.1 tombstones, from an export of the cache
 	if task.restore {
 		stats, err := restoreTombstones(ctx, m, task)
-		_, _ = fmt.Fprintf(out, "restore %s: tombstones=%d restored=%d missing=%d\n",
-			mode, stats.Tombstones, stats.Restored, len(stats.Missing))
-		for _, name := range stats.Missing {
-			_, _ = fmt.Fprintf(out, "  missing: %s\n", name)
+		_, _ = fmt.Fprintf(out, "restore %s: tombstones=%d restored=%d skipped=%d missing=%d conflicts=%d owner-differs=%d\n",
+			mode, stats.Tombstones, stats.Restored, stats.Skipped, len(stats.Missing), len(stats.Conflicts), len(stats.OwnerDiffers))
+		for _, list := range []struct {
+			label string
+			names []string
+		}{{"missing", stats.Missing}, {"conflict", stats.Conflicts}, {"owner-differs", stats.OwnerDiffers}} {
+			for _, name := range list.names {
+				_, _ = fmt.Fprintf(out, "  %s: %s\n", list.label, name)
+			}
 		}
 		if err != nil {
 			log.Error("restore failed", zap.Error(err))
 			return 1
 		}
-		if len(stats.Missing) > 0 {
-			log.Error("some tombstones have no owner in the export", zap.Int("missing", len(stats.Missing)))
+		if len(stats.Missing)+len(stats.Conflicts)+len(stats.OwnerDiffers) > 0 {
+			log.Error("some records need an operator", zap.Int("missing", len(stats.Missing)),
+				zap.Int("conflicts", len(stats.Conflicts)), zap.Int("owner differs", len(stats.OwnerDiffers)))
 			return 1
 		}
 	}
@@ -118,8 +124,8 @@ func maintainCache(ctx context.Context, m cache.Maintainer, task cacheTask, out 
 	// 4 - every name from the contracts
 	if task.refresh {
 		stats, err := m.RefreshAll(ctx, task.apply, task.interval)
-		_, _ = fmt.Fprintf(out, "refresh %s: total=%d unchanged=%d updated=%d lapsed=%d not-on-chain=%d failed=%d non-canonical=%d\n",
-			mode, stats.Total, stats.Unchanged, stats.Updated, stats.Lapsed, stats.NotOnChain, stats.Failed, stats.NonCanonical)
+		_, _ = fmt.Fprintf(out, "refresh %s: total=%d unchanged=%d updated=%d lapsed=%d not-on-chain=%d failed=%d non-canonical=%d unnormalizable=%d\n",
+			mode, stats.Total, stats.Unchanged, stats.Updated, stats.Lapsed, stats.NotOnChain, stats.Failed, stats.NonCanonical, stats.Unnormalizable)
 		if err != nil {
 			log.Error("refresh failed", zap.Error(err))
 			return 1
