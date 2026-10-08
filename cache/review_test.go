@@ -22,21 +22,21 @@ func TestCacheService_ReservedWithoutRegistryOwner(t *testing.T) {
 		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(expires), nil).Times(times)
 	}
 
-	t.Run("cached, the owner reclaimed to zero, unexpired: stays taken, never a tombstone", func(t *testing.T) {
+	t.Run("cached, the owner reclaimed to zero, unexpired: stays taken, the cached owner stays", func(t *testing.T) {
 		fx := newFixture(t)
 		defer fx.finish(t)
-		seedItem(t, fx, notExpired, 10, 0)
+		seedItem(t, fx, inGrace, 10, 0)
 
 		noOwner(fx, notExpired, 1)
 		require.NoError(t, fx.refreshName())
 		item := cachedItem(t, fx)
 		require.False(t, item.Removed)
 		require.False(t, item.Incomplete)
-		require.Empty(t, item.OwnerEthAddress)
+		require.Equal(t, notExpired, item.NameExpires)
 		require.Equal(t, common.Address{}.Hex(), common.HexToAddress(item.RegistryOwner).Hex())
-		out := isNameAvailable(t, fx.cacheService)
-		require.False(t, out.Available)
-		require.Equal(t, notExpired, out.NameExpires)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+		require.Equal(t, "space", item.SpaceId)
+		require.True(t, byAnyID(t, fx, testAnyID).Found)
 	})
 
 	t.Run("not cached, reserved in the grace period: cached as taken", func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestCacheService_FailureBackoffGrowsAndResets(t *testing.T) {
 }
 
 // c: completeness (what orders two reads of one block) is separate from the retry flag; an
-// incomplete read carries the owner fields over only from the same registry owner / wallet
+// incomplete read never wipes the owner: what it could not read is carried over from the record
 func TestCacheService_IncompleteReads(t *testing.T) {
 	infoFails := func(fx *fixture, registryOwner string) {
 		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(registryOwner), nil)
@@ -174,26 +174,20 @@ func TestCacheService_IncompleteReads(t *testing.T) {
 		require.True(t, byAnyID(t, fx, testAnyID).Found)
 	})
 
-	t.Run("a wrapped name transferred, the enrichment fails: nothing of the old owner is carried over", func(t *testing.T) {
-		fx := newFixture(t)
-		defer fx.finish(t)
-		expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
-		require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
-
-		// the registry owner is the NameWrapper before and after the transfer
-		infoFails(fx, nameWrapper)
-		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+	// requireOwnerKept: the record is incomplete and marked (retried), the owner is the stored one
+	requireOwnerKept := func(t *testing.T, fx *fixture) {
+		t.Helper()
 		item := cachedItem(t, fx)
 		require.True(t, item.Incomplete)
 		require.True(t, item.RefreshNeeded)
-		require.Empty(t, item.OwnerEthAddress)
-		require.Empty(t, item.OwnerScwEthAddress)
-		require.Empty(t, item.OwnerAnyAddress)
-		require.False(t, byAnyID(t, fx, testAnyID).Found, "the old owner does not resolve")
-		require.False(t, isNameAvailable(t, fx.cacheService).Available)
-	})
+		require.Equal(t, testEoa, item.OwnerEthAddress)
+		require.Equal(t, testScw, item.OwnerScwEthAddress)
+		require.Equal(t, testAnyID, item.OwnerAnyAddress)
+		require.True(t, byAnyID(t, fx, testAnyID).Found)
+		requireCachedAsTaken(t, isNameAvailable(t, fx.cacheService), notExpired)
+	}
 
-	t.Run("another registry owner (or none known): nothing is carried over", func(t *testing.T) {
+	t.Run("a newer read whose enrichment fails (nothing read) keeps the owner, AnyID and space; a lapse then keeps them too", func(t *testing.T) {
 		for _, legacy := range []bool{false, true} {
 			fx := newFixture(t)
 			if legacy {
@@ -201,20 +195,51 @@ func TestCacheService_IncompleteReads(t *testing.T) {
 			} else {
 				expectRegistered(fx.contracts, testScw, testEoa, testAnyID, notExpired)
 				require.NoError(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}))
+				_, err := fx.itemColl.UpdateOne(ctx, bson.M{"name": testFullName}, bson.M{"$set": bson.M{"space_id": "space"}})
+				require.NoError(t, err)
 			}
-			owner := otherEoa
-			if legacy {
-				owner = nameWrapper
+			// the registry owner: the NameWrapper, or another one: whatever it is
+			for _, owner := range []string{nameWrapper, otherEoa} {
+				infoFails(fx, owner)
+				require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+				requireOwnerKept(t, fx)
+				require.Equal(t, "space", cachedItem(t, fx).SpaceId)
 			}
-			infoFails(fx, owner)
-			require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+
+			expectLapsed(fx.contracts)
+			require.NoError(t, fx.refreshName())
 			item := cachedItem(t, fx)
-			require.True(t, item.Incomplete)
-			require.Empty(t, item.OwnerEthAddress)
-			require.Empty(t, item.OwnerAnyAddress)
-			require.False(t, isNameAvailable(t, fx.cacheService).Available)
+			require.True(t, item.Lapsed)
+			require.False(t, item.Incomplete)
+			require.Equal(t, testEoa, item.OwnerEthAddress)
+			require.Equal(t, testAnyID, item.OwnerAnyAddress)
+			require.Equal(t, "space", item.SpaceId)
 			fx.finish(t)
 		}
+	})
+
+	t.Run("a newer read without the owner (AnyID and space read) keeps the owner and its wallet", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		seedItem(t, fx, notExpired, 10, 0)
+
+		fx.contracts.EXPECT().GetOwnerForNamehash(gomock.Any(), gomock.Any(), gomock.Any()).Return(common.HexToAddress(nameWrapper), nil)
+		fx.contracts.EXPECT().GetNameExpires(gomock.Any(), testFullName, gomock.Any()).Return(big.NewInt(notExpired), nil)
+		fx.contracts.EXPECT().GetAdditionalNameInfo(gomock.Any(), gomock.Any(), testFullName, gomock.Any()).Return(common.Address{}.Hex(), testAnyID, "space-read", nil)
+		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+		requireOwnerKept(t, fx)
+		require.Equal(t, "space-read", cachedItem(t, fx).SpaceId)
+	})
+
+	t.Run("a 0.7.1 tombstone has nothing to carry over", func(t *testing.T) {
+		fx := newFixture(t)
+		defer fx.finish(t)
+		insertRaw(t, fx, bson.M{"name": testFullName, "removed": true, "observed_block": int64(10), "owner_any_address": "stale"})
+		infoFails(fx, nameWrapper)
+		require.ErrorIs(t, fx.UpdateInCache(ctx, &nsp.NameAvailableRequest{FullName: testFullName}), ErrNameDataIncomplete)
+		item := cachedItem(t, fx)
+		require.True(t, item.Incomplete)
+		require.Empty(t, item.OwnerAnyAddress)
 	})
 }
 

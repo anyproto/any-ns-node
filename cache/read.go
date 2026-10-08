@@ -156,7 +156,9 @@ func (cs *cacheService) readNameData(ctx context.Context, fullName string) (*Nam
 		return obs, errLapsed
 	}
 	if (addr == common.Address{}) {
-		// reserved without a registry owner: taken, nobody owns it (complete as it is)
+		// reserved without a registry owner (reclaimed to address(0)): taken, complete as it is.
+		// its owner can not be read from the chain: the cached one stays (see carryOver)
+		obs.unread = unreadAll
 		return obs, nil
 	}
 

@@ -112,15 +112,17 @@ type NameDataItem struct {
 	// the alias check finds records under another spelling by it (see alias.go). indexed
 	Canon string `bson:"canon,omitempty"`
 
-	// not stored: which fields of an incomplete observation could not be read (see carryOver)
+	// not stored: which fields of an observation could not be read (an incomplete one, or a name
+	// reserved without a registry owner), see carryOver
 	unread unreadFields
 }
 
-// unreadFields: what an incomplete read could not read
+// unreadFields: what a read could not read
 type unreadFields int
 
 const (
-	// the owner, its wallet, AnyID and space ID (the NameWrapper and the resolver failed)
+	// the owner, its wallet, AnyID and space ID (the NameWrapper and the resolver failed, or there
+	// is no registry owner to read them from)
 	unreadAll unreadFields = iota + 1
 	// the owner and its wallet (the NameWrapper returned no owner)
 	unreadOwner

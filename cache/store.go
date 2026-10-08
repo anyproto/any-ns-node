@@ -186,17 +186,30 @@ func readAt(d *NameDataItem) int64 {
 	return max(d.ObservedAt, d.ForkReadAt)
 }
 
-// carryOver fills what an incomplete observation could not read from the stored record only
-// where the observation proves that it can not have changed: the NameWrapper returned the same
-// wallet, only the wallet's owner (EOA) could not be read. when the owner itself was not read,
-// nothing is carried over (the registry owner of a wrapped name is the NameWrapper, whoever owns
-// the name): the fields stay empty, the record incomplete until the retry after the backoff
+// carryOver fills what a read could not read (an incomplete one, or a name reserved without a
+// registry owner, whose owner can not be read at all) from the stored record: a read never wipes
+// the owner of a name. the identity of a name only changes through our own operations (they
+// schedule re-reads, which see the new owner once the enrichment works again) or an operator
+// (-release-name deletes the record): a stored owner is never a guess. the record stays incomplete
+// (and marked) until a complete read:
+//   - unreadAll: the owner, its wallet, AnyID and space ID
+//   - unreadOwner: the owner and its wallet (AnyID and space ID were read)
+//   - unreadEOA: the EOA owner of the wallet, only if the read returned the same wallet (another
+//     wallet: its owner is not the stored one)
 func carryOver(obs *NameDataItem, stored *NameDataItem) {
-	if stored.Removed || obs.unread != unreadEOA {
+	if stored.Removed {
 		return
 	}
-	if obs.OwnerScwEthAddress != "" && strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
-		obs.OwnerEthAddress = stored.OwnerEthAddress
+	switch obs.unread {
+	case unreadAll:
+		obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
+		obs.OwnerAnyAddress, obs.SpaceId = stored.OwnerAnyAddress, stored.SpaceId
+	case unreadOwner:
+		obs.OwnerEthAddress, obs.OwnerScwEthAddress = stored.OwnerEthAddress, stored.OwnerScwEthAddress
+	case unreadEOA:
+		if obs.OwnerScwEthAddress != "" && strings.EqualFold(obs.OwnerScwEthAddress, stored.OwnerScwEthAddress) {
+			obs.OwnerEthAddress = stored.OwnerEthAddress
+		}
 	}
 }
 
@@ -324,9 +337,11 @@ func (cs *cacheService) applyObservationTx(ctx context.Context, obs *NameDataIte
 	}
 
 	item.Canon = item.FullName
+	if item.unread != 0 && stored != nil {
+		carryOver(&item, stored)
+	}
 	if item.Incomplete {
 		if stored != nil {
-			carryOver(&item, stored)
 			item.RefreshFailures = stored.RefreshFailures
 		}
 		// an incomplete read is a failed one: its retry backs off like a failed refresh
